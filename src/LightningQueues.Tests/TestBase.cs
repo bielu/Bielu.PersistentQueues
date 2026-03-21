@@ -42,7 +42,7 @@ public class TestBase
    }
 
    protected async Task QueueScenario(Action<QueueConfiguration> queueBuilder,
-      Func<Queue, CancellationToken, Task> scenario, TimeSpan timeout, string queueName = "test")
+      Func<IQueue, CancellationToken, Task> scenario, TimeSpan timeout, string queueName = "test")
    {
       using var cancellation = new CancellationTokenSource(timeout);
       var serializer = new MessageSerializer();
@@ -58,18 +58,18 @@ public class TestBase
    }
    
    protected Task QueueScenario(Action<QueueConfiguration> queueBuilder,
-      Func<Queue, CancellationToken, Task> scenario, string queueName = "test")
+      Func<IQueue, CancellationToken, Task> scenario, string queueName = "test")
    {
       return QueueScenario(queueBuilder, scenario, TimeSpan.FromSeconds(1), queueName);
    }
 
-   protected Task QueueScenario(Func<Queue, CancellationToken, Task> scenario, TimeSpan timeout,
+   protected Task QueueScenario(Func<IQueue, CancellationToken, Task> scenario, TimeSpan timeout,
       string queueName = "test")
    {
       return QueueScenario(config => { }, scenario, timeout, queueName);
    }
 
-   protected Task QueueScenario(Func<Queue, CancellationToken, Task> scenario, string queueName = "test")
+   protected Task QueueScenario(Func<IQueue, CancellationToken, Task> scenario, string queueName = "test")
    {
       return QueueScenario(scenario, TimeSpan.FromSeconds(1), queueName);
    }

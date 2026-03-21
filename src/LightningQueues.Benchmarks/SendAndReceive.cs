@@ -22,8 +22,8 @@ public enum StorageMode
 [MemoryDiagnoser]
 public class SendAndReceive
 {
-    private Queue? _sender;
-    private Queue? _receiver;
+    private IQueue? _sender;
+    private IQueue? _receiver;
     private Message[]? _messages;
     private Task? _receivingTask;
 

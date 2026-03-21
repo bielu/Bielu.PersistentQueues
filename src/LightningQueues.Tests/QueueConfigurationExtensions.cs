@@ -81,7 +81,7 @@ public static class QueueConfigurationExtensions
         return configuration;
     }
     
-    public static Queue BuildAndStartQueue(this QueueConfiguration configuration, params string[] queues)
+    public static IQueue BuildAndStartQueue(this QueueConfiguration configuration, params string[] queues)
     {
         var queue = configuration.BuildQueue();
         foreach (var queueName in queues)

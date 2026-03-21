@@ -17,7 +17,7 @@ namespace LightningQueues;
 /// Queue handles the core messaging operations including message sending, receiving,
 /// storage, and routing.
 /// </summary>
-public class Queue : IDisposable, IAsyncDisposable
+public class Queue : IQueue
 {
     private readonly Sender _sender;
     private readonly Receiver _receiver;

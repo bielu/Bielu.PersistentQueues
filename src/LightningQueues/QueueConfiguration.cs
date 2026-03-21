@@ -235,7 +235,7 @@ public class QueueConfiguration
     /// The queue is created but not started. Call Start() on the returned queue
     /// to begin message processing.
     /// </remarks>
-    public Queue BuildQueue()
+    public IQueue BuildQueue()
     {
         if (_store == null)
             throw new ArgumentNullException(nameof(_store), "Storage has not been configured. Are you missing a call to StoreMessagesWith?");
@@ -273,7 +273,7 @@ public class QueueConfiguration
     /// 
     /// The queue is ready to send and receive messages immediately after this call.
     /// </remarks>
-    public Queue BuildAndStart(string queueName)
+    public IQueue BuildAndStart(string queueName)
     {
         var queue = BuildQueue();
         queue.CreateQueue(queueName);
