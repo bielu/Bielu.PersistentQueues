@@ -338,25 +338,25 @@ public class QueueTests : TestBase
     {
         await QueueScenario(async (queue, token) =>
         {
-            // Enqueue first message immediately
+            // Enqueue both messages before starting ReceiveBatch so they're
+            // found on the first poll and collected into a single batch.
             queue.Enqueue(NewMessage("test", "msg1"));
+            queue.Enqueue(NewMessage("test", "msg2"));
             
-            // Start a background task that enqueues a second message after a short delay
-            _ = Task.Run(async () =>
-            {
-                await DeterministicDelay(200, token);
-                queue.Enqueue(NewMessage("test", "msg2"));
-            }, token);
-            
-            // Use a 500ms batch timeout so both messages should end up in the same batch
+            // Use a 500ms batch timeout — both messages should be found on the first poll
+            // and the batch yields quickly once the next poll finds nothing new.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var batchCtx = await queue.ReceiveBatch("test", batchTimeoutInMilliseconds: 500, 
                     pollIntervalInMilliseconds: 50, cancellationToken: token)
                 .FirstAsync(token);
+            sw.Stop();
             
             batchCtx.Messages.Length.ShouldBe(2);
             var payloads = batchCtx.Messages.Select(m => System.Text.Encoding.UTF8.GetString(m.DataArray!)).ToList();
             payloads.ShouldContain("msg1");
             payloads.ShouldContain("msg2");
+            // Should have returned well before the 500ms timeout
+            sw.ElapsedMilliseconds.ShouldBeLessThan(400);
         }, TimeSpan.FromSeconds(5));
     }
     

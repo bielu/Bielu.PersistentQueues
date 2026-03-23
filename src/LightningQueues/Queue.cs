@@ -200,10 +200,10 @@ public class Queue : IQueue
     /// <param name="maxMessages">The maximum number of messages per batch. When zero or negative, all available messages in each poll cycle are returned.</param>
     /// <param name="batchTimeoutInMilliseconds">
     /// Maximum time in milliseconds to spend collecting messages for a single batch before yielding.
-    /// When greater than zero, the method keeps polling for messages until the timeout expires or
-    /// <paramref name="maxMessages"/> is reached, whichever comes first, allowing messages arriving
-    /// over time to be grouped into a single batch. When zero or negative, each poll cycle yields
-    /// immediately with whatever messages are currently available.
+    /// When greater than zero, the method keeps polling for messages until the timeout expires,
+    /// <paramref name="maxMessages"/> is reached, or a poll cycle discovers no new messages after
+    /// some have already been collected — whichever comes first. When zero or negative, each poll
+    /// cycle yields immediately with whatever messages are currently available.
     /// </param>
     /// <param name="pollIntervalInMilliseconds">The period to rest before checking for new messages if no messages are found.</param>
     /// <param name="cancellationToken">A token to cancel the receive operation.</param>
@@ -211,10 +211,11 @@ public class Queue : IQueue
     /// <remarks>
     /// This method continuously polls the message store and yields <see cref="BatchQueueContext"/> objects.
     /// If <paramref name="maxMessages"/> is greater than zero, each batch contains at most that many messages.
-    /// If <paramref name="batchTimeoutInMilliseconds"/> is greater than zero, the method accumulates messages
-    /// over the timeout window before yielding, allowing messages arriving close together to be grouped.
-    /// The stream continues until canceled via the cancellation token or when the queue is disposed.
-    /// Only non-empty batches are yielded.
+    /// If <paramref name="batchTimeoutInMilliseconds"/> is greater than zero, the timeout acts as an upper
+    /// bound on how long a single batch can collect messages. The batch may yield earlier if a poll
+    /// cycle finds no new messages while the batch already has items, which prevents unnecessary waiting
+    /// when no more messages are arriving. The stream continues until canceled via the cancellation
+    /// token or when the queue is disposed. Only non-empty batches are yielded.
     /// </remarks>
     public async IAsyncEnumerable<BatchQueueContext> ReceiveBatch(string queueName,
         int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200,
@@ -234,12 +235,17 @@ public class Queue : IQueue
         while (!effectiveToken.IsCancellationRequested)
         {
             var messages = new List<Message>();
-            var seen = hasTimeout ? new HashSet<MessageId>() : null;
+            var seen = new HashSet<MessageId>();
             var deadline = hasTimeout ? DateTime.UtcNow + batchTimeout : DateTime.MaxValue;
 
-            // Inner loop: collect messages until maxMessages reached, timeout expired, or cancelled
+            // Inner loop: collect messages until maxMessages reached, timeout expired, or cancelled.
+            // The loop keeps polling to collect messages arriving over time. It yields early when
+            // a poll cycle finds no new messages and the batch already has items, avoiding a
+            // full-timeout wait when no more messages are expected.
             while (!effectiveToken.IsCancellationRequested)
             {
+                var countBefore = messages.Count;
+                
                 foreach (var message in Store.PersistedIncoming(queueName))
                 {
                     if (effectiveToken.IsCancellationRequested)
@@ -247,9 +253,9 @@ public class Queue : IQueue
 
                     if (message.Queue.Span.SequenceEqual(queueName.AsSpan()))
                     {
-                        // When using a timeout window, the same persisted message can appear
-                        // across multiple poll cycles. Skip messages already in this batch.
-                        if (seen != null && !seen.Add(message.Id))
+                        // The same persisted message can appear across multiple poll cycles
+                        // (it stays in storage until committed). Skip duplicates.
+                        if (!seen.Add(message.Id))
                             continue;
 
                         messages.Add(message);
@@ -267,8 +273,9 @@ public class Queue : IQueue
                 if (hasTimeout && DateTime.UtcNow >= deadline)
                     break;
 
-                // If no timeout and we found messages, yield immediately (original behavior)
-                if (!hasTimeout && messages.Count > 0)
+                // If we already have messages and this poll found nothing new, yield
+                // immediately rather than waiting for the full timeout window.
+                if (messages.Count > 0 && messages.Count == countBefore)
                     break;
 
                 // Wait before polling again, capping at remaining timeout
