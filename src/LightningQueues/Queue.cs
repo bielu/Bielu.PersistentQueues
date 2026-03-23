@@ -204,16 +204,16 @@ public class Queue : IQueue
     /// </param>
     /// <param name="pollIntervalInMilliseconds">The period to rest before checking for new messages if no messages are found.</param>
     /// <param name="cancellationToken">A token to cancel the receive operation.</param>
-    /// <returns>An asynchronous stream of <see cref="MessageContext"/> arrays, where each array contains the messages found in a single poll cycle.</returns>
+    /// <returns>An asynchronous stream of <see cref="BatchQueueContext"/> objects, each containing all messages found in a single batch cycle.</returns>
     /// <remarks>
-    /// This method continuously polls the message store and yields arrays of messages found in each cycle.
-    /// If <paramref name="maxMessages"/> is greater than zero, each yielded array contains at most that many messages.
+    /// This method continuously polls the message store and yields <see cref="BatchQueueContext"/> objects.
+    /// If <paramref name="maxMessages"/> is greater than zero, each batch contains at most that many messages.
     /// If <paramref name="batchTimeoutInMilliseconds"/> is greater than zero, the method accumulates messages
     /// over the timeout window before yielding, allowing messages arriving close together to be grouped.
     /// The stream continues until canceled via the cancellation token or when the queue is disposed.
     /// Only non-empty batches are yielded.
     /// </remarks>
-    public async IAsyncEnumerable<MessageContext[]> ReceiveBatch(string queueName,
+    public async IAsyncEnumerable<BatchQueueContext> ReceiveBatch(string queueName,
         int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -230,7 +230,7 @@ public class Queue : IQueue
 
         while (!effectiveToken.IsCancellationRequested)
         {
-            var batch = new List<MessageContext>();
+            var messages = new List<Message>();
             var seen = hasTimeout ? new HashSet<MessageId>() : null;
             var deadline = hasTimeout ? DateTime.UtcNow + batchTimeout : DateTime.MaxValue;
 
@@ -249,15 +249,15 @@ public class Queue : IQueue
                         if (seen != null && !seen.Add(message.Id))
                             continue;
 
-                        batch.Add(new MessageContext(message, this));
+                        messages.Add(message);
 
-                        if (hasLimit && batch.Count >= maxMessages)
+                        if (hasLimit && messages.Count >= maxMessages)
                             break;
                     }
                 }
 
                 // If we hit the max, yield immediately
-                if (hasLimit && batch.Count >= maxMessages)
+                if (hasLimit && messages.Count >= maxMessages)
                     break;
 
                 // If we have a timeout and it's expired, stop collecting
@@ -265,7 +265,7 @@ public class Queue : IQueue
                     break;
 
                 // If no timeout and we found messages, yield immediately (original behavior)
-                if (!hasTimeout && batch.Count > 0)
+                if (!hasTimeout && messages.Count > 0)
                     break;
 
                 // Wait before polling again, capping at remaining timeout
@@ -286,23 +286,9 @@ public class Queue : IQueue
                 }
             }
 
-            if (batch.Count > 0)
+            if (messages.Count > 0)
             {
-                // Collect the internal QueueContext from each MessageContext
-                var contexts = new List<QueueContext>(batch.Count);
-                foreach (var mc in batch)
-                {
-                    contexts.Add(mc.InternalContext);
-                }
-
-                // Wrap each message's QueueContext with a BatchQueueContext so that
-                // calling CommitChanges() on any message commits the entire batch.
-                foreach (var mc in batch)
-                {
-                    mc.QueueContext = new BatchQueueContext(mc.InternalContext, contexts);
-                }
-
-                yield return batch.ToArray();
+                yield return new BatchQueueContext(messages.ToArray(), this);
             }
             else if (effectiveToken.IsCancellationRequested)
             {

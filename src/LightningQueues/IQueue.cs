@@ -62,8 +62,8 @@ public interface IQueue : IDisposable, IAsyncDisposable
     /// </param>
     /// <param name="pollIntervalInMilliseconds">The period to rest before checking for new messages if no messages are found.</param>
     /// <param name="cancellationToken">A token to cancel the receive operation.</param>
-    /// <returns>An asynchronous stream of <see cref="MessageContext"/> arrays, where each array contains the messages found in a single poll cycle.</returns>
-    public IAsyncEnumerable<MessageContext[]> ReceiveBatch(string queueName,
+    /// <returns>An asynchronous stream of <see cref="BatchQueueContext"/> objects, each containing all messages found in a single batch cycle.</returns>
+    public IAsyncEnumerable<BatchQueueContext> ReceiveBatch(string queueName,
         int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default);
 

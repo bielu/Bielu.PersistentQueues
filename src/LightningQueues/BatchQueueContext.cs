@@ -4,49 +4,96 @@ using System.Collections.Generic;
 namespace LightningQueues;
 
 /// <summary>
-/// A queue context decorator that commits all messages in a batch atomically.
+/// Represents a batch of messages received from a queue, with a shared context
+/// that commits all messages atomically.
 /// </summary>
 /// <remarks>
-/// When messages are received via <see cref="IQueue.ReceiveBatch"/>, each message's
-/// <see cref="MessageContext.QueueContext"/> is a <see cref="BatchQueueContext"/>.
-/// Per-message operations like <see cref="SuccessfullyReceived"/> and <see cref="MoveTo"/>
-/// apply to the individual message, while <see cref="CommitChanges"/> commits all
-/// pending actions from every message in the batch in a single atomic transaction.
+/// <see cref="BatchQueueContext"/> is yielded by <see cref="IQueue.ReceiveBatch"/>.
+/// It exposes the full array of <see cref="Messages"/> in the batch and a single
+/// <see cref="QueueContext"/> whose operations apply to every message in the batch.
+/// Calling <see cref="IQueueContext.CommitChanges"/> on the context commits all
+/// pending actions from all messages in a single atomic transaction.
 /// </remarks>
-internal class BatchQueueContext : IQueueContext
+public class BatchQueueContext
 {
-    private readonly QueueContext _perMessageContext;
-    private readonly IReadOnlyList<QueueContext> _batchContexts;
+    private readonly IReadOnlyList<QueueContext> _perMessageContexts;
 
-    internal BatchQueueContext(QueueContext perMessageContext, IReadOnlyList<QueueContext> batchContexts)
+    internal BatchQueueContext(Message[] messages, Queue queue)
     {
-        _perMessageContext = perMessageContext;
-        _batchContexts = batchContexts;
+        Messages = messages;
+        var contexts = new List<QueueContext>(messages.Length);
+        foreach (var message in messages)
+        {
+            contexts.Add(new QueueContext(queue, message));
+        }
+        _perMessageContexts = contexts;
+        QueueContext = new BatchQueueContextImpl(contexts);
     }
 
     /// <summary>
-    /// Commits all pending actions from every message in the batch in a single atomic transaction.
+    /// Gets the messages in this batch.
     /// </summary>
-    public void CommitChanges()
+    public Message[] Messages { get; }
+
+    /// <summary>
+    /// Gets the queue context for the batch.
+    /// </summary>
+    /// <remarks>
+    /// Operations such as <see cref="IQueueContext.SuccessfullyReceived"/> and
+    /// <see cref="IQueueContext.MoveTo"/> apply to every message in the batch.
+    /// <see cref="IQueueContext.CommitChanges"/> commits all pending actions
+    /// from all messages in a single atomic transaction.
+    /// </remarks>
+    public IQueueContext QueueContext { get; }
+
+    private class BatchQueueContextImpl : IQueueContext
     {
-        QueueContext.CommitBatch(_batchContexts);
+        private readonly IReadOnlyList<QueueContext> _contexts;
+
+        internal BatchQueueContextImpl(IReadOnlyList<QueueContext> contexts)
+        {
+            _contexts = contexts;
+        }
+
+        public void CommitChanges()
+        {
+            LightningQueues.QueueContext.CommitBatch(_contexts);
+        }
+
+        public void Send(Message message)
+        {
+            if (_contexts.Count > 0)
+                _contexts[0].Send(message);
+        }
+
+        public void ReceiveLater(TimeSpan timeSpan)
+        {
+            foreach (var ctx in _contexts)
+                ctx.ReceiveLater(timeSpan);
+        }
+
+        public void ReceiveLater(DateTimeOffset time)
+        {
+            foreach (var ctx in _contexts)
+                ctx.ReceiveLater(time);
+        }
+
+        public void SuccessfullyReceived()
+        {
+            foreach (var ctx in _contexts)
+                ctx.SuccessfullyReceived();
+        }
+
+        public void MoveTo(string queueName)
+        {
+            foreach (var ctx in _contexts)
+                ctx.MoveTo(queueName);
+        }
+
+        public void Enqueue(Message message)
+        {
+            if (_contexts.Count > 0)
+                _contexts[0].Enqueue(message);
+        }
     }
-
-    /// <inheritdoc />
-    public void Send(Message message) => _perMessageContext.Send(message);
-
-    /// <inheritdoc />
-    public void ReceiveLater(TimeSpan timeSpan) => _perMessageContext.ReceiveLater(timeSpan);
-
-    /// <inheritdoc />
-    public void ReceiveLater(DateTimeOffset time) => _perMessageContext.ReceiveLater(time);
-
-    /// <inheritdoc />
-    public void SuccessfullyReceived() => _perMessageContext.SuccessfullyReceived();
-
-    /// <inheritdoc />
-    public void MoveTo(string queueName) => _perMessageContext.MoveTo(queueName);
-
-    /// <inheritdoc />
-    public void Enqueue(Message message) => _perMessageContext.Enqueue(message);
 }
