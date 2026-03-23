@@ -54,11 +54,13 @@ public interface IQueue : IDisposable, IAsyncDisposable
     /// <param name="queueName">The name of the queue to receive messages from.</param>
     /// <param name="maxMessages">The maximum number of messages per batch. When zero or negative, all available messages in each poll cycle are returned.</param>
     /// <param name="batchTimeoutInMilliseconds">
-    /// Maximum time in milliseconds to spend collecting messages for a single batch before yielding.
-    /// When greater than zero, the method keeps polling for messages until the timeout expires,
-    /// <paramref name="maxMessages"/> is reached, or a poll cycle discovers no new messages after
-    /// some have already been collected — whichever comes first. When zero or negative, each poll
-    /// cycle yields immediately with whatever messages are currently available.
+    /// Time in milliseconds to keep collecting messages before yielding a batch.
+    /// Acts as an <b>alternative</b> to <paramref name="maxMessages"/>: a batch is yielded
+    /// when either the timeout elapses or <paramref name="maxMessages"/> is reached,
+    /// whichever comes first. When used alone (without <paramref name="maxMessages"/>),
+    /// the method waits for the full timeout period and then yields all messages that
+    /// arrived during that window. When zero or negative, the timeout is disabled and
+    /// batches are yielded as soon as messages are available.
     /// </param>
     /// <param name="pollIntervalInMilliseconds">The period to rest before checking for new messages if no messages are found.</param>
     /// <param name="cancellationToken">A token to cancel the receive operation.</param>
