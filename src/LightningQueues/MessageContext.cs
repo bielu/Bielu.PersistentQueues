@@ -27,6 +27,11 @@ public class MessageContext
     }
 
     /// <summary>
+    /// Gets the internal queue context for batch wiring.
+    /// </summary>
+    internal QueueContext InternalContext => _internalContext;
+
+    /// <summary>
     /// Gets the message being processed.
     /// </summary>
     /// <remarks>
@@ -41,8 +46,11 @@ public class MessageContext
     /// The queue context provides operations for processing the message,
     /// such as marking it as received, moving it to another queue,
     /// or scheduling it for later processing.
+    /// For messages received via <see cref="IQueue.ReceiveBatch"/>, this is a
+    /// <see cref="BatchQueueContext"/> where <see cref="IQueueContext.CommitChanges"/>
+    /// commits all messages in the batch atomically.
     /// </remarks>
-    public IQueueContext QueueContext { get; }
+    public IQueueContext QueueContext { get; internal set; }
 
     /// <summary>
     /// Commits all pending actions from multiple message contexts in a single atomic transaction.
@@ -58,7 +66,7 @@ public class MessageContext
         var contexts = new List<QueueContext>();
         foreach (var msg in batch)
         {
-            contexts.Add(msg._internalContext);
+            contexts.Add(msg.InternalContext);
         }
         LightningQueues.QueueContext.CommitBatch(contexts);
     }

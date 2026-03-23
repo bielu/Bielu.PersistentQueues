@@ -288,6 +288,20 @@ public class Queue : IQueue
 
             if (batch.Count > 0)
             {
+                // Collect the internal QueueContext from each MessageContext
+                var contexts = new List<QueueContext>(batch.Count);
+                foreach (var mc in batch)
+                {
+                    contexts.Add(mc.InternalContext);
+                }
+
+                // Wrap each message's QueueContext with a BatchQueueContext so that
+                // calling CommitChanges() on any message commits the entire batch.
+                foreach (var mc in batch)
+                {
+                    mc.QueueContext = new BatchQueueContext(mc.InternalContext, contexts);
+                }
+
                 yield return batch.ToArray();
             }
             else if (effectiveToken.IsCancellationRequested)
