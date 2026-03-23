@@ -21,15 +21,41 @@ internal class QueueContext : IQueueContext
     public void CommitChanges()
     {
         using var transaction = _queue.Store.BeginTransaction();
+        ExecuteActions(transaction);
+        transaction.Commit();
+        NotifySuccess();
+    }
+
+    internal void ExecuteActions(LmdbTransaction transaction)
+    {
         foreach (var action in _queueActions)
         {
             action.Execute(transaction);
         }
-        transaction.Commit();
+    }
 
+    internal void NotifySuccess()
+    {
         foreach (var action in _queueActions)
         {
             action.Success();
+        }
+    }
+
+    internal static void CommitBatch(IReadOnlyList<QueueContext> contexts)
+    {
+        if (contexts.Count == 0) return;
+
+        using var transaction = contexts[0]._queue.Store.BeginTransaction();
+        foreach (var context in contexts)
+        {
+            context.ExecuteActions(transaction);
+        }
+        transaction.Commit();
+
+        foreach (var context in contexts)
+        {
+            context.NotifySuccess();
         }
     }
 
