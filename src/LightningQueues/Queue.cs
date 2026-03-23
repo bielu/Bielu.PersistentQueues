@@ -160,24 +160,27 @@ public class Queue : IQueue
         
         while (!effectiveToken.IsCancellationRequested)
         {
-            var foundNewMessages = false;
+            // Materialize all messages into a list before yielding.
+            // This fully consumes the PersistedIncoming enumerator and releases
+            // the LMDB read lock before control returns to the caller, preventing
+            // a deadlock when the caller acquires a write lock via CommitChanges().
+            var messages = Store.PersistedIncoming(queueName)
+                .Where(m => m.Queue.Span.SequenceEqual(queueName.AsSpan()))
+                .ToList();
             
-            // Read messages from storage
-            foreach (var message in Store.PersistedIncoming(queueName))
+            if (messages.Count > 0)
             {
-                if (effectiveToken.IsCancellationRequested)
-                    yield break;
-                
-                if (message.Queue.Span.SequenceEqual(queueName.AsSpan()))
+                foreach (var message in messages)
                 {
-                    foundNewMessages = true;
+                    if (effectiveToken.IsCancellationRequested)
+                        yield break;
+                    
                     yield return new MessageContext(message, this);
                 }
             }
-            
-            // If no new messages found, wait before polling again
-            if (!foundNewMessages)
+            else
             {
+                // No messages found, wait before polling again
                 try
                 {
                     await Task.Delay(pollInterval, effectiveToken).ConfigureAwait(false);
