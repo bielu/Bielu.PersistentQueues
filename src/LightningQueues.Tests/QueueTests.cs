@@ -336,4 +336,90 @@ public class QueueTests : TestBase
             batches[0].Length.ShouldBe(1);
         }, TimeSpan.FromSeconds(3));
     }
+    
+    public async Task receive_batch_with_timeout_collects_messages_over_window()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            // Enqueue first message immediately
+            queue.Enqueue(NewMessage("test", "msg1"));
+            
+            // Start a background task that enqueues a second message after a short delay
+            _ = Task.Run(async () =>
+            {
+                await DeterministicDelay(200, token);
+                queue.Enqueue(NewMessage("test", "msg2"));
+            }, token);
+            
+            // Use a 500ms batch timeout so both messages should end up in the same batch
+            var batch = await queue.ReceiveBatch("test", batchTimeoutInMilliseconds: 500, 
+                    pollIntervalInMilliseconds: 50, cancellationToken: token)
+                .FirstAsync(token);
+            
+            batch.Length.ShouldBe(2);
+            var payloads = batch.Select(ctx => System.Text.Encoding.UTF8.GetString(ctx.Message.DataArray!)).ToList();
+            payloads.ShouldContain("msg1");
+            payloads.ShouldContain("msg2");
+        }, TimeSpan.FromSeconds(5));
+    }
+    
+    public async Task receive_batch_without_timeout_yields_immediately()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            // Enqueue one message
+            queue.Enqueue(NewMessage("test", "msg1"));
+            
+            // Without timeout (default), should yield immediately with only the first message
+            var batch = await queue.ReceiveBatch("test", pollIntervalInMilliseconds: 50, 
+                    cancellationToken: token)
+                .FirstAsync(token);
+            
+            // Should get the message immediately without waiting
+            batch.Length.ShouldBeGreaterThanOrEqualTo(1);
+        }, TimeSpan.FromSeconds(3));
+    }
+    
+    public async Task receive_batch_timeout_does_not_yield_empty_batches()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            // With a short timeout and no messages, the stream should not yield empty batches
+            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(600));
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, token);
+            
+            var batches = new List<MessageContext[]>();
+            await foreach (var batch in queue.ReceiveBatch("test", batchTimeoutInMilliseconds: 200, 
+                pollIntervalInMilliseconds: 50, cancellationToken: linked.Token))
+            {
+                batches.Add(batch);
+            }
+            
+            // No messages were enqueued, so no batches should have been yielded
+            batches.Count.ShouldBe(0);
+        }, TimeSpan.FromSeconds(3));
+    }
+    
+    public async Task receive_batch_timeout_with_max_messages_yields_early_when_full()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            // Enqueue 3 messages
+            queue.Enqueue(NewMessage("test", "msg1"));
+            queue.Enqueue(NewMessage("test", "msg2"));
+            queue.Enqueue(NewMessage("test", "msg3"));
+            
+            // Set a long timeout but a low max - should yield as soon as max is reached
+            var start = DateTime.UtcNow;
+            var batch = await queue.ReceiveBatch("test", maxMessages: 2, 
+                    batchTimeoutInMilliseconds: 5000, pollIntervalInMilliseconds: 50, 
+                    cancellationToken: token)
+                .FirstAsync(token);
+            var elapsed = DateTime.UtcNow - start;
+            
+            batch.Length.ShouldBe(2);
+            // Should have returned well before the 5-second timeout
+            elapsed.TotalMilliseconds.ShouldBeLessThan(2000);
+        }, TimeSpan.FromSeconds(5));
+    }
 }

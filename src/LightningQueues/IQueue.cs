@@ -53,11 +53,18 @@ public interface IQueue : IDisposable, IAsyncDisposable
     /// </summary>
     /// <param name="queueName">The name of the queue to receive messages from.</param>
     /// <param name="maxMessages">The maximum number of messages per batch. When zero or negative, all available messages in each poll cycle are returned.</param>
+    /// <param name="batchTimeoutInMilliseconds">
+    /// Maximum time in milliseconds to spend collecting messages for a single batch before yielding.
+    /// When greater than zero, the method keeps polling for messages until the timeout expires or
+    /// <paramref name="maxMessages"/> is reached, whichever comes first, allowing messages arriving
+    /// over time to be grouped into a single batch. When zero or negative, each poll cycle yields
+    /// immediately with whatever messages are currently available.
+    /// </param>
     /// <param name="pollIntervalInMilliseconds">The period to rest before checking for new messages if no messages are found.</param>
     /// <param name="cancellationToken">A token to cancel the receive operation.</param>
     /// <returns>An asynchronous stream of <see cref="MessageContext"/> arrays, where each array contains the messages found in a single poll cycle.</returns>
     public IAsyncEnumerable<MessageContext[]> ReceiveBatch(string queueName,
-        int maxMessages = 0, int pollIntervalInMilliseconds = 200,
+        int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default);
 
     /// <summary>

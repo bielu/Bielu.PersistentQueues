@@ -195,17 +195,26 @@ public class Queue : IQueue
     /// </summary>
     /// <param name="queueName">The name of the queue to receive messages from.</param>
     /// <param name="maxMessages">The maximum number of messages per batch. When zero or negative, all available messages in each poll cycle are returned.</param>
+    /// <param name="batchTimeoutInMilliseconds">
+    /// Maximum time in milliseconds to spend collecting messages for a single batch before yielding.
+    /// When greater than zero, the method keeps polling for messages until the timeout expires or
+    /// <paramref name="maxMessages"/> is reached, whichever comes first, allowing messages arriving
+    /// over time to be grouped into a single batch. When zero or negative, each poll cycle yields
+    /// immediately with whatever messages are currently available.
+    /// </param>
     /// <param name="pollIntervalInMilliseconds">The period to rest before checking for new messages if no messages are found.</param>
     /// <param name="cancellationToken">A token to cancel the receive operation.</param>
     /// <returns>An asynchronous stream of <see cref="MessageContext"/> arrays, where each array contains the messages found in a single poll cycle.</returns>
     /// <remarks>
     /// This method continuously polls the message store and yields arrays of messages found in each cycle.
     /// If <paramref name="maxMessages"/> is greater than zero, each yielded array contains at most that many messages.
+    /// If <paramref name="batchTimeoutInMilliseconds"/> is greater than zero, the method accumulates messages
+    /// over the timeout window before yielding, allowing messages arriving close together to be grouped.
     /// The stream continues until canceled via the cancellation token or when the queue is disposed.
     /// Only non-empty batches are yielded.
     /// </remarks>
     public async IAsyncEnumerable<MessageContext[]> ReceiveBatch(string queueName,
-        int maxMessages = 0, int pollIntervalInMilliseconds = 200,
+        int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         using var linkedSource = cancellationToken != CancellationToken.None
@@ -214,24 +223,66 @@ public class Queue : IQueue
         var effectiveToken = linkedSource?.Token ?? _cancelOnDispose.Token;
 
         bool hasLimit = maxMessages > 0;
+        bool hasTimeout = batchTimeoutInMilliseconds > 0;
         var pollInterval = TimeSpan.FromMilliseconds(pollIntervalInMilliseconds);
-        _logger.QueueStartReceivingBatch(queueName, maxMessages);
+        var batchTimeout = TimeSpan.FromMilliseconds(batchTimeoutInMilliseconds);
+        _logger.QueueStartReceivingBatch(queueName, maxMessages, batchTimeoutInMilliseconds);
 
         while (!effectiveToken.IsCancellationRequested)
         {
             var batch = new List<MessageContext>();
+            var seen = hasTimeout ? new HashSet<MessageId>() : null;
+            var deadline = hasTimeout ? DateTime.UtcNow + batchTimeout : DateTime.MaxValue;
 
-            foreach (var message in Store.PersistedIncoming(queueName))
+            // Inner loop: collect messages until maxMessages reached, timeout expired, or cancelled
+            while (!effectiveToken.IsCancellationRequested)
             {
-                if (effectiveToken.IsCancellationRequested)
-                    yield break;
-
-                if (message.Queue.Span.SequenceEqual(queueName.AsSpan()))
+                foreach (var message in Store.PersistedIncoming(queueName))
                 {
-                    batch.Add(new MessageContext(message, this));
-
-                    if (hasLimit && batch.Count >= maxMessages)
+                    if (effectiveToken.IsCancellationRequested)
                         break;
+
+                    if (message.Queue.Span.SequenceEqual(queueName.AsSpan()))
+                    {
+                        // When using a timeout window, the same persisted message can appear
+                        // across multiple poll cycles. Skip messages already in this batch.
+                        if (seen != null && !seen.Add(message.Id))
+                            continue;
+
+                        batch.Add(new MessageContext(message, this));
+
+                        if (hasLimit && batch.Count >= maxMessages)
+                            break;
+                    }
+                }
+
+                // If we hit the max, yield immediately
+                if (hasLimit && batch.Count >= maxMessages)
+                    break;
+
+                // If we have a timeout and it's expired, stop collecting
+                if (hasTimeout && DateTime.UtcNow >= deadline)
+                    break;
+
+                // If no timeout and we found messages, yield immediately (original behavior)
+                if (!hasTimeout && batch.Count > 0)
+                    break;
+
+                // Wait before polling again, capping at remaining timeout
+                try
+                {
+                    var delay = hasTimeout
+                        ? TimeSpan.FromMilliseconds(Math.Min(pollInterval.TotalMilliseconds, Math.Max(0, (deadline - DateTime.UtcNow).TotalMilliseconds)))
+                        : pollInterval;
+
+                    if (delay > TimeSpan.Zero)
+                        await Task.Delay(delay, effectiveToken).ConfigureAwait(false);
+                    else
+                        break; // Timeout has expired
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
                 }
             }
 
@@ -239,16 +290,9 @@ public class Queue : IQueue
             {
                 yield return batch.ToArray();
             }
-            else
+            else if (effectiveToken.IsCancellationRequested)
             {
-                try
-                {
-                    await Task.Delay(pollInterval, effectiveToken).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    yield break;
-                }
+                yield break;
             }
         }
     }
