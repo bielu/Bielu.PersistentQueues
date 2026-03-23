@@ -736,11 +736,31 @@ public class LmdbMessageStore : IMessageStore
         MoveToQueue(tx, queueName, message);
     }
 
+    public void MoveToQueue(LmdbTransaction transaction, string queueName, IEnumerable<Message> messages)
+    {
+        CheckDisposed();
+        var tx = transaction.Transaction;
+        foreach (var message in messages)
+        {
+            MoveToQueue(tx, queueName, message);
+        }
+    }
+
     public void SuccessfullyReceived(LmdbTransaction transaction, Message message)
     {
         CheckDisposed();
         var tx = transaction.Transaction;
         SuccessfullyReceived(tx, message);
+    }
+
+    public void SuccessfullyReceived(LmdbTransaction transaction, IEnumerable<Message> messages)
+    {
+        CheckDisposed();
+        var tx = transaction.Transaction;
+        foreach (var message in messages)
+        {
+            SuccessfullyReceived(tx, message);
+        }
     }
 
     private void SuccessfullyReceived(LightningTransaction tx, Message message)

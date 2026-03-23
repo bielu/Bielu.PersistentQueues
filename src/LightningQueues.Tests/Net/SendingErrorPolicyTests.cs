@@ -260,7 +260,17 @@ public class StubMessageStore : IMessageStore
         throw new NotImplementedException();
     }
 
+    public void MoveToQueue(LmdbTransaction transaction, string queueName, IEnumerable<Message> messages)
+    {
+        throw new NotImplementedException();
+    }
+
     public void SuccessfullyReceived(LmdbTransaction transaction, Message message)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void SuccessfullyReceived(LmdbTransaction transaction, IEnumerable<Message> messages)
     {
         throw new NotImplementedException();
     }

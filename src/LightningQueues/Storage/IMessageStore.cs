@@ -138,6 +138,14 @@ public interface IMessageStore : IDisposable
     /// available for consumers of the target queue.
     /// </remarks>
     void MoveToQueue(LmdbTransaction transaction, string queueName, Message message);
+
+    /// <summary>
+    /// Moves multiple messages to a different queue in a single operation.
+    /// </summary>
+    /// <param name="transaction">The transaction to use for the operation.</param>
+    /// <param name="queueName">The name of the target queue.</param>
+    /// <param name="messages">The messages to move.</param>
+    void MoveToQueue(LmdbTransaction transaction, string queueName, IEnumerable<Message> messages);
     
     /// <summary>
     /// Marks a message as successfully received and processed.
@@ -149,6 +157,13 @@ public interface IMessageStore : IDisposable
     /// after successful processing.
     /// </remarks>
     void SuccessfullyReceived(LmdbTransaction transaction, Message message);
+
+    /// <summary>
+    /// Marks multiple messages as successfully received and processed in a single operation.
+    /// </summary>
+    /// <param name="transaction">The transaction to use for the operation.</param>
+    /// <param name="messages">The messages that have been processed.</param>
+    void SuccessfullyReceived(LmdbTransaction transaction, IEnumerable<Message> messages);
     
     /// <summary>
     /// Stores an outgoing message using an existing transaction.
