@@ -130,6 +130,11 @@ internal static class Logs
     public static void QueueStartReceiving(this ILogger logger, string queueName) =>
         QueueStartingReceiveDefinition(logger, queueName, null);
 
+    private static readonly Action<ILogger, string, int, Exception?> QueueStartingReceiveBatchDefinition =
+        LoggerMessage.Define<string, int>(LogLevel.Debug, QueueEvents.Receiver, "Start receiving batch for {Queue} with max {MaxMessages}");
+    public static void QueueStartReceivingBatch(this ILogger logger, string queueName, int maxMessages) =>
+        QueueStartingReceiveBatchDefinition(logger, queueName, maxMessages, null);
+
     private static readonly Action<ILogger, Exception?> QueueStartErrorDefinition =
         LoggerMessage.Define(LogLevel.Error, QueueEvents.Receiver, "Error starting queue");
     public static void QueueStartError(this ILogger logger, Exception ex) =>

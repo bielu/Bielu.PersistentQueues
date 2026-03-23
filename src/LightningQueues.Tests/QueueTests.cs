@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -233,5 +234,106 @@ public class QueueTests : TestBase
             
             return Task.CompletedTask;
         });
+    }
+    
+    public async Task receive_batch_of_enqueued_messages()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.Enqueue(NewMessage("test", "msg1"));
+            queue.Enqueue(NewMessage("test", "msg2"));
+            queue.Enqueue(NewMessage("test", "msg3"));
+            
+            var batch = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            
+            batch.Length.ShouldBe(3);
+            var payloads = batch.Select(ctx => System.Text.Encoding.UTF8.GetString(ctx.Message.DataArray!)).ToList();
+            payloads.ShouldContain("msg1");
+            payloads.ShouldContain("msg2");
+            payloads.ShouldContain("msg3");
+        }, TimeSpan.FromSeconds(5));
+    }
+    
+    public async Task receive_batch_with_max_messages_limit()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.Enqueue(NewMessage("test", "msg1"));
+            queue.Enqueue(NewMessage("test", "msg2"));
+            queue.Enqueue(NewMessage("test", "msg3"));
+            
+            var batch = await queue.ReceiveBatch("test", maxMessages: 2, cancellationToken: token).FirstAsync(token);
+            
+            batch.Length.ShouldBe(2);
+        }, TimeSpan.FromSeconds(5));
+    }
+    
+    public async Task receive_batch_returns_empty_on_timeout_when_no_messages()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, token);
+            
+            var batches = await queue.ReceiveBatch("test", cancellationToken: linked.Token)
+                .ToListAsync(linked.Token)
+                .AsTask()
+                .ContinueWith(t => t.IsCompletedSuccessfully ? t.Result : new List<MessageContext[]>());
+            
+            batches.Count.ShouldBe(0);
+        }, TimeSpan.FromSeconds(3));
+    }
+    
+    public async Task receive_batch_yields_multiple_batches_as_messages_arrive()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.Enqueue(NewMessage("test", "first"));
+            
+            var batches = new List<MessageContext[]>();
+            var batchEnumerator = queue.ReceiveBatch("test", pollIntervalInMilliseconds: 50, cancellationToken: token)
+                .GetAsyncEnumerator(token);
+            
+            // First batch should contain the already-enqueued message
+            (await batchEnumerator.MoveNextAsync()).ShouldBeTrue();
+            batches.Add(batchEnumerator.Current);
+            batches[0].Length.ShouldBe(1);
+            System.Text.Encoding.UTF8.GetString(batches[0][0].Message.DataArray!).ShouldBe("first");
+            
+            // Acknowledge first batch so it's removed from storage, then enqueue more
+            foreach (var ctx in batches[0])
+            {
+                ctx.QueueContext.SuccessfullyReceived();
+                ctx.QueueContext.CommitChanges();
+            }
+            
+            queue.Enqueue(NewMessage("test", "second"));
+            (await batchEnumerator.MoveNextAsync()).ShouldBeTrue();
+            batches.Add(batchEnumerator.Current);
+            batches[1].Length.ShouldBe(1);
+            System.Text.Encoding.UTF8.GetString(batches[1][0].Message.DataArray!).ShouldBe("second");
+            
+            await batchEnumerator.DisposeAsync();
+        }, TimeSpan.FromSeconds(5));
+    }
+    
+    public async Task receive_batch_respects_cancellation_token()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.Enqueue(NewMessage("test", "msg1"));
+            
+            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, token);
+            
+            var batches = new List<MessageContext[]>();
+            await foreach (var batch in queue.ReceiveBatch("test", pollIntervalInMilliseconds: 50, cancellationToken: linked.Token))
+            {
+                batches.Add(batch);
+            }
+            
+            batches.Count.ShouldBeGreaterThanOrEqualTo(1);
+            batches[0].Length.ShouldBe(1);
+        }, TimeSpan.FromSeconds(3));
     }
 }
