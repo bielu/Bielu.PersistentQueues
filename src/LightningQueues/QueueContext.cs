@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using LightningQueues.Storage;
-using LightningQueues.Storage.LMDB;
 
 namespace LightningQueues;
 
@@ -65,7 +64,7 @@ internal class QueueContext : IQueueContext
 
     private interface IQueueAction
     {
-        void Execute(LmdbTransaction transaction);
+        void Execute(IStoreTransaction transaction);
         void Success();
     }
 
@@ -80,7 +79,7 @@ internal class QueueContext : IQueueContext
             _message = message;
         }
 
-        public void Execute(LmdbTransaction transaction)
+        public void Execute(IStoreTransaction transaction)
         {
             _context._queue.Store.StoreOutgoing(transaction, _message);
         }
@@ -101,7 +100,7 @@ internal class QueueContext : IQueueContext
             _message = message;
         }
 
-        public void Execute(LmdbTransaction transaction)
+        public void Execute(IStoreTransaction transaction)
         {
             _context._queue.Store.StoreIncoming(transaction, _message);
         }
@@ -122,7 +121,7 @@ internal class QueueContext : IQueueContext
             _queueName = queueName;
         }
 
-        public void Execute(LmdbTransaction transaction)
+        public void Execute(IStoreTransaction transaction)
         {
             _context._queue.Store.MoveToQueue(transaction, _queueName, _context._message);
         }
@@ -141,7 +140,7 @@ internal class QueueContext : IQueueContext
             _context = context;
         }
 
-        public void Execute(LmdbTransaction transaction)
+        public void Execute(IStoreTransaction transaction)
         {
             _context._queue.Store.SuccessfullyReceived(transaction, _context._message);
         }
@@ -162,7 +161,7 @@ internal class QueueContext : IQueueContext
             _timeSpan = timeSpan;
         }
 
-        public void Execute(LmdbTransaction transaction)
+        public void Execute(IStoreTransaction transaction)
         {
         }
 
@@ -184,7 +183,7 @@ internal class QueueContext : IQueueContext
         }
 
 
-        public void Execute(LmdbTransaction transaction)
+        public void Execute(IStoreTransaction transaction)
         {
         }
 

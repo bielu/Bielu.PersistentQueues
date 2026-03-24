@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using LightningQueues.Serialization;
-using LightningQueues.Storage.LMDB;
 
 namespace LightningQueues.Storage;
 
@@ -24,7 +23,7 @@ public interface IMessageStore : IDisposable
     /// Transactions ensure atomic operations on the message store and can be
     /// committed or aborted.
     /// </remarks>
-    LmdbTransaction BeginTransaction();
+    IStoreTransaction BeginTransaction();
     
     /// <summary>
     /// Creates a new queue with the specified name.
@@ -55,7 +54,7 @@ public interface IMessageStore : IDisposable
     /// This overload allows multiple storage operations to be performed
     /// within a single transaction for atomic behavior.
     /// </remarks>
-    void StoreIncoming(LmdbTransaction transaction, params IEnumerable<Message> messages);
+    void StoreIncoming(IStoreTransaction transaction, params IEnumerable<Message> messages);
 
     /// <summary>
     /// Stores incoming messages using raw wire-format bytes (zero-copy path).
@@ -137,7 +136,7 @@ public interface IMessageStore : IDisposable
     /// This method changes the queue association of a message, making it
     /// available for consumers of the target queue.
     /// </remarks>
-    void MoveToQueue(LmdbTransaction transaction, string queueName, Message message);
+    void MoveToQueue(IStoreTransaction transaction, string queueName, Message message);
     
     /// <summary>
     /// Marks a message as successfully received and processed.
@@ -148,7 +147,7 @@ public interface IMessageStore : IDisposable
     /// This method removes the message from the incoming messages store
     /// after successful processing.
     /// </remarks>
-    void SuccessfullyReceived(LmdbTransaction transaction, Message message);
+    void SuccessfullyReceived(IStoreTransaction transaction, Message message);
     
     /// <summary>
     /// Stores an outgoing message using an existing transaction.
@@ -158,7 +157,7 @@ public interface IMessageStore : IDisposable
     /// <remarks>
     /// This method persists a message that is to be sent to another queue.
     /// </remarks>
-    void StoreOutgoing(LmdbTransaction tx, Message message);
+    void StoreOutgoing(IStoreTransaction tx, Message message);
     
     /// <summary>
     /// Stores a single outgoing message.
