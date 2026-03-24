@@ -166,9 +166,10 @@ public class StorageProviderBenchmark
         _zoneTree?.Dispose();
         if (Directory.Exists(_zoneTreePath))
         {
-            foreach (var file in Directory.GetFiles(_zoneTreePath))
-                File.Delete(file);
+            try { Directory.Delete(_zoneTreePath, true); }
+            catch { /* ignore locked files */ }
         }
+        Directory.CreateDirectory(_zoneTreePath);
         _zoneTree = new ZoneTreeFactory<Memory<byte>, Memory<byte>>()
             .SetDataDirectory(_zoneTreePath)
             .SetKeySerializer(new ByteArraySerializer())
@@ -182,9 +183,10 @@ public class StorageProviderBenchmark
         _fasterLog?.Dispose();
         if (Directory.Exists(_fasterPath))
         {
-            foreach (var file in Directory.GetFiles(_fasterPath))
-                File.Delete(file);
+            try { Directory.Delete(_fasterPath, true); }
+            catch { /* ignore locked files */ }
         }
+        Directory.CreateDirectory(_fasterPath);
         var fasterMemoryBits = MessageCount switch
         {
             >= 1_000_000 => 30,

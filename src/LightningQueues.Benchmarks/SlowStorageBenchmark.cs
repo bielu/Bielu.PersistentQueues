@@ -167,9 +167,10 @@ public class SlowStorageBenchmark
         _zoneTree?.Dispose();
         if (Directory.Exists(_zoneTreePath))
         {
-            foreach (var file in Directory.GetFiles(_zoneTreePath))
-                File.Delete(file);
+            try { Directory.Delete(_zoneTreePath, true); }
+            catch { /* ignore locked files */ }
         }
+        Directory.CreateDirectory(_zoneTreePath);
         _zoneTree = new ZoneTreeFactory<Memory<byte>, Memory<byte>>()
             .SetDataDirectory(_zoneTreePath)
             .SetKeySerializer(new ByteArraySerializer())
@@ -183,9 +184,10 @@ public class SlowStorageBenchmark
         _fasterLog?.Dispose();
         if (Directory.Exists(_fasterPath))
         {
-            foreach (var file in Directory.GetFiles(_fasterPath))
-                File.Delete(file);
+            try { Directory.Delete(_fasterPath, true); }
+            catch { /* ignore locked files */ }
         }
+        Directory.CreateDirectory(_fasterPath);
         var fasterMemBits = MessageCount >= 100_000 ? 28 : 25;
         _fasterLog = Devices.CreateLogDevice(Path.Combine(_fasterPath, "hlog.log"));
         _fasterStore = new FasterKV<SpanByte, SpanByte>(
