@@ -36,7 +36,7 @@ public class Receiver : IDisposable
                 try
                 {
                     var socket = await _listener.AcceptSocketAsync(cancellationToken).ConfigureAwait(false);
-                    _ = Task.Run(() => HandleConnectionAsync(socket, receivedChannel, cancellationToken), cancellationToken);
+                    _ = HandleConnectionAsync(socket, receivedChannel, cancellationToken);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
