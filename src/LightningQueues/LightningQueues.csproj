@@ -1,18 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+  <Import Project="$(MSBuildThisFileDirectory)..\..\version.props" />
+
   <PropertyGroup>
-    <Description>LightningQueues</Description>
-    <VersionPrefix>0.6.0</VersionPrefix>
-    <Authors>Corey Kaylor</Authors>
+    <Description>Bielu.PersistentQueues - Fast persistent queues for .NET, based on LightningQueues</Description>
+    <Authors>bielu;Corey Kaylor</Authors>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>14</LangVersion>
     <Nullable>enable</Nullable>
     <AssemblyName>LightningQueues</AssemblyName>
     <PackageId>LightningQueues</PackageId>
-    <PackageIconUrl>https://raw.githubusercontent.com/LightningQueues/LightningQueues/refs/heads/main/lighting-qqqs.png</PackageIconUrl>
-    <PackageTags>queue;lightning;messaging;store-and-forward;</PackageTags>
-    <PackageProjectUrl>https://github.com/LightningQueues/LightningQueues</PackageProjectUrl>
-    <PackageLicenseUrl>https://github.com/LightningQueues/LightningQueues/blob/main/LICENSE</PackageLicenseUrl>
+    <PackageIconUrl>https://raw.githubusercontent.com/bielu/Bielu.PersistentQueues/refs/heads/main/lighting-qqqs.png</PackageIconUrl>
+    <PackageTags>queue;lightning;messaging;store-and-forward;persistent</PackageTags>
+    <PackageProjectUrl>https://github.com/bielu/Bielu.PersistentQueues</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>readme.md</PackageReadmeFile>
   </PropertyGroup>
   
