@@ -44,8 +44,29 @@ public interface IQueue : IDisposable, IAsyncDisposable
     /// <param name="queueName">The name of the queue to receive messages from.</param>
     /// <param name="pollIntervalInMilliseconds">The period to rest before checking for new messages if no messages are found.</param>
     /// <param name="cancellationToken">A token to cancel the receive operation.</param>
-    /// <returns>An asynchronous stream of <see cref="MessageContext"/> objects.</returns>
-    public IAsyncEnumerable<MessageContext> Receive(string queueName, int pollIntervalInMilliseconds = 200,
+    /// <returns>An asynchronous stream of <see cref="IMessageContext"/> objects.</returns>
+    public IAsyncEnumerable<IMessageContext> Receive(string queueName, int pollIntervalInMilliseconds = 200,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Receives batches of messages from the specified queue as an asynchronous stream.
+    /// </summary>
+    /// <param name="queueName">The name of the queue to receive messages from.</param>
+    /// <param name="maxMessages">The maximum number of messages per batch. When zero or negative, all available messages in each poll cycle are returned.</param>
+    /// <param name="batchTimeoutInMilliseconds">
+    /// Time in milliseconds to keep collecting messages before yielding a batch.
+    /// Acts as an <b>alternative</b> to <paramref name="maxMessages"/>: a batch is yielded
+    /// when either the timeout elapses or <paramref name="maxMessages"/> is reached,
+    /// whichever comes first. When used alone (without <paramref name="maxMessages"/>),
+    /// the method waits for the full timeout period and then yields all messages that
+    /// arrived during that window. When zero or negative, the timeout is disabled and
+    /// batches are yielded as soon as messages are available.
+    /// </param>
+    /// <param name="pollIntervalInMilliseconds">The period to rest before checking for new messages if no messages are found.</param>
+    /// <param name="cancellationToken">A token to cancel the receive operation.</param>
+    /// <returns>An asynchronous stream of <see cref="IBatchQueueContext"/> objects, each containing all messages found in a single batch cycle.</returns>
+    public IAsyncEnumerable<IBatchQueueContext> ReceiveBatch(string queueName,
+        int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default);
 
     /// <summary>

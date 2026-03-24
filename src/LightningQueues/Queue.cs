@@ -147,7 +147,7 @@ public class Queue : IQueue
     /// processing the message such as marking it as received, moving it to another queue,
     /// or scheduling it for later processing.
     /// </remarks>
-    public async IAsyncEnumerable<MessageContext> Receive(string queueName, int pollIntervalInMilliseconds = 200, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<IMessageContext> Receive(string queueName, int pollIntervalInMilliseconds = 200, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         // Combine the user's token with our disposal token, creating as few objects as possible
         using var linkedSource = cancellationToken != CancellationToken.None
@@ -160,24 +160,27 @@ public class Queue : IQueue
         
         while (!effectiveToken.IsCancellationRequested)
         {
-            var foundNewMessages = false;
+            // Materialize all messages into a list before yielding.
+            // This fully consumes the PersistedIncoming enumerator and releases
+            // the LMDB read lock before control returns to the caller, preventing
+            // a deadlock when the caller acquires a write lock via CommitChanges().
+            var messages = Store.PersistedIncoming(queueName)
+                .Where(m => m.Queue.Span.SequenceEqual(queueName.AsSpan()))
+                .ToList();
             
-            // Read messages from storage
-            foreach (var message in Store.PersistedIncoming(queueName))
+            if (messages.Count > 0)
             {
-                if (effectiveToken.IsCancellationRequested)
-                    yield break;
-                
-                if (message.Queue.Span.SequenceEqual(queueName.AsSpan()))
+                foreach (var message in messages)
                 {
-                    foundNewMessages = true;
+                    if (effectiveToken.IsCancellationRequested)
+                        yield break;
+                    
                     yield return new MessageContext(message, this);
                 }
             }
-            
-            // If no new messages found, wait before polling again
-            if (!foundNewMessages)
+            else
             {
+                // No messages found, wait before polling again
                 try
                 {
                     await Task.Delay(pollInterval, effectiveToken).ConfigureAwait(false);
@@ -186,6 +189,139 @@ public class Queue : IQueue
                 {
                     yield break;
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Receives batches of messages from the specified queue as an asynchronous stream.
+    /// </summary>
+    /// <param name="queueName">The name of the queue to receive messages from.</param>
+    /// <param name="maxMessages">The maximum number of messages per batch. When zero or negative, all available messages in each poll cycle are returned.</param>
+    /// <param name="batchTimeoutInMilliseconds">
+    /// Time in milliseconds to keep collecting messages before yielding a batch.
+    /// Acts as an <b>alternative</b> to <paramref name="maxMessages"/>: a batch is yielded
+    /// when either the timeout elapses or <paramref name="maxMessages"/> is reached,
+    /// whichever comes first. When used alone (without <paramref name="maxMessages"/>),
+    /// the method waits for the full timeout period and then yields all messages that
+    /// arrived during that window. When zero or negative, the timeout is disabled and
+    /// batches are yielded as soon as messages are available.
+    /// </param>
+    /// <param name="pollIntervalInMilliseconds">The period to rest before checking for new messages if no messages are found.</param>
+    /// <param name="cancellationToken">A token to cancel the receive operation.</param>
+    /// <returns>An asynchronous stream of <see cref="IBatchQueueContext"/> objects, each containing all messages found in a single batch cycle.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method continuously polls the message store and yields <see cref="IBatchQueueContext"/> objects.
+    /// The batch-completion strategy depends on which parameters are set:
+    /// </para>
+    /// <list type="bullet">
+    ///   <item><b>maxMessages only</b> — yield as soon as the batch has that many messages.</item>
+    ///   <item><b>timeout only</b> — wait until the timeout elapses, then yield whatever has been collected (may be empty-skipped).</item>
+    ///   <item><b>both</b> — yield when EITHER the batch is full OR the timeout elapses, whichever comes first.</item>
+    ///   <item><b>neither</b> — yield immediately with whatever messages are available on each poll cycle.</item>
+    /// </list>
+    /// <para>
+    /// The stream continues until canceled via the cancellation token or when the queue is disposed.
+    /// Only non-empty batches are yielded.
+    /// </para>
+    /// </remarks>
+    public async IAsyncEnumerable<IBatchQueueContext> ReceiveBatch(string queueName,
+        int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        using var linkedSource = cancellationToken != CancellationToken.None
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cancelOnDispose.Token)
+            : null;
+        var effectiveToken = linkedSource?.Token ?? _cancelOnDispose.Token;
+
+        bool hasLimit = maxMessages > 0;
+        bool hasTimeout = batchTimeoutInMilliseconds > 0;
+        var pollInterval = TimeSpan.FromMilliseconds(pollIntervalInMilliseconds);
+        var batchTimeout = TimeSpan.FromMilliseconds(batchTimeoutInMilliseconds);
+        _logger.QueueStartReceivingBatch(queueName, maxMessages, batchTimeoutInMilliseconds);
+
+        while (!effectiveToken.IsCancellationRequested)
+        {
+            var messages = new List<Message>();
+            var seen = new HashSet<MessageId>();
+            var deadline = hasTimeout ? DateTime.UtcNow + batchTimeout : DateTime.MaxValue;
+
+            // Inner loop: collect messages for one batch.
+            //
+            // Completion rules:
+            //   • maxMessages reached  → yield immediately
+            //   • timeout expired      → yield whatever we have
+            //   • no timeout & no limit & messages found → yield immediately
+            //   • cancellation         → stop
+            //
+            // When a timeout IS set, we always wait until the deadline (or maxMessages)
+            // because the whole point of the timeout is to give slow-arriving messages
+            // a window to be included in the batch.
+            while (!effectiveToken.IsCancellationRequested)
+            {
+                // Materialize all persisted messages into a snapshot list.
+                // This fully consumes the PersistedIncoming enumerator and releases
+                // the LMDB read lock before any further processing, preventing a
+                // deadlock when a previous batch's CommitChanges() acquires a write lock.
+                var incoming = Store.PersistedIncoming(queueName)
+                    .Where(m => m.Queue.Span.SequenceEqual(queueName.AsSpan()))
+                    .ToList();
+
+                foreach (var message in incoming)
+                {
+                    if (effectiveToken.IsCancellationRequested)
+                        break;
+
+                    // The same persisted message can appear across multiple poll cycles
+                    // (it stays in storage until committed). Skip duplicates.
+                    if (!seen.Add(message.Id))
+                        continue;
+
+                    messages.Add(message);
+
+                    if (hasLimit && messages.Count >= maxMessages)
+                        break;
+                }
+
+                // If we hit the max, yield immediately
+                if (hasLimit && messages.Count >= maxMessages)
+                    break;
+
+                // If we have a timeout and it's expired, stop collecting
+                if (hasTimeout && DateTime.UtcNow >= deadline)
+                    break;
+
+                // If no timeout is set, yield as soon as we have any messages
+                // (original immediate-yield behavior)
+                if (!hasTimeout && messages.Count > 0)
+                    break;
+
+                // Wait before polling again, capping at remaining timeout
+                try
+                {
+                    var delay = hasTimeout
+                        ? TimeSpan.FromMilliseconds(Math.Min(pollInterval.TotalMilliseconds, Math.Max(0, (deadline - DateTime.UtcNow).TotalMilliseconds)))
+                        : pollInterval;
+
+                    if (delay > TimeSpan.Zero)
+                        await Task.Delay(delay, effectiveToken).ConfigureAwait(false);
+                    else
+                        break; // Timeout has expired
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+            }
+
+            if (messages.Count > 0)
+            {
+                yield return new BatchQueueContext(messages.ToArray(), this);
+            }
+            else if (effectiveToken.IsCancellationRequested)
+            {
+                yield break;
             }
         }
     }

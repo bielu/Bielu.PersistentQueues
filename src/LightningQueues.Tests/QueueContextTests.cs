@@ -198,4 +198,111 @@ public class QueueContextTests : TestBase
             sentMessage.Message.Id.ShouldBe(sendMessageId);
         }, TimeSpan.FromSeconds(5));
     }
+    
+    public async Task batch_context_removes_all_messages_from_queue()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            var msg1 = NewMessage("test", "msg1");
+            var msg2 = NewMessage("test", "msg2");
+            var msg3 = NewMessage("test", "msg3");
+            queue.Enqueue(msg1);
+            queue.Enqueue(msg2);
+            queue.Enqueue(msg3);
+            
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            batchCtx.Messages.Length.ShouldBe(3);
+            
+            batchCtx.SuccessfullyReceived();
+            batchCtx.CommitChanges();
+            
+            // Verify every single message was removed, not just the first
+            var store = (LmdbMessageStore)queue.Store;
+            var remaining = store.PersistedIncoming("test").ToList();
+            remaining.Count.ShouldBe(0);
+            store.PersistedIncoming("test").Any(m => m.Id == msg1.Id).ShouldBeFalse();
+            store.PersistedIncoming("test").Any(m => m.Id == msg2.Id).ShouldBeFalse();
+            store.PersistedIncoming("test").Any(m => m.Id == msg3.Id).ShouldBeFalse();
+        }, TimeSpan.FromSeconds(5));
+    }
+    
+    public async Task batch_context_moves_all_messages_to_another_queue()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.CreateQueue("other");
+            queue.Enqueue(NewMessage("test", "msg1"));
+            queue.Enqueue(NewMessage("test", "msg2"));
+            
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            batchCtx.Messages.Length.ShouldBe(2);
+            
+            batchCtx.MoveTo("other");
+            batchCtx.CommitChanges();
+            
+            var store = (LmdbMessageStore)queue.Store;
+            store.PersistedIncoming("test").Any().ShouldBeFalse();
+            
+            var movedMessages = await queue.Receive("other", cancellationToken: token)
+                .Take(2)
+                .ToListAsync(token);
+            movedMessages.Count.ShouldBe(2);
+            movedMessages.All(m => m.Message.QueueString == "other").ShouldBeTrue();
+        }, TimeSpan.FromSeconds(5));
+    }
+    
+    public async Task batch_context_exposes_all_messages()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.Enqueue(NewMessage("test", "msg1"));
+            queue.Enqueue(NewMessage("test", "msg2"));
+            queue.Enqueue(NewMessage("test", "msg3"));
+            
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            
+            batchCtx.Messages.Length.ShouldBe(3);
+            var payloads = batchCtx.Messages
+                .Select(m => Encoding.UTF8.GetString(m.DataArray!))
+                .ToList();
+            payloads.ShouldContain("msg1");
+            payloads.ShouldContain("msg2");
+            payloads.ShouldContain("msg3");
+        }, TimeSpan.FromSeconds(5));
+    }
+    
+    public async Task batch_context_single_message_batch()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.Enqueue(NewMessage("test", "msg1"));
+            
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            batchCtx.Messages.Length.ShouldBe(1);
+            
+            batchCtx.SuccessfullyReceived();
+            batchCtx.CommitChanges();
+            
+            var store = (LmdbMessageStore)queue.Store;
+            store.PersistedIncoming("test").Any().ShouldBeFalse();
+        }, TimeSpan.FromSeconds(5));
+    }
+    
+    public async Task single_receive_still_uses_per_message_context()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            var message = NewMessage("test");
+            queue.Enqueue(message);
+            
+            // Single Receive should not be affected by BatchQueueContext changes
+            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            
+            receivedContext.QueueContext.SuccessfullyReceived();
+            receivedContext.QueueContext.CommitChanges();
+            
+            var store = (LmdbMessageStore)queue.Store;
+            store.PersistedIncoming("test").Any().ShouldBeFalse();
+        }, TimeSpan.FromSeconds(3));
+    }
 }
