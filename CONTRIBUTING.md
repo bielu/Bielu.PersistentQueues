@@ -58,13 +58,13 @@ dotnet build
 Build the entire solution:
 
 ```bash
-dotnet build LightningQueues.sln
+dotnet build src/Bielu.PersistentQueues.slnx
 ```
 
 ### Create NuGet Packages Locally
 
 ```bash
-dotnet pack src/LightningQueues --configuration Release --output ./build
+dotnet pack src/LightningQueues/LightningQueues.csproj --configuration Release --output ./build
 ```
 
 ## Running Tests
