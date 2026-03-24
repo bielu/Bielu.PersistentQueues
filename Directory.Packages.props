@@ -15,7 +15,7 @@
     <!-- Code Coverage -->
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <!-- Benchmarks -->
-    <PackageVersion Include="BenchmarkDotNet" Version="0.15.0" />
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
     <PackageVersion Include="BenchmarkDotNet.Diagnostics.dotMemory" Version="0.15.0" />
     <PackageVersion Include="BenchmarkDotNet.Diagnostics.dotTrace" Version="0.15.0" />
   </ItemGroup>
