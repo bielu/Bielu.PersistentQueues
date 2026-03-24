@@ -1,13 +1,13 @@
 using BenchmarkDotNet.Attributes;
 using FASTER.core;
 using LightningDB;
-using LightningQueues.Serialization;
-using LightningQueues.Storage.LMDB;
+using Bielu.PersistentQueues.Serialization;
+using Bielu.PersistentQueues.Storage.LMDB;
 using Tenray.ZoneTree;
 using Tenray.ZoneTree.Comparers;
 using Tenray.ZoneTree.Serializers;
 
-namespace LightningQueues.Benchmarks;
+namespace Bielu.PersistentQueues.Benchmarks;
 
 /// <summary>
 /// Compares three storage providers for LightningQueues message queue patterns:

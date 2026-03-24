@@ -5,7 +5,7 @@ using LightningDB;
 using Tenray.ZoneTree;
 using Tenray.ZoneTree.Serializers;
 
-namespace LightningQueues.Benchmarks;
+namespace Bielu.PersistentQueues.Benchmarks;
 
 /// <summary>
 /// Benchmarks how each storage provider degrades under slow filesystem conditions.
