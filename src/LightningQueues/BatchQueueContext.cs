@@ -18,10 +18,13 @@ namespace LightningQueues;
 /// </remarks>
 public class BatchQueueContext
 {
+    private readonly BatchQueueContextImpl _impl;
+
     internal BatchQueueContext(Message[] messages, Queue queue)
     {
         Messages = messages;
-        QueueContext = new BatchQueueContextImpl(messages, queue);
+        _impl = new BatchQueueContextImpl(messages, queue);
+        QueueContext = _impl;
     }
 
     /// <summary>
@@ -40,24 +43,66 @@ public class BatchQueueContext
     /// </remarks>
     public IQueueContext QueueContext { get; }
 
+    /// <summary>
+    /// Schedules a subset of messages in this batch to be processed again after a specified delay.
+    /// </summary>
+    /// <param name="messages">The messages to defer.</param>
+    /// <param name="timeSpan">The time to wait before making the messages available again.</param>
+    public void ReceiveLater(Message[] messages, TimeSpan timeSpan)
+    {
+        _impl.AddAction(new ReceiveLaterTimeSpanAction(_impl.Queue, messages, timeSpan));
+    }
+
+    /// <summary>
+    /// Schedules a subset of messages in this batch to be processed again at a specific time.
+    /// </summary>
+    /// <param name="messages">The messages to defer.</param>
+    /// <param name="time">The time at which the messages should be made available again.</param>
+    public void ReceiveLater(Message[] messages, DateTimeOffset time)
+    {
+        _impl.AddAction(new ReceiveLaterDateTimeOffsetAction(_impl.Queue, messages, time));
+    }
+
+    /// <summary>
+    /// Marks a subset of messages in this batch as successfully received and processed.
+    /// </summary>
+    /// <param name="messages">The messages to mark as received.</param>
+    public void SuccessfullyReceived(Message[] messages)
+    {
+        _impl.AddAction(new SuccessAllAction(_impl.Queue, messages));
+    }
+
+    /// <summary>
+    /// Moves a subset of messages in this batch to a different queue.
+    /// </summary>
+    /// <param name="queueName">The name of the destination queue.</param>
+    /// <param name="messages">The messages to move.</param>
+    public void MoveTo(string queueName, Message[] messages)
+    {
+        _impl.AddAction(new MoveAllAction(_impl.Queue, messages, queueName));
+    }
+
     private class BatchQueueContextImpl : IQueueContext
     {
         private readonly Message[] _messages;
-        private readonly Queue _queue;
         private readonly List<IBatchAction> _actions;
+
+        internal Queue Queue { get; }
 
         internal BatchQueueContextImpl(Message[] messages, Queue queue)
         {
             _messages = messages;
-            _queue = queue;
+            Queue = queue;
             _actions = new List<IBatchAction>();
         }
+
+        internal void AddAction(IBatchAction action) => _actions.Add(action);
 
         public void CommitChanges()
         {
             if (_actions.Count == 0) return;
 
-            using var transaction = _queue.Store.BeginTransaction();
+            using var transaction = Queue.Store.BeginTransaction();
             foreach (var action in _actions)
             {
                 action.Execute(transaction);
@@ -72,32 +117,32 @@ public class BatchQueueContext
 
         public void SuccessfullyReceived()
         {
-            _actions.Add(new SuccessAllAction(_queue, _messages));
+            _actions.Add(new SuccessAllAction(Queue, _messages));
         }
 
         public void MoveTo(string queueName)
         {
-            _actions.Add(new MoveAllAction(_queue, _messages, queueName));
+            _actions.Add(new MoveAllAction(Queue, _messages, queueName));
         }
 
         public void Send(Message message)
         {
-            _actions.Add(new SendAction(_queue, message));
+            _actions.Add(new SendAction(Queue, message));
         }
 
         public void Enqueue(Message message)
         {
-            _actions.Add(new EnqueueAction(_queue, message));
+            _actions.Add(new EnqueueAction(Queue, message));
         }
 
         public void ReceiveLater(TimeSpan timeSpan)
         {
-            _actions.Add(new ReceiveLaterTimeSpanAction(_queue, _messages, timeSpan));
+            _actions.Add(new ReceiveLaterTimeSpanAction(Queue, _messages, timeSpan));
         }
 
         public void ReceiveLater(DateTimeOffset time)
         {
-            _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, _messages, time));
+            _actions.Add(new ReceiveLaterDateTimeOffsetAction(Queue, _messages, time));
         }
     }
 

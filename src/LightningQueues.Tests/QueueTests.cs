@@ -495,4 +495,87 @@ public class QueueTests : TestBase
             sw.ElapsedMilliseconds.ShouldBeLessThan(1000);
         }, TimeSpan.FromSeconds(5));
     }
+    
+    public async Task receive_batch_receive_later_subset_of_messages()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.Enqueue(NewMessage("test", "process-now"));
+            queue.Enqueue(NewMessage("test", "defer-me"));
+            queue.Enqueue(NewMessage("test", "also-process"));
+            
+            // Get the batch
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            batchCtx.Messages.Length.ShouldBe(3);
+            
+            // Split messages: defer one, mark the rest as received
+            var toDefer = batchCtx.Messages.Where(m => 
+                System.Text.Encoding.UTF8.GetString(m.DataArray!) == "defer-me").ToArray();
+            var toProcess = batchCtx.Messages.Where(m => 
+                System.Text.Encoding.UTF8.GetString(m.DataArray!) != "defer-me").ToArray();
+            
+            toDefer.Length.ShouldBe(1);
+            toProcess.Length.ShouldBe(2);
+            
+            // Defer one message, successfully receive the others
+            batchCtx.ReceiveLater(toDefer, TimeSpan.FromMilliseconds(500));
+            batchCtx.SuccessfullyReceived(toProcess);
+            batchCtx.QueueContext.CommitChanges();
+            
+            // The deferred message should reappear after the delay
+            var reappeared = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            System.Text.Encoding.UTF8.GetString(reappeared.Message.DataArray!).ShouldBe("defer-me");
+        }, TimeSpan.FromSeconds(5));
+    }
+    
+    public async Task receive_batch_receive_later_subset_with_datetimeoffset()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.Enqueue(NewMessage("test", "process-now"));
+            queue.Enqueue(NewMessage("test", "defer-me"));
+            
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            batchCtx.Messages.Length.ShouldBe(2);
+            
+            var toDefer = batchCtx.Messages.Where(m => 
+                System.Text.Encoding.UTF8.GetString(m.DataArray!) == "defer-me").ToArray();
+            var toProcess = batchCtx.Messages.Where(m => 
+                System.Text.Encoding.UTF8.GetString(m.DataArray!) != "defer-me").ToArray();
+            
+            batchCtx.ReceiveLater(toDefer, DateTimeOffset.Now.AddMilliseconds(500));
+            batchCtx.SuccessfullyReceived(toProcess);
+            batchCtx.QueueContext.CommitChanges();
+            
+            // The deferred message should reappear after the specified time
+            var reappeared = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            System.Text.Encoding.UTF8.GetString(reappeared.Message.DataArray!).ShouldBe("defer-me");
+        }, TimeSpan.FromSeconds(5));
+    }
+    
+    public async Task receive_batch_move_subset_of_messages()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.CreateQueue("other");
+            queue.Enqueue(NewMessage("test", "stay"));
+            queue.Enqueue(NewMessage("test", "move-me"));
+            
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            batchCtx.Messages.Length.ShouldBe(2);
+            
+            var toMove = batchCtx.Messages.Where(m =>
+                System.Text.Encoding.UTF8.GetString(m.DataArray!) == "move-me").ToArray();
+            var toKeep = batchCtx.Messages.Where(m =>
+                System.Text.Encoding.UTF8.GetString(m.DataArray!) != "move-me").ToArray();
+            
+            batchCtx.MoveTo("other", toMove);
+            batchCtx.SuccessfullyReceived(toKeep);
+            batchCtx.QueueContext.CommitChanges();
+            
+            // The moved message should appear in the "other" queue
+            var moved = await queue.Receive("other", cancellationToken: token).FirstAsync(token);
+            System.Text.Encoding.UTF8.GetString(moved.Message.DataArray!).ShouldBe("move-me");
+        }, TimeSpan.FromSeconds(5));
+    }
 }
