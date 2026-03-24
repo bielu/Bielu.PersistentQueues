@@ -4,11 +4,19 @@ using LightningQueues.Serialization;
 using LightningQueues.Storage;
 using LightningQueues.Storage.LMDB;
 using Shouldly;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace LightningQueues.Tests.Storage.Lmdb;
 
 public class IncomingMessageTests : TestBase
 {
+    public IncomingMessageTests(ITestOutputHelper output)
+    {
+        Output = output;
+    }
+
+    [Fact]
     public void happy_path_success()
     {
         StorageScenario(store =>
@@ -27,6 +35,7 @@ public class IncomingMessageTests : TestBase
         });
     }
 
+    [Fact]
     public void storing_message_for_queue_that_doesnt_exist()
     {
         StorageScenario(store =>
@@ -36,6 +45,7 @@ public class IncomingMessageTests : TestBase
         });
     }
 
+    [Fact]
     public void crash_before_commit()
     {
         StorageScenario(store =>
@@ -58,6 +68,7 @@ public class IncomingMessageTests : TestBase
 
     }
 
+    [Fact]
     public void rollback_messages_received()
     {
         StorageScenario(store =>
@@ -74,6 +85,7 @@ public class IncomingMessageTests : TestBase
         });
     }
 
+    [Fact]
     public void creating_multiple_stores()
     {
         StorageScenario(store =>

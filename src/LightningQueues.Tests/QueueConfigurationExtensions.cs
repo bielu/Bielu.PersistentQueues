@@ -10,12 +10,13 @@ using LightningQueues.Logging;
 using LightningQueues.Net.Security;
 using Microsoft.Extensions.Logging;
 using LightningQueues.Storage.LMDB;
+using Xunit.Abstractions;
 
 namespace LightningQueues.Tests;
 
 public static class QueueConfigurationExtensions
 {
-    public static QueueConfiguration WithDefaultsForTest(this QueueConfiguration configuration, TextWriter? console = null)
+    public static QueueConfiguration WithDefaultsForTest(this QueueConfiguration configuration, ITestOutputHelper? output = null)
     {
         configuration.WithDefaults();
         configuration.StoreWithLmdb(TestBase.TempPath(), new EnvironmentConfiguration
@@ -23,7 +24,7 @@ public static class QueueConfigurationExtensions
             MapSize = 1024 * 1024 * 100,
             MaxDatabases = 5
         });
-        configuration.LogWith(new RecordingLogger(console, LogLevel.Information));
+        configuration.LogWith(new RecordingLogger(output != null ? new TestOutputHelperWriter(output) : null, LogLevel.Information));
         return configuration;
     }
 

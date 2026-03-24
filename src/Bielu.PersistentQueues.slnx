@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="LightningQueues.Tests/LightningQueues.Tests.csproj" />
+  </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="LightningQueues.Benchmarks/LightningQueues.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/Solution Files/">
+    <File Path="../.gitignore" />
+    <File Path="../CODEOWNERS" />
+    <File Path="../CONTRIBUTING.md" />
+    <File Path="../LICENSE" />
+    <File Path="../readme.md" />
+    <File Path="../version.props" />
+    <File Path="../Directory.Packages.props" />
+  </Folder>
+  <Project Path="LightningQueues/LightningQueues.csproj" />
+</Solution>

@@ -7,11 +7,19 @@ using LightningQueues.Logging;
 using LightningQueues.Serialization;
 using LightningQueues.Storage.LMDB;
 using Shouldly;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace LightningQueues.Tests;
 
 public class QueueTests : TestBase
 {
+    public QueueTests(ITestOutputHelper output)
+    {
+        Output = output;
+    }
+
+    [Fact]
     public async Task receive_at_a_later_time()
     {
         await QueueScenario(async (queue, token) =>
@@ -25,6 +33,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(4));
     }
 
+    [Fact]
     public async Task receive_at_a_specified_time()
     {
         await QueueScenario(async (queue, token) =>
@@ -38,6 +47,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(4));
     }
 
+    [Fact]
     public async Task enqueue_a_message()
     {
         await QueueScenario(async (queue, token) =>
@@ -52,6 +62,7 @@ public class QueueTests : TestBase
         });
     }
 
+    [Fact]
     public async Task moving_queues()
     {
         await QueueScenario(async (queue, token) =>
@@ -67,6 +78,7 @@ public class QueueTests : TestBase
         });
     }
 
+    [Fact]
     public async Task send_message_to_self()
     {
         await QueueScenario(async (queue, token) =>
@@ -84,6 +96,7 @@ public class QueueTests : TestBase
         });
     }
 
+    [Fact]
     public async Task sending_to_bad_endpoint_no_retries_integration_test()
     {
         await QueueScenario(config =>
@@ -105,6 +118,7 @@ public class QueueTests : TestBase
             }, TimeSpan.FromSeconds(10));
     }
 
+    [Fact]
     public async Task can_start_two_instances_for_IIS_stop_and_start()
     {
         //This shows that the port doesn't have an exclusive lock, and that lmdb itself can have multiple instances
@@ -114,7 +128,7 @@ public class QueueTests : TestBase
         using var store = new LmdbMessageStore(env, serializer);
         var queueConfiguration = new QueueConfiguration();
         queueConfiguration.WithDefaults();
-        queueConfiguration.LogWith(new RecordingLogger(Console));
+        queueConfiguration.LogWith(new RecordingLogger(OutputWriter));
         queueConfiguration.AutomaticEndpoint();
         queueConfiguration.SerializeWith(serializer);
         queueConfiguration.StoreMessagesWith(() => store);
@@ -127,6 +141,7 @@ public class QueueTests : TestBase
         await cancellation.CancelAsync();
     }
     
+    [Fact]
     public async Task send_batch_of_messages()
     {
         await QueueScenario(async (queue, token) =>
@@ -175,6 +190,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task receive_from_multiple_queues_concurrently()
     {
         await QueueScenario(async (queue, token) =>
@@ -213,6 +229,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task get_all_queue_names()
     {
         await QueueScenario((queue, token) =>
@@ -236,6 +253,7 @@ public class QueueTests : TestBase
         });
     }
     
+    [Fact]
     public async Task receive_batch_of_enqueued_messages()
     {
         await QueueScenario(async (queue, token) =>
@@ -254,6 +272,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task receive_batch_with_max_messages_limit()
     {
         await QueueScenario(async (queue, token) =>
@@ -268,6 +287,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task receive_batch_returns_empty_on_timeout_when_no_messages()
     {
         await QueueScenario(async (queue, token) =>
@@ -284,6 +304,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(3));
     }
     
+    [Fact]
     public async Task receive_batch_yields_multiple_batches_as_messages_arrive()
     {
         await QueueScenario(async (queue, token) =>
@@ -314,6 +335,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task receive_batch_respects_cancellation_token()
     {
         await QueueScenario(async (queue, token) =>
@@ -334,6 +356,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(3));
     }
     
+    [Fact]
     public async Task receive_batch_with_timeout_collects_messages_over_window()
     {
         await QueueScenario(async (queue, token) =>
@@ -365,6 +388,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task receive_batch_without_timeout_yields_immediately()
     {
         await QueueScenario(async (queue, token) =>
@@ -382,6 +406,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(3));
     }
     
+    [Fact]
     public async Task receive_batch_timeout_does_not_yield_empty_batches()
     {
         await QueueScenario(async (queue, token) =>
@@ -402,6 +427,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(3));
     }
     
+    [Fact]
     public async Task receive_batch_timeout_with_max_messages_yields_early_when_full()
     {
         await QueueScenario(async (queue, token) =>
@@ -425,6 +451,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task receive_batch_timeout_alone_waits_for_window()
     {
         await QueueScenario(async (queue, token) =>
@@ -446,6 +473,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task receive_batch_timeout_collects_late_arriving_messages()
     {
         await QueueScenario(async (queue, token) =>
@@ -474,6 +502,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task receive_batch_either_max_or_timeout_whichever_first()
     {
         await QueueScenario(async (queue, token) =>
@@ -496,6 +525,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task receive_batch_receive_later_subset_of_messages()
     {
         await QueueScenario(async (queue, token) =>
@@ -528,6 +558,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task receive_batch_receive_later_subset_with_datetimeoffset()
     {
         await QueueScenario(async (queue, token) =>
@@ -553,6 +584,7 @@ public class QueueTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task receive_batch_move_subset_of_messages()
     {
         await QueueScenario(async (queue, token) =>

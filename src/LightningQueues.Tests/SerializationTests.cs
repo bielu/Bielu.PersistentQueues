@@ -3,11 +3,19 @@ using System.Buffers;
 using System.Collections.Generic;
 using LightningQueues.Serialization;
 using Shouldly;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace LightningQueues.Tests;
 
 public class SerializationTests : TestBase
 {
+    public SerializationTests(ITestOutputHelper output)
+    {
+        Output = output;
+    }
+
+    [Fact]
     public void can_serialize_and_deserialize_message_as_span()
     {
         var serializer = new MessageSerializer();
@@ -24,6 +32,7 @@ public class SerializationTests : TestBase
         deserialized.DataArray.ShouldBe(msg.DataArray);
     }
 
+    [Fact]
     public void comb_guid_generates_ascending_keys()
     {
         // Generate 1000 COMBs rapidly and verify they're in strictly ascending order
@@ -43,6 +52,7 @@ public class SerializationTests : TestBase
         }
     }
 
+    [Fact]
     public void wire_format_reader_extracts_routing_info_correctly()
     {
         var serializer = new MessageSerializer();
@@ -74,6 +84,7 @@ public class SerializationTests : TestBase
         rawMessage.FullMessage.Length.ShouldBe(serializedBytes.Length);
     }
 
+    [Fact]
     public void wire_format_reader_handles_message_with_headers()
     {
         var serializer = new MessageSerializer();
@@ -92,6 +103,7 @@ public class SerializationTests : TestBase
         WireFormatReader.GetQueueName(in rawMessage).ShouldBe("headerqueue");
     }
 
+    [Fact]
     public void wire_format_reader_destination_comparison_without_allocation()
     {
         var serializer = new MessageSerializer();

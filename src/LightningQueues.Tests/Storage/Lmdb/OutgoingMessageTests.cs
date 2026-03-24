@@ -3,11 +3,19 @@ using System.Collections.Generic;
 using System.Linq;
 using LightningQueues.Serialization;
 using Shouldly;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace LightningQueues.Tests.Storage.Lmdb;
 
 public class OutgoingMessageTests : TestBase
 {
+    public OutgoingMessageTests(ITestOutputHelper output)
+    {
+        Output = output;
+    }
+
+    [Fact]
     public void happy_path_messages_sent()
     {
         StorageScenario(store =>
@@ -46,6 +54,7 @@ public class OutgoingMessageTests : TestBase
         });
     }
 
+    [Fact]
     public void failed_to_send_with_max_attempts()
     {
         StorageScenario(store =>
@@ -69,6 +78,7 @@ public class OutgoingMessageTests : TestBase
         });
     }
 
+    [Fact]
     public void failed_to_send_with_deliver_by()
     {
         StorageScenario(store =>
@@ -92,6 +102,7 @@ public class OutgoingMessageTests : TestBase
         });
     }
 
+    [Fact]
     public void persisted_outgoing_raw_returns_wire_format_with_routing_info()
     {
         StorageScenario(store =>

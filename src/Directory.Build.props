@@ -1,0 +1,24 @@
+<Project>
+
+    <Import Project="../version.props"/>
+
+    <PropertyGroup>
+      <Title>$(MSBuildProjectName)</Title>
+      <AssemblyName>$(MSBuildProjectName)</AssemblyName>
+      <AssemblyVersion>$(Version)</AssemblyVersion>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <Authors>bielu;Corey Kaylor</Authors>
+        <PackageOutputPath>$(MSBuildProjectDirectory)/../../dist</PackageOutputPath>
+        <PackageReadmeFile>readme.md</PackageReadmeFile>
+        <RepositoryUrl>https://github.com/bielu/Bielu.PersistentQueues</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageProjectUrl>https://github.com/bielu/Bielu.PersistentQueues</PackageProjectUrl>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="$(MSBuildThisFileDirectory)../readme.md" Pack="true" PackagePath="/" />
+    </ItemGroup>
+
+</Project>

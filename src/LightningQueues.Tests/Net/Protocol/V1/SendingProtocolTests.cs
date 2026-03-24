@@ -10,18 +10,25 @@ using LightningQueues.Net.Security;
 using LightningQueues.Serialization;
 using LightningQueues.Storage.LMDB;
 using Shouldly;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace LightningQueues.Tests.Net.Protocol.V1;
 
 public class SendingProtocolTests : TestBase
 {
+    public SendingProtocolTests(ITestOutputHelper output)
+    {
+        Output = output;
+    }
 
+    [Fact]
     public async Task writing_single_message()
     {
         var serializer = new MessageSerializer();
         using var env = LightningEnvironment();
         using var store = new LmdbMessageStore(env, serializer);
-        var sender = new SendingProtocol(store, new NoSecurity(), serializer, new RecordingLogger(Console));
+        var sender = new SendingProtocol(store, new NoSecurity(), serializer, new RecordingLogger(OutputWriter));
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(1));
         var expected = Message.Create(
             data: "hello"u8.ToArray(),

@@ -6,13 +6,15 @@ using System.Threading.Tasks;
 using LightningDB;
 using LightningQueues.Serialization;
 using LightningQueues.Storage.LMDB;
+using Xunit.Abstractions;
 
 namespace LightningQueues.Tests;
 
 public class TestBase
 {
    private static readonly string _tempPath = Path.Combine(Path.GetTempPath(), $"lightningqueuestests-{Environment.Version.ToString()}");
-   internal TextWriter? Console { get; set; }
+   protected ITestOutputHelper? Output { get; set; }
+   protected TextWriter? OutputWriter => Output != null ? new TestOutputHelperWriter(Output) : null;
 
    protected static Task DeterministicDelay(int delayMs, CancellationToken token)
    {
@@ -48,7 +50,7 @@ public class TestBase
       var serializer = new MessageSerializer();
       using var env = LightningEnvironment();
       var queueConfiguration = new QueueConfiguration()
-         .WithDefaultsForTest(Console)
+         .WithDefaultsForTest(Output)
          .SerializeWith(serializer)
          .StoreWithLmdb(() => env);
       queueBuilder(queueConfiguration);

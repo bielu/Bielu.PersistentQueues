@@ -12,11 +12,19 @@ using LightningQueues.Net.Security;
 using LightningQueues.Serialization;
 using LightningQueues.Storage.LMDB;
 using Shouldly;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace LightningQueues.Tests.Net.Protocol.V1;
 
 public class ReceivingProtocolTests : TestBase
 {
+    public ReceivingProtocolTests(ITestOutputHelper output)
+    {
+        Output = output;
+    }
+
+    [Fact]
     public async Task client_sending_negative_length_is_ignored()
     {
         await ReceivingScenario(async (protocol, _, token) =>
@@ -28,6 +36,7 @@ public class ReceivingProtocolTests : TestBase
         });
     }
 
+    [Fact]
     public async Task handling_disconnects_mid_protocol_gracefully()
     {
         await ReceivingScenario(async (protocol, _, token) =>
@@ -42,6 +51,7 @@ public class ReceivingProtocolTests : TestBase
         });
     }
 
+    [Fact]
     public async Task handling_valid_length()
     {
         await ReceivingScenario(async (protocol, logger, token) =>
@@ -51,6 +61,7 @@ public class ReceivingProtocolTests : TestBase
         });
     }
 
+    [Fact]
     public async Task sending_shorter_length_than_payload_length()
     {
         await ReceivingScenario(async (protocol, _, token) =>
@@ -61,6 +72,7 @@ public class ReceivingProtocolTests : TestBase
         });
     }
 
+    [Fact]
     public async Task sending_longer_length_than_payload_length()
     {
         await ReceivingScenario(async (protocol, _, token) =>
@@ -86,6 +98,7 @@ public class ReceivingProtocolTests : TestBase
         var msgs = await protocol.ReceiveMessagesAsync(ms, token);
     }
 
+    [Fact]
     public async Task sending_to_a_queue_that_doesnt_exist()
     {
         await ReceivingScenario(async (protocol, _, token) =>
@@ -107,6 +120,7 @@ public class ReceivingProtocolTests : TestBase
         });
     }
 
+    [Fact]
     public async Task sending_data_that_is_cannot_be_deserialized()
     {
         await ReceivingScenario(async (protocol, _, token) =>
@@ -129,6 +143,7 @@ public class ReceivingProtocolTests : TestBase
         });
     }
 
+    [Fact]
     public async Task supports_ability_to_cancel_for_slow_clients()
     {
         await ReceivingScenario(async (protocol, logger, _) =>
@@ -146,7 +161,7 @@ public class ReceivingProtocolTests : TestBase
     private async Task ReceivingScenario(Func<ReceivingProtocol, RecordingLogger, CancellationToken, Task> scenario)
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-        var logger = new RecordingLogger(Console);
+        var logger = new RecordingLogger(OutputWriter);
         var serializer = new MessageSerializer();
         using var env = LightningEnvironment();
         using var store = new LmdbMessageStore(env, serializer);

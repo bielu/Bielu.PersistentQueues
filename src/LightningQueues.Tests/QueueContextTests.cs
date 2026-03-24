@@ -4,11 +4,19 @@ using System.Linq;
 using System.Text;
 using Shouldly;
 using LightningQueues.Storage.LMDB;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace LightningQueues.Tests;
 
 public class QueueContextTests : TestBase
 {
+    public QueueContextTests(ITestOutputHelper output)
+    {
+        Output = output;
+    }
+
+    [Fact]
     public async Task successfully_received_removes_message_from_queue()
     {
         await QueueScenario(async (queue, token) =>
@@ -29,6 +37,7 @@ public class QueueContextTests : TestBase
         }, TimeSpan.FromSeconds(3));
     }
     
+    [Fact]
     public async Task move_to_moves_message_to_another_queue()
     {
         await QueueScenario(async (queue, token) =>
@@ -50,6 +59,7 @@ public class QueueContextTests : TestBase
         });
     }
     
+    [Fact]
     public async Task send_enqueues_outgoing_message()
     {
         await QueueScenario(async (queue, token) =>
@@ -75,6 +85,7 @@ public class QueueContextTests : TestBase
         }, TimeSpan.FromSeconds(3));
     }
     
+    [Fact]
     public async Task receive_later_with_time_span_delays_processing()
     {
         await QueueScenario(async (queue, token) =>
@@ -99,6 +110,7 @@ public class QueueContextTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task receive_later_with_date_time_offset_delays_processing()
     {
         await QueueScenario(async (queue, token) =>
@@ -124,6 +136,7 @@ public class QueueContextTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task enqueue_adds_message_to_queue()
     {
         await QueueScenario(async (queue, token) =>
@@ -147,6 +160,7 @@ public class QueueContextTests : TestBase
         }, TimeSpan.FromSeconds(3));
     }
     
+    [Fact]
     public async Task commit_changes_executes_all_pending_actions()
     {
         await QueueScenario(async (queue, token) =>
@@ -199,6 +213,7 @@ public class QueueContextTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task batch_context_removes_all_messages_from_queue()
     {
         await QueueScenario(async (queue, token) =>
@@ -226,6 +241,7 @@ public class QueueContextTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task batch_context_moves_all_messages_to_another_queue()
     {
         await QueueScenario(async (queue, token) =>
@@ -251,6 +267,7 @@ public class QueueContextTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task batch_context_exposes_all_messages()
     {
         await QueueScenario(async (queue, token) =>
@@ -271,6 +288,7 @@ public class QueueContextTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task batch_context_single_message_batch()
     {
         await QueueScenario(async (queue, token) =>
@@ -288,6 +306,7 @@ public class QueueContextTests : TestBase
         }, TimeSpan.FromSeconds(5));
     }
     
+    [Fact]
     public async Task single_receive_still_uses_per_message_context()
     {
         await QueueScenario(async (queue, token) =>
