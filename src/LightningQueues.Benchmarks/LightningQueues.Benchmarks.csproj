@@ -12,6 +12,8 @@
       <PackageReference Include="BenchmarkDotNet" Version="0.15.0" />
       <PackageReference Include="BenchmarkDotNet.Diagnostics.dotMemory" Version="0.15.0" />
       <PackageReference Include="BenchmarkDotNet.Diagnostics.dotTrace" Version="0.15.0" />
+      <PackageReference Include="Microsoft.FASTER.Core" Version="2.6.5" />
+      <PackageReference Include="ZoneTree" Version="1.8.6" />
     </ItemGroup>
 
     <ItemGroup>
