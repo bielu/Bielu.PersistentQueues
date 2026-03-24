@@ -44,7 +44,7 @@ public class StorageProviderBenchmark
     private byte[][] _keys = null!;
     private byte[][] _values = null!;
 
-    [Params(100, 1000, 10000)]
+    [Params(100, 1_000, 10_000, 100_000, 1_000_000)]
     public int MessageCount { get; set; }
 
     [Params(64, 512)]
@@ -79,11 +79,18 @@ public class StorageProviderBenchmark
         }
 
         // --- Initialize LMDB ---
+        // Scale map size based on message count to avoid running out of space
+        var lmdbMapSize = MessageCount switch
+        {
+            >= 1_000_000 => 4L * 1024 * 1024 * 1024,  // 4GB for 1M messages
+            >= 100_000 => 2L * 1024 * 1024 * 1024,     // 2GB for 100K messages
+            _ => 1L * 1024 * 1024 * 1024                // 1GB default
+        };
         _lmdbPath = Path.Combine(basePath, "lmdb");
         Directory.CreateDirectory(_lmdbPath);
         _lmdbEnv = new LightningEnvironment(_lmdbPath, new EnvironmentConfiguration
         {
-            MapSize = 1024L * 1024 * 1024, // 1GB
+            MapSize = lmdbMapSize,
             MaxDatabases = 5
         });
         _lmdbEnv.Open(EnvironmentOpenFlags.NoLock | EnvironmentOpenFlags.MapAsync);
@@ -104,6 +111,13 @@ public class StorageProviderBenchmark
             .OpenOrCreate();
 
         // --- Initialize FASTER ---
+        // Scale FASTER in-memory log size based on message count
+        var fasterMemoryBits = MessageCount switch
+        {
+            >= 1_000_000 => 30, // 1GB in-memory log
+            >= 100_000 => 28,   // 256MB in-memory log
+            _ => 25             // 32MB in-memory log
+        };
         _fasterPath = Path.Combine(basePath, "faster");
         Directory.CreateDirectory(_fasterPath);
         _fasterLog = Devices.CreateLogDevice(Path.Combine(_fasterPath, "hlog.log"));
@@ -112,8 +126,8 @@ public class StorageProviderBenchmark
             new LogSettings
             {
                 LogDevice = _fasterLog,
-                MemorySizeBits = 25, // 32MB in-memory log
-                PageSizeBits = 20   // 1MB pages
+                MemorySizeBits = fasterMemoryBits,
+                PageSizeBits = 22   // 4MB pages for better throughput at scale
             }
         );
         _fasterSession = _fasterStore.NewSession(new SpanByteFunctions<Empty>());
@@ -171,14 +185,20 @@ public class StorageProviderBenchmark
             foreach (var file in Directory.GetFiles(_fasterPath))
                 File.Delete(file);
         }
+        var fasterMemoryBits = MessageCount switch
+        {
+            >= 1_000_000 => 30,
+            >= 100_000 => 28,
+            _ => 25
+        };
         _fasterLog = Devices.CreateLogDevice(Path.Combine(_fasterPath, "hlog.log"));
         _fasterStore = new FasterKV<SpanByte, SpanByte>(
             1L << 20,
             new LogSettings
             {
                 LogDevice = _fasterLog,
-                MemorySizeBits = 25,
-                PageSizeBits = 20
+                MemorySizeBits = fasterMemoryBits,
+                PageSizeBits = 22
             }
         );
         _fasterSession = _fasterStore.NewSession(new SpanByteFunctions<Empty>());
