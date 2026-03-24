@@ -147,7 +147,7 @@ public class Queue : IQueue
     /// processing the message such as marking it as received, moving it to another queue,
     /// or scheduling it for later processing.
     /// </remarks>
-    public async IAsyncEnumerable<MessageContext> Receive(string queueName, int pollIntervalInMilliseconds = 200, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<IMessageContext> Receive(string queueName, int pollIntervalInMilliseconds = 200, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         // Combine the user's token with our disposal token, creating as few objects as possible
         using var linkedSource = cancellationToken != CancellationToken.None

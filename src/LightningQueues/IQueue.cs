@@ -44,8 +44,8 @@ public interface IQueue : IDisposable, IAsyncDisposable
     /// <param name="queueName">The name of the queue to receive messages from.</param>
     /// <param name="pollIntervalInMilliseconds">The period to rest before checking for new messages if no messages are found.</param>
     /// <param name="cancellationToken">A token to cancel the receive operation.</param>
-    /// <returns>An asynchronous stream of <see cref="MessageContext"/> objects.</returns>
-    public IAsyncEnumerable<MessageContext> Receive(string queueName, int pollIntervalInMilliseconds = 200,
+    /// <returns>An asynchronous stream of <see cref="IMessageContext"/> objects.</returns>
+    public IAsyncEnumerable<IMessageContext> Receive(string queueName, int pollIntervalInMilliseconds = 200,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -278,7 +278,7 @@ public class QueueTests : TestBase
             var batches = await queue.ReceiveBatch("test", cancellationToken: linked.Token)
                 .ToListAsync(linked.Token)
                 .AsTask()
-                .ContinueWith(t => t.IsCompletedSuccessfully ? t.Result : new List<BatchQueueContext>());
+                .ContinueWith(t => t.IsCompletedSuccessfully ? t.Result : new List<IBatchQueueContext>());
             
             batches.Count.ShouldBe(0);
         }, TimeSpan.FromSeconds(3));
@@ -290,7 +290,7 @@ public class QueueTests : TestBase
         {
             queue.Enqueue(NewMessage("test", "first"));
             
-            var batches = new List<BatchQueueContext>();
+            var batches = new List<IBatchQueueContext>();
             var batchEnumerator = queue.ReceiveBatch("test", pollIntervalInMilliseconds: 50, cancellationToken: token)
                 .GetAsyncEnumerator(token);
             
@@ -301,8 +301,8 @@ public class QueueTests : TestBase
             System.Text.Encoding.UTF8.GetString(batches[0].Messages[0].DataArray!).ShouldBe("first");
             
             // Acknowledge first batch so it's removed from storage, then enqueue more
-            batches[0].QueueContext.SuccessfullyReceived();
-            batches[0].QueueContext.CommitChanges();
+            batches[0].SuccessfullyReceived();
+            batches[0].CommitChanges();
             
             queue.Enqueue(NewMessage("test", "second"));
             (await batchEnumerator.MoveNextAsync()).ShouldBeTrue();
@@ -323,7 +323,7 @@ public class QueueTests : TestBase
             using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, token);
             
-            var batches = new List<BatchQueueContext>();
+            var batches = new List<IBatchQueueContext>();
             await foreach (var batchCtx in queue.ReceiveBatch("test", pollIntervalInMilliseconds: 50, cancellationToken: linked.Token))
             {
                 batches.Add(batchCtx);
@@ -390,7 +390,7 @@ public class QueueTests : TestBase
             using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(600));
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, token);
             
-            var batches = new List<BatchQueueContext>();
+            var batches = new List<IBatchQueueContext>();
             await foreach (var batchCtx in queue.ReceiveBatch("test", batchTimeoutInMilliseconds: 200, 
                 pollIntervalInMilliseconds: 50, cancellationToken: linked.Token))
             {
@@ -520,7 +520,7 @@ public class QueueTests : TestBase
             // Defer one message, successfully receive the others
             batchCtx.ReceiveLater(toDefer, TimeSpan.FromMilliseconds(500));
             batchCtx.SuccessfullyReceived(toProcess);
-            batchCtx.QueueContext.CommitChanges();
+            batchCtx.CommitChanges();
             
             // The deferred message should reappear after the delay
             var reappeared = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
@@ -545,7 +545,7 @@ public class QueueTests : TestBase
             
             batchCtx.ReceiveLater(toDefer, DateTimeOffset.Now.AddMilliseconds(500));
             batchCtx.SuccessfullyReceived(toProcess);
-            batchCtx.QueueContext.CommitChanges();
+            batchCtx.CommitChanges();
             
             // The deferred message should reappear after the specified time
             var reappeared = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
@@ -571,7 +571,7 @@ public class QueueTests : TestBase
             
             batchCtx.MoveTo("other", toMove);
             batchCtx.SuccessfullyReceived(toKeep);
-            batchCtx.QueueContext.CommitChanges();
+            batchCtx.CommitChanges();
             
             // The moved message should appear in the "other" queue
             var moved = await queue.Receive("other", cancellationToken: token).FirstAsync(token);

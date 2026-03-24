@@ -213,8 +213,8 @@ public class QueueContextTests : TestBase
             var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
             batchCtx.Messages.Length.ShouldBe(3);
             
-            batchCtx.QueueContext.SuccessfullyReceived();
-            batchCtx.QueueContext.CommitChanges();
+            batchCtx.SuccessfullyReceived();
+            batchCtx.CommitChanges();
             
             // Verify every single message was removed, not just the first
             var store = (LmdbMessageStore)queue.Store;
@@ -237,8 +237,8 @@ public class QueueContextTests : TestBase
             var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
             batchCtx.Messages.Length.ShouldBe(2);
             
-            batchCtx.QueueContext.MoveTo("other");
-            batchCtx.QueueContext.CommitChanges();
+            batchCtx.MoveTo("other");
+            batchCtx.CommitChanges();
             
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").Any().ShouldBeFalse();
@@ -280,8 +280,8 @@ public class QueueContextTests : TestBase
             var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
             batchCtx.Messages.Length.ShouldBe(1);
             
-            batchCtx.QueueContext.SuccessfullyReceived();
-            batchCtx.QueueContext.CommitChanges();
+            batchCtx.SuccessfullyReceived();
+            batchCtx.CommitChanges();
             
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").Any().ShouldBeFalse();
