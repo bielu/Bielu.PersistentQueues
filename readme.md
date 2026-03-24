@@ -76,7 +76,7 @@ services.AddPersistentQueues(builder =>
     builder
         .AddLmdbStorage("C:\\path_to_your_queue_folder", config =>
         {
-            config.EnvironmentConfiguration = new EnvironmentConfiguration
+            config.EnvironmentConfiguration = new LightningDB.EnvironmentConfiguration
             {
                 MaxDatabases = 10,
                 MapSize = 1024 * 1024 * 500 // 500 MB
@@ -159,8 +159,8 @@ Storage providers are distributed as separate NuGet packages, each implementing 
 **Currently available:**
 - **LMDB** (`Bielu.PersistentQueues.Storage.LMDB`) — High-performance embedded key-value store powered by [LightningDB](https://github.com/CoreyKaylor/Lightning.NET).
 
-**Planned:**
-- Additional storage backends can be implemented by creating a package that references `Bielu.PersistentQueues` and implements `IMessageStore` and `IStoreTransaction`.
+**Extensibility:**
+- Additional storage backends can be added by creating a package that references `Bielu.PersistentQueues` and implements `IMessageStore` and `IStoreTransaction`.
 
 ### Custom Storage Providers
 
