@@ -7,7 +7,7 @@ results/
 .vs/
 artifacts/
 TestData/
-BenchmarkDotnet.Artifacts/
+BenchmarkDotNet.Artifacts/
 logs/
 [Bb]in/
 [Oo]bj/

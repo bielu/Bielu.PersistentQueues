@@ -7,8 +7,8 @@
 [![NuGet Downloads](https://img.shields.io/nuget/dt/Bielu.PersistentQueues.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Bielu.PersistentQueues is a high-performance, lightweight, **store-and-forward message queue** for .NET applications. Powered
-by **LightningDB** (LMDB), it ensures fast and durable persistence for sending and receiving messages, making it an
+Bielu.PersistentQueues is a high-performance, lightweight, **store-and-forward message queue** for .NET applications with
+**pluggable storage backends**. It ensures fast and durable persistence for sending and receiving messages, making it an
 excellent choice for lightweight and cross-platform message queuing needs.
 
 > This project is a fork of [LightningQueues](https://github.com/LightningQueues/LightningQueues), originally created by [Corey Kaylor](https://github.com/CoreyKaylor). It extends the original with additional features, bug fixes, and alignment with the bielu package ecosystem.
@@ -18,69 +18,169 @@ excellent choice for lightweight and cross-platform message queuing needs.
 ## Why Bielu.PersistentQueues?
 
 - **Simple API**: Easily interact with the message queue through an intuitive API.
+- **Pluggable Storage**: Choose from multiple storage backends (LMDB included, more coming).
+- **Microsoft DI Integration**: First-class support for `Microsoft.Extensions.DependencyInjection` with a fluent builder API.
 - **No Administration**: Unlike MSMQ or other Server / Brokers, it requires zero administrative setup.
 - **XCopy Deployable**: No complex installation; just copy and run.
 - **Cross-Platform**: Works on Windows, macOS, and Linux.
-- **Durable Storage**: Leverages LMDB for high-performance reliable message storage.
+- **Durable Storage**: High-performance reliable message storage.
 - **TLS Encryption**: Optionally secure your transport layer. You have full control.
 - **Batch Receive**: Efficiently receive and process messages in batches.
 
 ---
 
+## Packages
+
+| Package | Description | NuGet |
+|---------|-------------|-------|
+| `Bielu.PersistentQueues` | Core library with queue abstractions and DI support | [![NuGet](https://img.shields.io/nuget/v/Bielu.PersistentQueues.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues/) |
+| `Bielu.PersistentQueues.Storage.LMDB` | LMDB storage provider (using LightningDB) | [![NuGet](https://img.shields.io/nuget/v/Bielu.PersistentQueues.Storage.LMDB.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues.Storage.LMDB/) |
+
+---
+
 ## Installation
 
-To use Bielu.PersistentQueues, add it to your .NET project via NuGet:
+Install the core package and the storage provider you want to use:
 
 ```bash
 dotnet add package Bielu.PersistentQueues
+dotnet add package Bielu.PersistentQueues.Storage.LMDB
 ```
 
 ---
 
 ## Getting Started
 
-Here’s how to use the library to set up a message queue and send a message:
+### Using Microsoft Dependency Injection (Recommended)
 
-### 1. Creating a Queue
+The recommended way to configure Bielu.PersistentQueues is via the fluent DI builder API:
+
+```csharp
+using Bielu.PersistentQueues;
+using Bielu.PersistentQueues.Storage.LMDB;
+
+services.AddPersistentQueues(builder =>
+{
+    builder
+        .AddLmdbStorage("C:\\path_to_your_queue_folder")
+        .ListenOn(new IPEndPoint(IPAddress.Loopback, 5050))
+        .CreateQueues("my-queue");
+});
+```
+
+You can also customize the LMDB storage configuration:
+
+```csharp
+services.AddPersistentQueues(builder =>
+{
+    builder
+        .AddLmdbStorage("C:\\path_to_your_queue_folder", config =>
+        {
+            config.EnvironmentConfiguration = new EnvironmentConfiguration
+            {
+                MaxDatabases = 10,
+                MapSize = 1024 * 1024 * 500 // 500 MB
+            };
+            config.StorageOptions = LmdbStorageOptions.MaxThroughput();
+        })
+        .AutomaticEndpoint()
+        .CreateQueues("queue-a", "queue-b");
+});
+```
+
+Then inject `IQueue` wherever you need it:
+
+```csharp
+public class MyService(IQueue queue)
+{
+    public void SendMessage()
+    {
+        queue.Send(new Message
+        {
+            Data = "hello"u8.ToArray(),
+            Id = MessageId.GenerateRandom(),
+            Queue = "my-queue",
+            Destination = new Uri("lq.tcp://localhost:5050")
+        });
+    }
+}
+```
+
+### Manual Configuration (Without DI)
+
+You can also configure the queue manually using `QueueConfiguration`:
 
 ```csharp
 using Bielu.PersistentQueues;
 
-// Define queue location and create the queue
 var queue = new QueueConfiguration()
-         .WithDefaults("C:\\path_to_your_queue_folder")
+         .WithDefaults()
+         .StoreWithLmdb("C:\\path_to_your_queue_folder")
          .BuildAndStart("queue-name");
 ```
 
-### 2. Sending Messages
+### Sending Messages
 
 ```csharp
-// Send a message to the queue
 var message = new Message
 {
      Data = "hello"u8.ToArray(),
-     Id = MessageId.GenerateRandom(), //source identifier (for the server instance) + message identifier
+     Id = MessageId.GenerateRandom(),
      Queue = "queue-name",
      Destination = new Uri("lq.tcp://localhost:port")
-     //Note the uri pattern, can be DNS, loopback, etc.
 };
 queue.Send(message);
 ```
 
-### 3. Receiving Messages
+### Receiving Messages
 
 ```csharp
-// Start receiving messages asynchronously with IAsyncEnumerable<MessageContext>
-var messages = queue.Receive("queue-name", token);
-await foreach (var msg in messages)
+await foreach (var msg in queue.Receive("queue-name", token))
 {
-    //process the message and respond with one or more of the following
-    msg.QueueContext.ReceiveLater(TimeSpan.FromSeconds(1));
-    msg.QueueContext.SuccessfullyReceived(); //nothing more to do, done processing
-    msg.QueueContext.Enqueue(msg.Message); //ideally a new message enqueued to the queue name on the msg
-    msg.QueueContext.Send(msg.Message); //send a response or send a message to another uri;
-    msg.QueueContext.MoveTo("different-queue"); //moves the currently received message to a different queue
-    msg.QueueContext.CommitChanges(); // Everything previous is gathered in memory and committed in one transaction with LightningDB
+    // Process the message and respond with one or more of the following:
+    msg.QueueContext.SuccessfullyReceived();  // Done processing
+    msg.QueueContext.ReceiveLater(TimeSpan.FromSeconds(1));  // Retry later
+    msg.QueueContext.Enqueue(msg.Message);    // Re-enqueue to same/other queue
+    msg.QueueContext.Send(msg.Message);       // Send to another endpoint
+    msg.QueueContext.MoveTo("other-queue");   // Move to different queue
+    msg.QueueContext.CommitChanges();         // Commit all changes atomically
+}
+```
+
+---
+
+## Architecture
+
+### Pluggable Storage
+
+The core library defines a storage-agnostic `IMessageStore` interface with `IStoreTransaction` for atomic operations.
+Storage providers are distributed as separate NuGet packages, each implementing these interfaces.
+
+**Currently available:**
+- **LMDB** (`Bielu.PersistentQueues.Storage.LMDB`) — High-performance embedded key-value store powered by [LightningDB](https://github.com/CoreyKaylor/Lightning.NET).
+
+**Planned:**
+- Additional storage backends can be implemented by creating a package that references `Bielu.PersistentQueues` and implements `IMessageStore` and `IStoreTransaction`.
+
+### Custom Storage Providers
+
+To implement your own storage provider:
+
+1. Create a new project referencing `Bielu.PersistentQueues`
+2. Implement `IMessageStore` and `IStoreTransaction`
+3. Create an extension method on `PersistentQueuesBuilder` to register your storage:
+
+```csharp
+public static PersistentQueuesBuilder AddMyStorage(
+    this PersistentQueuesBuilder builder,
+    string connectionString)
+{
+    builder.UseStorage(sp =>
+    {
+        // Create and return your IMessageStore implementation
+        return new MyMessageStore(connectionString);
+    });
+    return builder;
 }
 ```
 
@@ -99,27 +199,29 @@ dotnet test src/Bielu.PersistentQueues.slnx
 ## Transport Security (TLS Encryption)
 
 Bielu.PersistentQueues supports **TLS encryption** to secure communication. The library provides hooks to enable custom
-certificate validation and encryption settings. For example:
+certificate validation and encryption settings:
 
 ```csharp
-var certificate = LoadYourCertificate();
-configuration.SecureTransportWith(new TlsStreamSecurity(async (uri, stream) =>
+services.AddPersistentQueues(builder =>
 {
-    //client side with no validation of server certificate
-    var sslStream = new SslStream(stream, true, (_, _, _, _) => true, null);
-    await sslStream.AuthenticateAsClientAsync(uri.Host);
-    return sslStream;
-}),
-new TlsStreamSecurity(async (_, stream) =>
-{
-    var sslStream = new SslStream(stream, false);
-    await sslStream.AuthenticateAsServerAsync(certificate, false,
-        checkCertificateRevocation: false, enabledSslProtocols: SslProtocols.Tls12);
-    return sslStream;
-}));
+    builder
+        .AddLmdbStorage("C:\\queue_path")
+        .SecureTransportWith(
+            new TlsStreamSecurity(async (uri, stream) =>
+            {
+                var sslStream = new SslStream(stream, true, (_, _, _, _) => true, null);
+                await sslStream.AuthenticateAsClientAsync(uri.Host);
+                return sslStream;
+            }),
+            new TlsStreamSecurity(async (_, stream) =>
+            {
+                var sslStream = new SslStream(stream, false);
+                await sslStream.AuthenticateAsServerAsync(certificate, false,
+                    checkCertificateRevocation: false, enabledSslProtocols: SslProtocols.Tls12);
+                return sslStream;
+            }));
+});
 ```
-
-You can customize the encryption level based on your requirements.
 
 ---
 
