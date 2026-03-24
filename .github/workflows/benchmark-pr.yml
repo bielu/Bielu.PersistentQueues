@@ -26,10 +26,10 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore src/Bielu.PersistentQueues.slnx
 
       - name: Build Release
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build src/Bielu.PersistentQueues.slnx --configuration Release --no-restore
 
       - name: Restore baseline cache
         id: cache-baseline
