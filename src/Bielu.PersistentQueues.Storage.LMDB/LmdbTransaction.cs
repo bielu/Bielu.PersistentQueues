@@ -5,7 +5,7 @@ using LightningDB;
 namespace Bielu.PersistentQueues.Storage.LMDB;
 
 public class LmdbTransaction(LightningTransaction tx, ReaderWriterLockSlim transactionLock)
-    : IDisposable
+    : IStoreTransaction
 {
     public LightningTransaction Transaction { get; } = tx;
 

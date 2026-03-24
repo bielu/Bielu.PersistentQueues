@@ -236,7 +236,7 @@ public class StubMessageStore : IMessageStore
     {
     }
 
-    public LmdbTransaction BeginTransaction()
+    public IStoreTransaction BeginTransaction()
     {
         throw new NotImplementedException();
     }
@@ -251,7 +251,7 @@ public class StubMessageStore : IMessageStore
         throw new NotImplementedException();
     }
 
-    public void StoreIncoming(LmdbTransaction transaction, params IEnumerable<Message> messages)
+    public void StoreIncoming(IStoreTransaction transaction, params IEnumerable<Message> messages)
     {
         throw new NotImplementedException();
     }
@@ -271,27 +271,27 @@ public class StubMessageStore : IMessageStore
         throw new NotImplementedException();
     }
 
-    public void MoveToQueue(LmdbTransaction transaction, string queueName, Message message)
+    public void MoveToQueue(IStoreTransaction transaction, string queueName, Message message)
     {
         throw new NotImplementedException();
     }
 
-    public void MoveToQueue(LmdbTransaction transaction, string queueName, IEnumerable<Message> messages)
+    public void MoveToQueue(IStoreTransaction transaction, string queueName, IEnumerable<Message> messages)
     {
         throw new NotImplementedException();
     }
 
-    public void SuccessfullyReceived(LmdbTransaction transaction, Message message)
+    public void SuccessfullyReceived(IStoreTransaction transaction, Message message)
     {
         throw new NotImplementedException();
     }
 
-    public void SuccessfullyReceived(LmdbTransaction transaction, IEnumerable<Message> messages)
+    public void SuccessfullyReceived(IStoreTransaction transaction, IEnumerable<Message> messages)
     {
         throw new NotImplementedException();
     }
 
-    public void StoreOutgoing(LmdbTransaction tx, Message message)
+    public void StoreOutgoing(IStoreTransaction tx, Message message)
     {
         throw new NotImplementedException();
     }

@@ -15,4 +15,5 @@
     <File Path="../Directory.Packages.props" />
   </Folder>
   <Project Path="Bielu.PersistentQueues/Bielu.PersistentQueues.csproj" />
+  <Project Path="Bielu.PersistentQueues.Storage.LMDB/Bielu.PersistentQueues.Storage.LMDB.csproj" />
 </Solution>
