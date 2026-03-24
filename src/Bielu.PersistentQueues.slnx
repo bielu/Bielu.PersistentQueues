@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="Bielu.PersistentQueues.Tests/Bielu.PersistentQueues.Tests.csproj" />
+  </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="Bielu.PersistentQueues.Benchmarks/Bielu.PersistentQueues.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/Solution Files/">
+    <File Path="../.gitignore" />
+    <File Path="../CODEOWNERS" />
+    <File Path="../CONTRIBUTING.md" />
+    <File Path="../LICENSE" />
+    <File Path="../readme.md" />
+    <File Path="../version.props" />
+    <File Path="../Directory.Packages.props" />
+  </Folder>
+  <Project Path="Bielu.PersistentQueues/Bielu.PersistentQueues.csproj" />
+</Solution>
