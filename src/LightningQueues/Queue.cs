@@ -209,10 +209,10 @@ public class Queue : IQueue
     /// </param>
     /// <param name="pollIntervalInMilliseconds">The period to rest before checking for new messages if no messages are found.</param>
     /// <param name="cancellationToken">A token to cancel the receive operation.</param>
-    /// <returns>An asynchronous stream of <see cref="BatchQueueContext"/> objects, each containing all messages found in a single batch cycle.</returns>
+    /// <returns>An asynchronous stream of <see cref="IBatchQueueContext"/> objects, each containing all messages found in a single batch cycle.</returns>
     /// <remarks>
     /// <para>
-    /// This method continuously polls the message store and yields <see cref="BatchQueueContext"/> objects.
+    /// This method continuously polls the message store and yields <see cref="IBatchQueueContext"/> objects.
     /// The batch-completion strategy depends on which parameters are set:
     /// </para>
     /// <list type="bullet">
@@ -226,7 +226,7 @@ public class Queue : IQueue
     /// Only non-empty batches are yielded.
     /// </para>
     /// </remarks>
-    public async IAsyncEnumerable<BatchQueueContext> ReceiveBatch(string queueName,
+    public async IAsyncEnumerable<IBatchQueueContext> ReceiveBatch(string queueName,
         int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
