@@ -1,9 +1,9 @@
 <Solution>
   <Folder Name="/tests/">
-    <Project Path="LightningQueues.Tests/LightningQueues.Tests.csproj" />
+    <Project Path="Bielu.PersistentQueues.Tests/Bielu.PersistentQueues.Tests.csproj" />
   </Folder>
   <Folder Name="/benchmarks/">
-    <Project Path="LightningQueues.Benchmarks/LightningQueues.Benchmarks.csproj" />
+    <Project Path="Bielu.PersistentQueues.Benchmarks/Bielu.PersistentQueues.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/Solution Files/">
     <File Path="../.gitignore" />
@@ -14,5 +14,5 @@
     <File Path="../version.props" />
     <File Path="../Directory.Packages.props" />
   </Folder>
-  <Project Path="LightningQueues/LightningQueues.csproj" />
+  <Project Path="Bielu.PersistentQueues/Bielu.PersistentQueues.csproj" />
 </Solution>

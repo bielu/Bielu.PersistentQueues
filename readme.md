@@ -3,8 +3,8 @@
 ---
 
 [![CI](https://github.com/bielu/Bielu.PersistentQueues/actions/workflows/buildAndPublishPackage.yml/badge.svg)](https://github.com/bielu/Bielu.PersistentQueues/actions/workflows/buildAndPublishPackage.yml)
-[![NuGet version](https://img.shields.io/nuget/v/LightningQueues.svg)](https://www.nuget.org/packages/LightningQueues/)
-[![NuGet Downloads](https://img.shields.io/nuget/dt/LightningQueues.svg)](https://www.nuget.org/packages/LightningQueues/)
+[![NuGet version](https://img.shields.io/nuget/v/Bielu.PersistentQueues.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues/)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/Bielu.PersistentQueues.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Bielu.PersistentQueues is a high-performance, lightweight, **store-and-forward message queue** for .NET applications. Powered
@@ -32,7 +32,7 @@ excellent choice for lightweight and cross-platform message queuing needs.
 To use Bielu.PersistentQueues, add it to your .NET project via NuGet:
 
 ```bash
-dotnet add package LightningQueues
+dotnet add package Bielu.PersistentQueues
 ```
 
 ---
@@ -44,7 +44,7 @@ Here’s how to use the library to set up a message queue and send a message:
 ### 1. Creating a Queue
 
 ```csharp
-using LightningQueues;
+using Bielu.PersistentQueues;
 
 // Define queue location and create the queue
 var queue = new QueueConfiguration()

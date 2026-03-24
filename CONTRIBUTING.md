@@ -64,7 +64,7 @@ dotnet build src/Bielu.PersistentQueues.slnx
 ### Create NuGet Packages Locally
 
 ```bash
-dotnet pack src/LightningQueues/LightningQueues.csproj --configuration Release --output ./build
+dotnet pack src/Bielu.PersistentQueues/Bielu.PersistentQueues.csproj --configuration Release --output ./build
 ```
 
 ## Running Tests
