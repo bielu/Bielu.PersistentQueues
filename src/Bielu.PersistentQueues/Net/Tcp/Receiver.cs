@@ -35,25 +35,8 @@ public class Receiver : IDisposable
             {
                 try
                 {
-                    using var socket = await _listener.AcceptSocketAsync(cancellationToken).ConfigureAwait(false);
-                    await using var stream = new NetworkStream(socket, false);
-                    try
-                    {
-                        var messages = await _protocol.ReceiveMessagesAsync(stream, cancellationToken)
-                            .ConfigureAwait(false);
-                        foreach (var msg in messages)
-                        {
-                            await receivedChannel.WriteAsync(msg, cancellationToken).ConfigureAwait(false);
-                        }
-                    }
-                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                    {
-                        // Expected during shutdown - don't log
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.ReceiverErrorReadingMessages(socket.RemoteEndPoint!, ex);
-                    }
+                    var socket = await _listener.AcceptSocketAsync(cancellationToken).ConfigureAwait(false);
+                    _ = Task.Run(() => HandleConnectionAsync(socket, receivedChannel, cancellationToken), cancellationToken);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -68,6 +51,38 @@ public class Receiver : IDisposable
         finally
         {
             _listener.Stop();
+        }
+    }
+
+    private async Task HandleConnectionAsync(Socket socket, ChannelWriter<Message> receivedChannel, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using (socket)
+            await using (var stream = new NetworkStream(socket, false))
+            {
+                var messages = await _protocol.ReceiveMessagesAsync(stream, cancellationToken)
+                    .ConfigureAwait(false);
+                foreach (var msg in messages)
+                {
+                    await receivedChannel.WriteAsync(msg, cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Expected during shutdown - don't log
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                _logger.ReceiverErrorReadingMessages(socket.RemoteEndPoint!, ex);
+            }
+            catch
+            {
+                // RemoteEndPoint may throw if socket is already disposed
+            }
         }
     }
 

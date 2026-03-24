@@ -7,8 +7,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>Bielu.PersistentQueues</AssemblyName>
     <PackageId>Bielu.PersistentQueues</PackageId>
-    <PackageIconUrl>https://raw.githubusercontent.com/bielu/Bielu.PersistentQueues/refs/heads/main/lighting-qqqs.png</PackageIconUrl>
-    <PackageTags>queue;lightning;messaging;store-and-forward;persistent</PackageTags>
+    <PackageTags>queue;messaging;store-and-forward;persistent</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
