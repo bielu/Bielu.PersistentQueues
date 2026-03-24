@@ -50,6 +50,11 @@ public class LmdbMessageStore : IMessageStore
     /// </summary>
     public bool UseAppendData => _useAppendData;
 
+    private static LightningTransaction GetLightningTransaction(IStoreTransaction transaction) =>
+        transaction is LmdbTransaction lmdb
+            ? lmdb.Transaction
+            : throw new ArgumentException($"Expected LmdbTransaction but received {transaction.GetType().Name}", nameof(transaction));
+
     public void StoreIncoming(params IEnumerable<Message> messages)
     {
         CheckDisposed();
@@ -73,10 +78,10 @@ public class LmdbMessageStore : IMessageStore
             throw new ObjectDisposedException(nameof(LmdbMessageStore), "Cannot perform operation on a disposed message store");
     }
 
-    public void StoreIncoming(LmdbTransaction transaction, params IEnumerable<Message> messages)
+    public void StoreIncoming(IStoreTransaction transaction, params IEnumerable<Message> messages)
     {
         CheckDisposed();
-        var tx = transaction.Transaction;
+        var tx = GetLightningTransaction(transaction);
         StoreIncoming(tx, messages);
     }
 
@@ -318,7 +323,7 @@ public class LmdbMessageStore : IMessageStore
         throw new QueueDoesNotExistException(queueName);
     }
 
-    public LmdbTransaction BeginTransaction()
+    public IStoreTransaction BeginTransaction()
     {
         CheckDisposed();
         
@@ -729,34 +734,34 @@ public class LmdbMessageStore : IMessageStore
         return new RawOutgoingMessageEnumerable(this, OutgoingQueue);
     }
 
-    public void MoveToQueue(LmdbTransaction transaction, string queueName, Message message)
+    public void MoveToQueue(IStoreTransaction transaction, string queueName, Message message)
     {
         CheckDisposed();
-        var tx = transaction.Transaction;
+        var tx = GetLightningTransaction(transaction);
         MoveToQueue(tx, queueName, message);
     }
 
-    public void MoveToQueue(LmdbTransaction transaction, string queueName, IEnumerable<Message> messages)
+    public void MoveToQueue(IStoreTransaction transaction, string queueName, IEnumerable<Message> messages)
     {
         CheckDisposed();
-        var tx = transaction.Transaction;
+        var tx = GetLightningTransaction(transaction);
         foreach (var message in messages)
         {
             MoveToQueue(tx, queueName, message);
         }
     }
 
-    public void SuccessfullyReceived(LmdbTransaction transaction, Message message)
+    public void SuccessfullyReceived(IStoreTransaction transaction, Message message)
     {
         CheckDisposed();
-        var tx = transaction.Transaction;
+        var tx = GetLightningTransaction(transaction);
         SuccessfullyReceived(tx, message);
     }
 
-    public void SuccessfullyReceived(LmdbTransaction transaction, IEnumerable<Message> messages)
+    public void SuccessfullyReceived(IStoreTransaction transaction, IEnumerable<Message> messages)
     {
         CheckDisposed();
-        var tx = transaction.Transaction;
+        var tx = GetLightningTransaction(transaction);
         foreach (var message in messages)
         {
             SuccessfullyReceived(tx, message);
@@ -787,10 +792,10 @@ public class LmdbMessageStore : IMessageStore
             throw new StorageException("Error with LightningDB operation", result);
     }
 
-    public void StoreOutgoing(LmdbTransaction transaction, Message message)
+    public void StoreOutgoing(IStoreTransaction transaction, Message message)
     {
         CheckDisposed();
-        var tx = transaction.Transaction;
+        var tx = GetLightningTransaction(transaction);
         var db = GetCachedDatabase(OutgoingQueue);
         StoreOutgoing(tx, db, message);
     }

@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using Bielu.PersistentQueues.Storage.LMDB;
+using Bielu.PersistentQueues.Storage;
 
 namespace Bielu.PersistentQueues;
 
@@ -114,7 +114,7 @@ public class BatchQueueContext : IBatchQueueContext
 
     private interface IBatchAction
     {
-        void Execute(LmdbTransaction transaction);
+        void Execute(IStoreTransaction transaction);
         void Success();
     }
 
@@ -129,7 +129,7 @@ public class BatchQueueContext : IBatchQueueContext
             _messages = messages;
         }
 
-        public void Execute(LmdbTransaction transaction) =>
+        public void Execute(IStoreTransaction transaction) =>
             _queue.Store.SuccessfullyReceived(transaction, _messages);
 
         public void Success() { }
@@ -148,7 +148,7 @@ public class BatchQueueContext : IBatchQueueContext
             _queueName = queueName;
         }
 
-        public void Execute(LmdbTransaction transaction) =>
+        public void Execute(IStoreTransaction transaction) =>
             _queue.Store.MoveToQueue(transaction, _queueName, _messages);
 
         public void Success() { }
@@ -165,7 +165,7 @@ public class BatchQueueContext : IBatchQueueContext
             _message = message;
         }
 
-        public void Execute(LmdbTransaction transaction) =>
+        public void Execute(IStoreTransaction transaction) =>
             _queue.Store.StoreOutgoing(transaction, _message);
 
         public void Success() { }
@@ -182,7 +182,7 @@ public class BatchQueueContext : IBatchQueueContext
             _message = message;
         }
 
-        public void Execute(LmdbTransaction transaction) =>
+        public void Execute(IStoreTransaction transaction) =>
             _queue.Store.StoreIncoming(transaction, _message);
 
         public void Success() { }
@@ -201,7 +201,7 @@ public class BatchQueueContext : IBatchQueueContext
             _timeSpan = timeSpan;
         }
 
-        public void Execute(LmdbTransaction transaction) { }
+        public void Execute(IStoreTransaction transaction) { }
 
         public void Success()
         {
@@ -223,7 +223,7 @@ public class BatchQueueContext : IBatchQueueContext
             _time = time;
         }
 
-        public void Execute(LmdbTransaction transaction) { }
+        public void Execute(IStoreTransaction transaction) { }
 
         public void Success()
         {

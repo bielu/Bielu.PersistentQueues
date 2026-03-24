@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Net;
-using LightningDB;
 using Bielu.PersistentQueues.Net;
 using Bielu.PersistentQueues.Net.Protocol.V1;
 using Bielu.PersistentQueues.Net.Security;
 using Bielu.PersistentQueues.Net.Tcp;
 using Bielu.PersistentQueues.Serialization;
 using Bielu.PersistentQueues.Storage;
-using Bielu.PersistentQueues.Storage.LMDB;
 using Microsoft.Extensions.Logging;
 
 namespace Bielu.PersistentQueues;
@@ -195,7 +193,6 @@ public class QueueConfiguration
     /// <summary>
     /// Configures the queue with sensible default settings.
     /// </summary>
-    /// <param name="path">Optional path for message storage. If provided, LMDB storage will be used.</param>
     /// <returns>The configuration object for method chaining.</returns>
     /// <remarks>
     /// This method provides a quick way to get started with reasonable defaults:
@@ -204,17 +201,14 @@ public class QueueConfiguration
     /// - No transport security
     /// - 5-second network batch timeout
     /// - Automatic endpoint selection
-    /// - LMDB storage if a path is provided
     /// </remarks>
-    public QueueConfiguration WithDefaults(string? path = null)
+    public QueueConfiguration WithDefaults()
     {
         SerializeWith(new MessageSerializer());
         LogWith(new NoLoggingLogger());
         SecureTransportWith(new NoSecurity(), new NoSecurity());
         TimeoutNetworkBatchAfter(TimeSpan.FromSeconds(5));
         AutomaticEndpoint();
-        if(path != null)
-            this.StoreWithLmdb(path, new EnvironmentConfiguration { MaxDatabases = 5, MapSize = 1024 * 1024 * 100 });
         return this;
     }
 
