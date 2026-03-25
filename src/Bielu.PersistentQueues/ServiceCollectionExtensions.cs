@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net;
 using Bielu.PersistentQueues.Net;
 using Bielu.PersistentQueues.Net.Protocol.V1;
@@ -43,7 +44,7 @@ public class PersistentQueuesBuilder
     private TimeSpan _networkBatchTimeout = TimeSpan.FromSeconds(5);
     private IStreamSecurity _sendingSecurity = new NoSecurity();
     private IStreamSecurity _receivingSecurity = new NoSecurity();
-    private string[]? _queueNames;
+    private string[] _queueNames = [];
     private Func<IServiceProvider, IMessageStore>? _storeFactory;
 
     /// <summary>
@@ -112,7 +113,7 @@ public class PersistentQueuesBuilder
     /// <returns>The builder for chaining.</returns>
     public PersistentQueuesBuilder CreateQueues(params string[] queueNames)
     {
-        _queueNames = queueNames;
+        _queueNames = _queueNames.Concat(queueNames).ToArray();
         return this;
     }
 
@@ -188,6 +189,7 @@ public class PersistentQueuesBuilder
                     queue.CreateQueue(name);
                 }
             }
+
             queue.Start();
             return queue;
         });
