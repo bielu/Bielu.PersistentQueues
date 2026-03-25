@@ -17,7 +17,7 @@ public class QueueContextTests : TestBase
     }
 
     [Fact]
-    public async Task successfully_received_removes_message_from_queue()
+    public async Task SuccessfullyReceived_RemovesMessageFromQueue()
     {
         await QueueScenario(async (queue, token) =>
         {
@@ -38,7 +38,7 @@ public class QueueContextTests : TestBase
     }
     
     [Fact]
-    public async Task move_to_moves_message_to_another_queue()
+    public async Task MoveTo_MovesMessageToAnotherQueue()
     {
         await QueueScenario(async (queue, token) =>
         {
@@ -60,7 +60,7 @@ public class QueueContextTests : TestBase
     }
     
     [Fact]
-    public async Task send_enqueues_outgoing_message()
+    public async Task Send_EnqueuesOutgoingMessage()
     {
         await QueueScenario(async (queue, token) =>
         {
@@ -86,7 +86,7 @@ public class QueueContextTests : TestBase
     }
     
     [Fact]
-    public async Task receive_later_with_time_span_delays_processing()
+    public async Task ReceiveLater_WithTimeSpan_DelaysProcessing()
     {
         await QueueScenario(async (queue, token) =>
         {
@@ -97,7 +97,7 @@ public class QueueContextTests : TestBase
             var messageId = receivedContext.Message.Id;
             
             receivedContext.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(800));
-            receivedContext.QueueContext.SuccessfullyReceived(); 
+            // ReceiveLater now handles message removal automatically, no need to call SuccessfullyReceived
             receivedContext.QueueContext.CommitChanges();
             
             var store = (LmdbMessageStore)queue.Store;
@@ -111,7 +111,7 @@ public class QueueContextTests : TestBase
     }
     
     [Fact]
-    public async Task receive_later_with_date_time_offset_delays_processing()
+    public async Task ReceiveLater_WithDateTimeOffset_DelaysProcessing()
     {
         await QueueScenario(async (queue, token) =>
         {
@@ -123,7 +123,7 @@ public class QueueContextTests : TestBase
             
             var futureTime = DateTimeOffset.Now.AddMilliseconds(800);
             receivedContext.QueueContext.ReceiveLater(futureTime);
-            receivedContext.QueueContext.SuccessfullyReceived(); 
+            // ReceiveLater now handles message removal automatically, no need to call SuccessfullyReceived
             receivedContext.QueueContext.CommitChanges();
             
             var store = (LmdbMessageStore)queue.Store;
@@ -137,7 +137,7 @@ public class QueueContextTests : TestBase
     }
     
     [Fact]
-    public async Task enqueue_adds_message_to_queue()
+    public async Task Enqueue_AddsMessageToQueue()
     {
         await QueueScenario(async (queue, token) =>
         {
@@ -161,7 +161,7 @@ public class QueueContextTests : TestBase
     }
     
     [Fact]
-    public async Task commit_changes_executes_all_pending_actions()
+    public async Task CommitChanges_ExecutesAllPendingActions()
     {
         await QueueScenario(async (queue, token) =>
         {
@@ -214,7 +214,7 @@ public class QueueContextTests : TestBase
     }
     
     [Fact]
-    public async Task batch_context_removes_all_messages_from_queue()
+    public async Task BatchContext_RemovesAllMessagesFromQueue()
     {
         await QueueScenario(async (queue, token) =>
         {
@@ -242,7 +242,7 @@ public class QueueContextTests : TestBase
     }
     
     [Fact]
-    public async Task batch_context_moves_all_messages_to_another_queue()
+    public async Task BatchContext_MovesAllMessagesToAnotherQueue()
     {
         await QueueScenario(async (queue, token) =>
         {
@@ -268,7 +268,7 @@ public class QueueContextTests : TestBase
     }
     
     [Fact]
-    public async Task batch_context_exposes_all_messages()
+    public async Task BatchContext_ExposesAllMessages()
     {
         await QueueScenario(async (queue, token) =>
         {
@@ -289,7 +289,7 @@ public class QueueContextTests : TestBase
     }
     
     [Fact]
-    public async Task batch_context_single_message_batch()
+    public async Task BatchContext_SingleMessageBatch()
     {
         await QueueScenario(async (queue, token) =>
         {
@@ -307,7 +307,7 @@ public class QueueContextTests : TestBase
     }
     
     [Fact]
-    public async Task single_receive_still_uses_per_message_context()
+    public async Task SingleReceive_StillUsesPerMessageContext()
     {
         await QueueScenario(async (queue, token) =>
         {
@@ -323,5 +323,179 @@ public class QueueContextTests : TestBase
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").Any().ShouldBeFalse();
         }, TimeSpan.FromSeconds(3));
+    }
+    
+    [Fact]
+    public async Task BatchContext_MovesSubsetOfMessagesToAnotherQueue()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.CreateQueue("moved");
+            
+            var msg1 = NewMessage("test", "msg1");
+            var msg2 = NewMessage("test", "msg2");
+            var msg3 = NewMessage("test", "msg3");
+            var msg4 = NewMessage("test", "msg4");
+            
+            queue.Enqueue(msg1);
+            queue.Enqueue(msg2);
+            queue.Enqueue(msg3);
+            queue.Enqueue(msg4);
+            
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            batchCtx.Messages.Length.ShouldBe(4);
+            
+            // Move only msg1 and msg3 to another queue, mark msg2 and msg4 as successfully received
+            var messagesToMove = new[] { msg1.Id.MessageIdentifier, msg3.Id.MessageIdentifier };
+            var messagesToConfirm = new[] { msg2.Id.MessageIdentifier, msg4.Id.MessageIdentifier };
+            
+            batchCtx.MoveTo("moved", batchCtx.Messages.Where(m => messagesToMove.Contains(m.Id.MessageIdentifier)).ToArray());
+            batchCtx.SuccessfullyReceived(messagesToConfirm);
+            batchCtx.CommitChanges();
+            
+            var store = (LmdbMessageStore)queue.Store;
+            // Original queue should be empty
+            store.PersistedIncoming("test").Any().ShouldBeFalse();
+            
+            // Verify moved messages are in the "moved" queue
+            var movedMessages = await queue.Receive("moved", cancellationToken: token)
+                .Take(2)
+                .ToListAsync(token);
+            movedMessages.Count.ShouldBe(2);
+            movedMessages.All(m => m.Message.QueueString == "moved").ShouldBeTrue();
+            var movedIds = movedMessages.Select(m => m.Message.Id.MessageIdentifier).ToList();
+            movedIds.ShouldContain(msg1.Id.MessageIdentifier);
+            movedIds.ShouldContain(msg3.Id.MessageIdentifier);
+            
+            // Verify confirmed messages are gone
+            store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg2.Id.MessageIdentifier).ShouldBeFalse();
+            store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg4.Id.MessageIdentifier).ShouldBeFalse();
+        }, TimeSpan.FromSeconds(5));
+    }
+    
+    [Fact]
+    public async Task BatchContext_ReceiveLaterSubsetOfMessages()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            var msg1 = NewMessage("test", "msg1");
+            var msg2 = NewMessage("test", "msg2");
+            var msg3 = NewMessage("test", "msg3");
+            var msg4 = NewMessage("test", "msg4");
+            
+            queue.Enqueue(msg1);
+            queue.Enqueue(msg2);
+            queue.Enqueue(msg3);
+            queue.Enqueue(msg4);
+            
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            batchCtx.Messages.Length.ShouldBe(4);
+            
+            // Delay msg1 and msg3, mark msg2 and msg4 as successfully received
+            var messagesToDelay = new[] { msg1.Id.MessageIdentifier, msg3.Id.MessageIdentifier };
+            var messagesToConfirm = new[] { msg2.Id.MessageIdentifier, msg4.Id.MessageIdentifier };
+            
+            batchCtx.ReceiveLater(messagesToDelay, TimeSpan.FromMilliseconds(800));
+            batchCtx.SuccessfullyReceived(messagesToConfirm);
+            batchCtx.CommitChanges();
+            
+            var store = (LmdbMessageStore)queue.Store;
+            // Queue should be empty immediately after commit
+            store.PersistedIncoming("test").Any().ShouldBeFalse();
+            
+            // Verify confirmed messages (msg2, msg4) are permanently gone
+            store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg2.Id.MessageIdentifier).ShouldBeFalse();
+            store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg4.Id.MessageIdentifier).ShouldBeFalse();
+            
+            // Wait for delayed messages to be re-enqueued
+            await DeterministicDelay(1000, token);
+            
+            // Verify delayed messages reappear
+            var delayedMessages = await queue.Receive("test", cancellationToken: token)
+                .Take(2)
+                .ToListAsync(token);
+            delayedMessages.Count.ShouldBe(2);
+            var delayedIds = delayedMessages.Select(m => m.Message.Id.MessageIdentifier).ToList();
+            delayedIds.ShouldContain(msg1.Id.MessageIdentifier);
+            delayedIds.ShouldContain(msg3.Id.MessageIdentifier);
+            
+            // Verify confirmed messages are still gone after delayed messages reappear
+            var allMessages = store.PersistedIncoming("test").ToList();
+            allMessages.Count.ShouldBe(2); // Only msg1 and msg3 should be in storage
+            allMessages.Any(m => m.Id.MessageIdentifier == msg2.Id.MessageIdentifier).ShouldBeFalse();
+            allMessages.Any(m => m.Id.MessageIdentifier == msg4.Id.MessageIdentifier).ShouldBeFalse();
+        }, TimeSpan.FromSeconds(5));
+    }
+    
+    [Fact]
+    public async Task BatchContext_MixMoveToAndReceiveLaterOnDifferentMessages()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.CreateQueue("moved");
+            
+            var msg1 = NewMessage("test", "msg1");
+            var msg2 = NewMessage("test", "msg2");
+            var msg3 = NewMessage("test", "msg3");
+            var msg4 = NewMessage("test", "msg4");
+            var msg5 = NewMessage("test", "msg5");
+            
+            queue.Enqueue(msg1);
+            queue.Enqueue(msg2);
+            queue.Enqueue(msg3);
+            queue.Enqueue(msg4);
+            queue.Enqueue(msg5);
+            
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            batchCtx.Messages.Length.ShouldBe(5);
+            
+            // Move msg1 and msg2 to another queue
+            var messagesToMove = new[] { msg1.Id.MessageIdentifier, msg2.Id.MessageIdentifier };
+            // Delay msg3 and msg4
+            var messagesToDelay = new[] { msg3.Id.MessageIdentifier, msg4.Id.MessageIdentifier };
+            // Confirm msg5
+            var messagesToConfirm = new[] { msg5.Id.MessageIdentifier };
+            
+            batchCtx.MoveTo("moved", batchCtx.Messages.Where(m => messagesToMove.Contains(m.Id.MessageIdentifier)).ToArray());
+            batchCtx.ReceiveLater(messagesToDelay, TimeSpan.FromMilliseconds(800));
+            batchCtx.SuccessfullyReceived(messagesToConfirm);
+            batchCtx.CommitChanges();
+            
+            var store = (LmdbMessageStore)queue.Store;
+            // Original queue should be empty immediately
+            store.PersistedIncoming("test").Any().ShouldBeFalse();
+            
+            // Verify moved messages are in the "moved" queue
+            var movedMessages = await queue.Receive("moved", cancellationToken: token)
+                .Take(2)
+                .ToListAsync(token);
+            movedMessages.Count.ShouldBe(2);
+            movedMessages.All(m => m.Message.QueueString == "moved").ShouldBeTrue();
+            var movedIds = movedMessages.Select(m => m.Message.Id.MessageIdentifier).ToList();
+            movedIds.ShouldContain(msg1.Id.MessageIdentifier);
+            movedIds.ShouldContain(msg2.Id.MessageIdentifier);
+            
+            // Verify confirmed message is gone
+            store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg5.Id.MessageIdentifier).ShouldBeFalse();
+            
+            // Wait for delayed messages to be re-enqueued
+            await DeterministicDelay(1000, token);
+            
+            // Verify delayed messages reappear in original queue
+            var delayedMessages = await queue.Receive("test", cancellationToken: token)
+                .Take(2)
+                .ToListAsync(token);
+            delayedMessages.Count.ShouldBe(2);
+            var delayedIds = delayedMessages.Select(m => m.Message.Id.MessageIdentifier).ToList();
+            delayedIds.ShouldContain(msg3.Id.MessageIdentifier);
+            delayedIds.ShouldContain(msg4.Id.MessageIdentifier);
+            
+            // Double-check that all messages are accounted for
+            var testQueueMessages = store.PersistedIncoming("test").ToList();
+            testQueueMessages.Count.ShouldBe(2); // Only delayed messages
+            
+            var movedQueueMessages = store.PersistedIncoming("moved").ToList();
+            movedQueueMessages.Count.ShouldBe(2); // Only moved messages
+        }, TimeSpan.FromSeconds(5));
     }
 }

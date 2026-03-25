@@ -24,12 +24,14 @@ public class BatchQueueContext : IBatchQueueContext
 {
     private readonly Queue _queue;
     private readonly List<IBatchAction> _actions;
+    private readonly HashSet<Guid> _disposedMessageIds;
 
     internal BatchQueueContext(Message[] messages, Queue queue)
     {
         Messages = messages;
         _queue = queue;
         _actions = new List<IBatchAction>();
+        _disposedMessageIds = new HashSet<Guid>();
     }
 
     /// <inheritdoc />
@@ -68,64 +70,88 @@ public class BatchQueueContext : IBatchQueueContext
     /// <inheritdoc />
     public void ReceiveLater(TimeSpan timeSpan)
     {
+        ValidateAndMarkMessages(Messages, "ReceiveLater");
         _actions.Add(new ReceiveLaterTimeSpanAction(_queue, Messages, timeSpan));
     }
 
     /// <inheritdoc />
     public void ReceiveLater(DateTimeOffset time)
     {
+        ValidateAndMarkMessages(Messages, "ReceiveLater");
         _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, Messages, time));
     }
 
     /// <inheritdoc />
     public void SuccessfullyReceived()
     {
+        ValidateAndMarkMessages(Messages, "SuccessfullyReceived");
         _actions.Add(new SuccessAllAction(_queue, Messages));
     }
 
     /// <inheritdoc />
     public void MoveTo(string queueName)
     {
+        ValidateAndMarkMessages(Messages, "MoveTo");
         _actions.Add(new MoveAllAction(_queue, Messages, queueName));
     }
 
     /// <inheritdoc />
     public void ReceiveLater(Message[] messages, TimeSpan timeSpan)
     {
+        ValidateAndMarkMessages(messages, "ReceiveLater");
         _actions.Add(new ReceiveLaterTimeSpanAction(_queue, messages, timeSpan));
     }
 
     public void ReceiveLater(Guid[] messageIds, TimeSpan timeSpan)
     {
-        _actions.Add(new ReceiveLaterTimeSpanAction(_queue,Messages.Where(x=>messageIds.Contains(x.Id.MessageIdentifier)).ToArray() , timeSpan));
+        var messages = Messages.Where(x => messageIds.Contains(x.Id.MessageIdentifier)).ToArray();
+        ValidateAndMarkMessages(messages, "ReceiveLater");
+        _actions.Add(new ReceiveLaterTimeSpanAction(_queue, messages, timeSpan));
     }
 
     /// <inheritdoc />
     public void ReceiveLater(Message[] messages, DateTimeOffset time)
     {
+        ValidateAndMarkMessages(messages, "ReceiveLater");
         _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, messages, time));
     }
 
     public void ReceiveLater(Guid[] messageIds, DateTimeOffset time)
     {
-        _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue,Messages.Where(x=>messageIds.Contains(x.Id.MessageIdentifier)).ToArray() , time));
-
+        var messages = Messages.Where(x => messageIds.Contains(x.Id.MessageIdentifier)).ToArray();
+        ValidateAndMarkMessages(messages, "ReceiveLater");
+        _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, messages, time));
     }
 
     /// <inheritdoc />
     public void SuccessfullyReceived(Message[] messages)
     {
+        ValidateAndMarkMessages(messages, "SuccessfullyReceived");
         _actions.Add(new SuccessAllAction(_queue, messages));
     }
     /// <inheritdoc />
     public void SuccessfullyReceived(Guid[] messageIds)
     {
-        _actions.Add(new SuccessAllAction(_queue, Messages.Where(x=>messageIds.Contains(x.Id.MessageIdentifier)).ToArray()));
+        var messages = Messages.Where(x => messageIds.Contains(x.Id.MessageIdentifier)).ToArray();
+        ValidateAndMarkMessages(messages, "SuccessfullyReceived");
+        _actions.Add(new SuccessAllAction(_queue, messages));
     }
     /// <inheritdoc />
     public void MoveTo(string queueName, Message[] messages)
     {
+        ValidateAndMarkMessages(messages, "MoveTo");
         _actions.Add(new MoveAllAction(_queue, messages, queueName));
+    }
+
+    private void ValidateAndMarkMessages(Message[] messages, string operationName)
+    {
+        foreach (var message in messages)
+        {
+            if (!_disposedMessageIds.Add(message.Id.MessageIdentifier))
+            {
+                throw new InvalidOperationException($"Cannot call {operationName} on message {message.Id.MessageIdentifier} - it has already been processed by another operation (SuccessfullyReceived, MoveTo, or ReceiveLater).");
+            }
+        }
     }
 
     private interface IBatchAction
@@ -217,7 +243,11 @@ public class BatchQueueContext : IBatchQueueContext
             _timeSpan = timeSpan;
         }
 
-        public void Execute(IStoreTransaction transaction) { }
+        public void Execute(IStoreTransaction transaction)
+        {
+            // Remove the messages from current queue before scheduling them for later
+            _queue.Store.SuccessfullyReceived(transaction, _messages);
+        }
 
         public void Success()
         {
@@ -239,7 +269,11 @@ public class BatchQueueContext : IBatchQueueContext
             _time = time;
         }
 
-        public void Execute(IStoreTransaction transaction) { }
+        public void Execute(IStoreTransaction transaction)
+        {
+            // Remove the messages from current queue before scheduling them for later
+            _queue.Store.SuccessfullyReceived(transaction, _messages);
+        }
 
         public void Success()
         {

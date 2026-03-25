@@ -9,6 +9,7 @@ internal class QueueContext : IQueueContext
     private readonly Queue _queue;
     private readonly Message _message;
     private readonly List<IQueueAction> _queueActions;
+    private bool _messageDisposed;
 
     internal QueueContext(Queue queue, Message message)
     {
@@ -65,21 +66,33 @@ internal class QueueContext : IQueueContext
 
     public void ReceiveLater(TimeSpan timeSpan)
     {
+        if (_messageDisposed)
+            throw new InvalidOperationException("Cannot call ReceiveLater after SuccessfullyReceived or MoveTo has been called on this message.");
+        _messageDisposed = true;
         _queueActions.Add(new ReceiveLaterTimeSpanAction(this, timeSpan));
     }
 
     public void ReceiveLater(DateTimeOffset time)
     {
+        if (_messageDisposed)
+            throw new InvalidOperationException("Cannot call ReceiveLater after SuccessfullyReceived or MoveTo has been called on this message.");
+        _messageDisposed = true;
         _queueActions.Add(new ReceiveLaterDateTimeOffsetAction(this, time));
     }
 
     public void SuccessfullyReceived()
     {
+        if (_messageDisposed)
+            throw new InvalidOperationException("Cannot call SuccessfullyReceived after ReceiveLater or MoveTo has been called on this message.");
+        _messageDisposed = true;
         _queueActions.Add(new SuccessAction(this));
     }
 
     public void MoveTo(string queueName)
     {
+        if (_messageDisposed)
+            throw new InvalidOperationException("Cannot call MoveTo after SuccessfullyReceived or ReceiveLater has been called on this message.");
+        _messageDisposed = true;
         _queueActions.Add(new MoveAction(this, queueName));
     }
 
@@ -189,6 +202,8 @@ internal class QueueContext : IQueueContext
 
         public void Execute(IStoreTransaction transaction)
         {
+            // Remove the message from current queue before scheduling it for later
+            _context._queue.Store.SuccessfullyReceived(transaction, _context._message);
         }
 
         public void Success()
@@ -211,6 +226,8 @@ internal class QueueContext : IQueueContext
 
         public void Execute(IStoreTransaction transaction)
         {
+            // Remove the message from current queue before scheduling it for later
+            _context._queue.Store.SuccessfullyReceived(transaction, _context._message);
         }
 
         public void Success()
