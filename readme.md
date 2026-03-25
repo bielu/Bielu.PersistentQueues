@@ -35,6 +35,7 @@ excellent choice for lightweight and cross-platform message queuing needs.
 |---------|-------------|-------|
 | `Bielu.PersistentQueues` | Core library with queue abstractions and DI support | [![NuGet](https://img.shields.io/nuget/v/Bielu.PersistentQueues.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues/) |
 | `Bielu.PersistentQueues.Storage.LMDB` | LMDB storage provider (using LightningDB) | [![NuGet](https://img.shields.io/nuget/v/Bielu.PersistentQueues.Storage.LMDB.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues.Storage.LMDB/) |
+| `Bielu.PersistentQueues.OpenTelemetry` | OpenTelemetry instrumentation for distributed tracing and metrics | [![NuGet](https://img.shields.io/nuget/v/Bielu.PersistentQueues.OpenTelemetry.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues.OpenTelemetry/) |
 
 ---
 
@@ -192,6 +193,92 @@ To ensure everything is running smoothly, clone the repository and run:
 
 ```bash
 dotnet test src/Bielu.PersistentQueues.slnx
+```
+
+---
+
+## OpenTelemetry Integration
+
+Bielu.PersistentQueues provides built-in **OpenTelemetry** support for distributed tracing and metrics through the `PersistentQueueOtelDecorator`. This enables comprehensive observability of your queue operations.
+
+### Installation
+
+```bash
+dotnet add package Bielu.PersistentQueues.OpenTelemetry
+```
+
+### Usage
+
+Add instrumentation to your service collection to automatically decorate the queue with OpenTelemetry:
+
+```csharp
+using Bielu.PersistentQueues.OpenTelemetry;
+
+services.AddBieluPersistentQueueInstrumentation();
+```
+
+### Metrics Collected
+
+The decorator automatically collects the following metrics:
+
+- **`lightningqueues.messages.sent`** - Counter: Total number of messages sent
+- **`lightningqueues.messages.received`** - Counter: Total number of messages received
+- **`lightningqueues.messages.enqueued`** - Counter: Total number of messages enqueued
+- **`lightningqueues.operations.errors`** - Counter: Total number of operation errors
+- **`lightningqueues.message.processing.duration`** - Histogram: Duration of message processing in milliseconds
+- **`lightningqueues.batch.size`** - Histogram: Number of messages in batches
+
+All metrics include relevant dimensions such as `queue.name`, `operation`, and `batch.size`.
+
+### Distributed Tracing
+
+The decorator creates OpenTelemetry activities (spans) for all queue operations:
+
+- **Producer operations**: `Send`, `SendBatch`, `Enqueue`
+- **Consumer operations**: `Receive`, `ReceiveBatch`, `ProcessMessage`, `ProcessBatch`
+- **Internal operations**: `CreateQueue`, `Start`, `MoveToQueue`, `ReceiveLater`
+
+Each span includes tags such as:
+- `queue.name` - The queue name
+- `message.id` - Unique message identifier
+- `destination` - Message destination endpoint
+- `batch.size` - Number of messages in batch operations
+- `delay.seconds` - Delay time for scheduled messages
+
+### Error Tracking
+
+All operations are wrapped with exception handling that:
+- Records error metrics with operation context
+- Sets activity status to `Error`
+- Adds exception details to the span
+- Preserves original exception for caller handling
+
+### Example: Full Configuration with OpenTelemetry
+
+```csharp
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+using Bielu.PersistentQueues.OpenTelemetry;
+
+// Configure OpenTelemetry
+services.AddOpenTelemetry()
+    .WithMetrics(metrics => metrics
+        .AddBieluPersistentQueuesInstrumentation())
+    .WithTracing(tracing => tracing
+        .AddBieluPersistentQueuesInstrumentation());
+
+// Configure queue
+services.AddPersistentQueues(builder =>
+{
+    builder
+        .AddLmdbStorage("C:\\queue_path")
+        .ListenOn(new IPEndPoint(IPAddress.Loopback, 5050))
+        .CreateQueues("my-queue");
+});
+
+// Add instrumentation
+services.AddBieluPersistentQueueInstrumentation();
 ```
 
 ---
