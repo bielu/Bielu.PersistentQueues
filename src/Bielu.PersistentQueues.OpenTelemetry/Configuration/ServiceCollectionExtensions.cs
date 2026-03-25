@@ -1,11 +1,13 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Bielu.PersistentQueues.OpenTelemetry.Instrumentation;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace Bielu.PersistentQueues.OpenTelemetry;
+namespace Bielu.PersistentQueues.OpenTelemetry.Configuration;
 
-public static class QueueExtensions
+public static class ServiceCollectionExtensions
 {
     public const string MetricName = "BieluPersistentQueues";
     public const string ActivityName = "BieluPersistentQueues";
+
     public static ServiceCollection AddBieluPersistentQueueInstrumentation(this ServiceCollection serviceCollection)
     {
         serviceCollection.Decorate<IQueue, PersistentQueueOtelDecorator>();
