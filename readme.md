@@ -221,12 +221,13 @@ services.AddBieluPersistentQueueInstrumentation();
 
 The decorator automatically collects the following metrics:
 
-- **`lightningqueues.messages.sent`** - Counter: Total number of messages sent
-- **`lightningqueues.messages.received`** - Counter: Total number of messages received
-- **`lightningqueues.messages.enqueued`** - Counter: Total number of messages enqueued
-- **`lightningqueues.operations.errors`** - Counter: Total number of operation errors
-- **`lightningqueues.message.processing.duration`** - Histogram: Duration of message processing in milliseconds
-- **`lightningqueues.batch.size`** - Histogram: Number of messages in batches
+- **`bielupersistentqueues.messages.sent`** - Counter: Total number of messages sent
+- **`bielupersistentqueues.messages.received`** - Counter: Total number of messages received
+- **`bielupersistentqueues.messages.enqueued`** - Counter: Total number of messages enqueued
+- **`bielupersistentqueues.operations.errors`** - Counter: Total number of operation errors
+- **`bielupersistentqueues.message.processing.duration`** - Histogram: Duration of message processing in milliseconds
+- **`bielupersistentqueues.batch.size`** - Histogram: Number of messages in batches
+- **`bielupersistentqueues.queues.active`** - Gauge: Number of currently active queues
 
 All metrics include relevant dimensions such as `queue.name`, `operation`, and `batch.size`.
 

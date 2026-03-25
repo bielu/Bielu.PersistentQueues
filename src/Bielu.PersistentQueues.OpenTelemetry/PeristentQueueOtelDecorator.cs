@@ -16,35 +16,35 @@ public class PersistentQueueOtelDecorator : IQueue
     private static readonly Meter Meter = new(QueueExtensions.MetricName, "1.0.0");
 
     private static readonly Counter<long> MessagesSentCounter = Meter.CreateCounter<long>(
-        "lightningqueues.messages.sent",
+        "bielupersistentqueues.messages.sent",
         description: "Total number of messages sent");
 
     private static readonly Counter<long> MessagesReceivedCounter = Meter.CreateCounter<long>(
-        "lightningqueues.messages.received",
+        "bielupersistentqueues.messages.received",
         description: "Total number of messages received");
 
     private static readonly Counter<long> MessagesEnqueuedCounter = Meter.CreateCounter<long>(
-        "lightningqueues.messages.enqueued",
+        "bielupersistentqueues.messages.enqueued",
         description: "Total number of messages enqueued");
 
     private static readonly Counter<long> OperationErrorsCounter = Meter.CreateCounter<long>(
-        "lightningqueues.operations.errors",
+        "bielupersistentqueues.operations.errors",
         description: "Total number of operation errors");
 
     private static readonly Histogram<double> MessageProcessingDuration = Meter.CreateHistogram<double>(
-        "lightningqueues.message.processing.duration",
+        "bielupersistentqueues.message.processing.duration",
         unit: "ms",
         description: "Duration of message processing");
 
     private static readonly Histogram<int> BatchSizeHistogram = Meter.CreateHistogram<int>(
-        "lightningqueues.batch.size",
+        "bielupersistentqueues.batch.size",
         description: "Number of messages in a batch");
 
     public PersistentQueueOtelDecorator(IQueue queue)
     {
         _queue = queue;
         _activeQueuesGauge = Meter.CreateObservableGauge(
-            "lightningqueues.queues.active",
+            "bielupersistentqueues.queues.active",
             () => new Measurement<int>(_queue.Queues.Length),
             description: "Number of active queues");
     }
