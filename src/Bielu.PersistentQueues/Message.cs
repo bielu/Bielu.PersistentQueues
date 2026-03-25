@@ -115,6 +115,7 @@ public readonly struct Message
     /// Creates a new message with string parameters for convenience.
     /// </summary>
     public static Message Create(
+        Guid? id = null,
         byte[]? data = null,
         string? queue = null,
         string? subQueue = null,
@@ -124,7 +125,7 @@ public readonly struct Message
         Dictionary<string, string>? headers = null)
     {
         return new Message(
-            id: MessageId.GenerateRandom(),
+            id: id != null ? MessageId.WithId(id.Value) : MessageId.GenerateRandom(),
             data: data?.AsMemory() ?? default,
             queue: queue?.AsMemory() ?? default,
             subQueue: subQueue?.AsMemory() ?? default,
@@ -209,11 +210,11 @@ public readonly struct FixedHeaders
 {
     private const int MaxHeaders = 4; // Most messages have 0-2 headers
     private const string SentAttemptsKey = "sent-attempts";
-    
+
     // Cache common sent attempt values to avoid string allocations
     private static readonly ReadOnlyMemory<char>[] CachedSentAttempts = new ReadOnlyMemory<char>[11];
     private static readonly ReadOnlyMemory<char> SentAttemptsKeyMemory = SentAttemptsKey.AsMemory();
-    
+
     static FixedHeaders()
     {
         for (int i = 0; i <= 10; i++)
@@ -276,7 +277,7 @@ public readonly struct FixedHeaders
     public void CopyTo(IDictionary<string, string> target)
     {
         target.Clear();
-        
+
         if (_count > 0 && !_h0.IsEmpty) target[_h0.Key.ToString()] = _h0.Value.ToString();
         if (_count > 1 && !_h1.IsEmpty) target[_h1.Key.ToString()] = _h1.Value.ToString();
         if (_count > 2 && !_h2.IsEmpty) target[_h2.Key.ToString()] = _h2.Value.ToString();
@@ -294,7 +295,7 @@ public readonly struct FixedHeaders
             return int.TryParse(_h2.Value.Span, out var val2) ? val2 : 0;
         if (_count > 3 && _h3.Key.Span.SequenceEqual(SentAttemptsKey))
             return int.TryParse(_h3.Value.Span, out var val3) ? val3 : 0;
-        
+
         return 0;
     }
 
@@ -306,7 +307,7 @@ public readonly struct FixedHeaders
         // Check if we already have sent-attempts header - if so, can we reuse existing structure?
         var foundSentAttemptsIndex = -1;
         var sentAttemptsKeySpan = SentAttemptsKey.AsSpan();
-        
+
         // Find existing sent-attempts header
         if (_count > 0 && !_h0.IsEmpty && _h0.Key.Span.SequenceEqual(sentAttemptsKeySpan))
             foundSentAttemptsIndex = 0;
@@ -335,7 +336,8 @@ public readonly struct FixedHeaders
         {
             return _count switch
             {
-                0 => new FixedHeaders(new HeaderEntry(SentAttemptsKeyMemory, attemptsStr), default, default, default, 1),
+                0 => new FixedHeaders(new HeaderEntry(SentAttemptsKeyMemory, attemptsStr), default, default, default,
+                    1),
                 1 => new FixedHeaders(_h0, new HeaderEntry(SentAttemptsKeyMemory, attemptsStr), default, default, 2),
                 2 => new FixedHeaders(_h0, _h1, new HeaderEntry(SentAttemptsKeyMemory, attemptsStr), default, 3),
                 3 => new FixedHeaders(_h0, _h1, _h2, new HeaderEntry(SentAttemptsKeyMemory, attemptsStr), 4),

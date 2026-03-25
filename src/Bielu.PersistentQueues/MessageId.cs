@@ -137,4 +137,13 @@ public record MessageId
 
         return new Guid(guidArray);
     }
+
+    public static MessageId WithId(Guid id)
+    {
+        return new MessageId
+        {
+            SourceInstanceId = InstanceId,
+            MessageIdentifier = id
+        };
+    }
 }

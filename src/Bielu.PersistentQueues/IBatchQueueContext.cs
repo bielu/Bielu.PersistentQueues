@@ -23,6 +23,13 @@ public interface IBatchQueueContext : IQueueContext
     void ReceiveLater(Message[] messages, TimeSpan timeSpan);
 
     /// <summary>
+    /// Schedules a subset of messages in this batch to be processed again after a specified delay.
+    /// </summary>
+    /// <param name="messageIds">The messages ids to defer.</param>
+    /// <param name="timeSpan">The time to wait before making the messages available again.</param>
+    void ReceiveLater(Guid[] messageIds, TimeSpan timeSpan);
+
+    /// <summary>
     /// Schedules a subset of messages in this batch to be processed again at a specific time.
     /// </summary>
     /// <param name="messages">The messages to defer.</param>
@@ -30,11 +37,23 @@ public interface IBatchQueueContext : IQueueContext
     void ReceiveLater(Message[] messages, DateTimeOffset time);
 
     /// <summary>
+    /// Schedules a subset of messages in this batch to be processed again at a specific time.
+    /// </summary>
+    /// <param name="messageIds">The messages ids to defer.</param>
+    /// <param name="time">The time at which the messages should be made available again.</param>
+    void ReceiveLater(Guid[] messageIds, DateTimeOffset time);
+
+    /// <summary>
     /// Marks a subset of messages in this batch as successfully received and processed.
     /// </summary>
     /// <param name="messages">The messages to mark as received.</param>
     void SuccessfullyReceived(Message[] messages);
 
+    /// <summary>
+    /// Marks a subset of messages in this batch as successfully received and processed.
+    /// </summary>
+    /// <param name="messageIds">The messages ids to mark as received.</param>
+    void SuccessfullyReceived(Guid[] messageIds);
     /// <summary>
     /// Moves a subset of messages in this batch to a different queue.
     /// </summary>

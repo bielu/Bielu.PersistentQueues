@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Bielu.PersistentQueues.Storage;
 
 namespace Bielu.PersistentQueues;
@@ -94,10 +95,21 @@ public class BatchQueueContext : IBatchQueueContext
         _actions.Add(new ReceiveLaterTimeSpanAction(_queue, messages, timeSpan));
     }
 
+    public void ReceiveLater(Guid[] messageIds, TimeSpan timeSpan)
+    {
+        _actions.Add(new ReceiveLaterTimeSpanAction(_queue,Messages.Where(x=>messageIds.Contains(x.Id.MessageIdentifier)).ToArray() , timeSpan));
+    }
+
     /// <inheritdoc />
     public void ReceiveLater(Message[] messages, DateTimeOffset time)
     {
         _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, messages, time));
+    }
+
+    public void ReceiveLater(Guid[] messageIds, DateTimeOffset time)
+    {
+        _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue,Messages.Where(x=>messageIds.Contains(x.Id.MessageIdentifier)).ToArray() , time));
+
     }
 
     /// <inheritdoc />
@@ -105,7 +117,11 @@ public class BatchQueueContext : IBatchQueueContext
     {
         _actions.Add(new SuccessAllAction(_queue, messages));
     }
-
+    /// <inheritdoc />
+    public void SuccessfullyReceived(Guid[] messageIds)
+    {
+        _actions.Add(new SuccessAllAction(_queue, Messages.Where(x=>messageIds.Contains(x.Id.MessageIdentifier)).ToArray()));
+    }
     /// <inheritdoc />
     public void MoveTo(string queueName, Message[] messages)
     {
