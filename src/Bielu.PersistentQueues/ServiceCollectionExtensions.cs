@@ -188,6 +188,7 @@ public class PersistentQueuesBuilder
                     queue.CreateQueue(name);
                 }
             }
+            queue.Start();
             return queue;
         });
     }
