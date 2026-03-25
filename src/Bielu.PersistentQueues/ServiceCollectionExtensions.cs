@@ -45,6 +45,7 @@ public class PersistentQueuesBuilder
     private IStreamSecurity _sendingSecurity = new NoSecurity();
     private IStreamSecurity _receivingSecurity = new NoSecurity();
     private string[] _queueNames = [];
+    private bool _autoStart { get; set; }
     private Func<IServiceProvider, IMessageStore>? _storeFactory;
 
     /// <summary>
@@ -127,6 +128,11 @@ public class PersistentQueuesBuilder
         _storeFactory = storeFactory;
         return this;
     }
+    public PersistentQueuesBuilder AutoStart()
+    {
+        _autoStart = true;
+        return this;
+    }
 
     internal void Build()
     {
@@ -190,7 +196,10 @@ public class PersistentQueuesBuilder
                 }
             }
 
-            queue.Start();
+            if (_autoStart)
+            {
+                queue.Start();
+            }
             return queue;
         });
     }
