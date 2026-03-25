@@ -7,11 +7,12 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Bielu.PersistentQueues.Network.Protocol;
 using Microsoft.Extensions.Logging;
 using Bielu.PersistentQueues.Serialization;
 using Bielu.PersistentQueues.Storage;
 
-namespace Bielu.PersistentQueues.Net.Tcp;
+namespace Bielu.PersistentQueues.Network.Tcp;
 
 public class Sender : IDisposable
 {

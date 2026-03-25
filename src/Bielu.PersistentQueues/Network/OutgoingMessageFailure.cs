@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace Bielu.PersistentQueues.Net;
+namespace Bielu.PersistentQueues.Network;
 
 public class OutgoingMessageFailure
 {

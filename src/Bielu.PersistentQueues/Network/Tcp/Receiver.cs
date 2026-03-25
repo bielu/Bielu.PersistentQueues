@@ -4,9 +4,10 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Bielu.PersistentQueues.Network.Protocol;
 using Microsoft.Extensions.Logging;
 
-namespace Bielu.PersistentQueues.Net.Tcp;
+namespace Bielu.PersistentQueues.Network.Tcp;
 
 public class Receiver : IDisposable
 {

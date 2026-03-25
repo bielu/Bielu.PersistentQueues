@@ -46,7 +46,7 @@ public interface IQueue : IDisposable, IAsyncDisposable
     /// <param name="cancellationToken">A token to cancel the receive operation.</param>
     /// <returns>An asynchronous stream of <see cref="IMessageContext"/> objects.</returns>
     public IAsyncEnumerable<IMessageContext> Receive(string queueName, int pollIntervalInMilliseconds = 200,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Receives batches of messages from the specified queue as an asynchronous stream.
@@ -67,7 +67,7 @@ public interface IQueue : IDisposable, IAsyncDisposable
     /// <returns>An asynchronous stream of <see cref="IBatchQueueContext"/> objects, each containing all messages found in a single batch cycle.</returns>
     public IAsyncEnumerable<IBatchQueueContext> ReceiveBatch(string queueName,
         int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Schedules a message to be available for processing after a specified delay.

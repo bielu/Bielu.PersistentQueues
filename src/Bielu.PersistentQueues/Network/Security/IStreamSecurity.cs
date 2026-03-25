@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace Bielu.PersistentQueues.Net.Security;
+namespace Bielu.PersistentQueues.Network.Security;
 
 /// <summary>
 /// Defines the contract for applying security mechanisms to network streams.

@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Bielu.PersistentQueues.Logging;
-using Bielu.PersistentQueues.Net;
+using Bielu.PersistentQueues.Network;
 using Bielu.PersistentQueues.Serialization;
 using Bielu.PersistentQueues.Storage;
 using Bielu.PersistentQueues.Storage.LMDB;

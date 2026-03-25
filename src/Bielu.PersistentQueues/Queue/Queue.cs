@@ -6,8 +6,8 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Bielu.PersistentQueues.Net;
-using Bielu.PersistentQueues.Net.Tcp;
+using Bielu.PersistentQueues.Network;
+using Bielu.PersistentQueues.Network.Tcp;
 using Bielu.PersistentQueues.Storage;
 
 namespace Bielu.PersistentQueues;

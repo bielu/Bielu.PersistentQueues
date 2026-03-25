@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
-namespace Bielu.PersistentQueues.Net.Tcp;
+namespace Bielu.PersistentQueues.Network.Tcp;
 
 public static class NetExtensions
 {

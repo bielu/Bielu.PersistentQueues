@@ -8,11 +8,11 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Bielu.PersistentQueues.Net.Security;
+using Bielu.PersistentQueues.Network.Security;
 using Bielu.PersistentQueues.Serialization;
 using Bielu.PersistentQueues.Storage;
 
-namespace Bielu.PersistentQueues.Net.Protocol.V1;
+namespace Bielu.PersistentQueues.Network.Protocol.V1;
 
 public class ReceivingProtocol(IMessageStore store, IStreamSecurity security, IMessageSerializer serializer, Uri receivingUri, ILogger logger)
     : ProtocolBase(logger), IReceivingProtocol

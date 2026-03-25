@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace Bielu.PersistentQueues.Net.Security;
+namespace Bielu.PersistentQueues.Network.Security;
 
 public class TlsStreamSecurity(Func<Uri, Stream, Task<Stream>> streamSecurity) : IStreamSecurity
 {

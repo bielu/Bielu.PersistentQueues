@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 
-namespace Bielu.PersistentQueues.Net.Protocol.V1;
+namespace Bielu.PersistentQueues.Network.Protocol.V1;
 
 public static class Constants
 {

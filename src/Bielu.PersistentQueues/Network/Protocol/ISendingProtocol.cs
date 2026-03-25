@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Bielu.PersistentQueues.Serialization;
 
-namespace Bielu.PersistentQueues.Net;
+namespace Bielu.PersistentQueues.Network.Protocol;
 
 /// <summary>
 /// Defines the protocol for sending messages over a network connection.

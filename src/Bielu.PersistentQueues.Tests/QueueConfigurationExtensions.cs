@@ -7,7 +7,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using LightningDB;
 using Bielu.PersistentQueues.Logging;
-using Bielu.PersistentQueues.Net.Security;
+using Bielu.PersistentQueues.Network.Security;
 using Microsoft.Extensions.Logging;
 using Bielu.PersistentQueues.Storage.LMDB;
 using Xunit.Abstractions;

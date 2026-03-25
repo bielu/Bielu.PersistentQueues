@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace Bielu.PersistentQueues.Net.Protocol;
+namespace Bielu.PersistentQueues.Network.Protocol;
 
 public abstract class ProtocolBase(ILogger logger)
 {

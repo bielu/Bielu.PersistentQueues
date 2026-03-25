@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Net;
-using Bielu.PersistentQueues.Net;
-using Bielu.PersistentQueues.Net.Protocol.V1;
-using Bielu.PersistentQueues.Net.Security;
-using Bielu.PersistentQueues.Net.Tcp;
+using Bielu.PersistentQueues.Network;
+using Bielu.PersistentQueues.Network.Protocol;
+using Bielu.PersistentQueues.Network.Protocol.V1;
+using Bielu.PersistentQueues.Network.Security;
+using Bielu.PersistentQueues.Network.Tcp;
 using Bielu.PersistentQueues.Serialization;
 using Bielu.PersistentQueues.Storage;
 using Microsoft.Extensions.Logging;

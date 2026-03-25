@@ -9,12 +9,12 @@ using System.Net;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Bielu.PersistentQueues.Net.Security;
+using Bielu.PersistentQueues.Network.Security;
 using Bielu.PersistentQueues.Serialization;
 using Bielu.PersistentQueues.Storage;
 using Microsoft.Extensions.Logging;
 
-namespace Bielu.PersistentQueues.Net.Protocol.V1;
+namespace Bielu.PersistentQueues.Network.Protocol.V1;
 
 public class SendingProtocol(IMessageStore store, IStreamSecurity security, IMessageSerializer serializer, ILogger logger)
     : ProtocolBase(logger), ISendingProtocol

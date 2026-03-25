@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Bielu.PersistentQueues.Storage;
 
-namespace Bielu.PersistentQueues.Net;
+namespace Bielu.PersistentQueues.Network;
 
 public class SendingErrorPolicy
 {
