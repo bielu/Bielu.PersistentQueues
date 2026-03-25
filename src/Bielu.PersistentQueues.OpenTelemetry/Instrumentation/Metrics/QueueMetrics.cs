@@ -10,6 +10,8 @@ internal sealed class QueueMetrics
     private readonly Counter<long> _messagesEnqueuedCounter;
     private readonly Counter<long> _operationErrorsCounter;
     private readonly Histogram<double> _messageProcessingDuration;
+    private readonly Histogram<double> _enqueueDuration;
+    private readonly Histogram<double> _dequeueDuration;
     private readonly Histogram<int> _batchSizeHistogram;
 
     public QueueMetrics()
@@ -36,6 +38,16 @@ internal sealed class QueueMetrics
             MetricNames.MessageProcessingDuration,
             unit: "ms",
             description: "Duration of message processing");
+
+        _enqueueDuration = _meter.CreateHistogram<double>(
+            MetricNames.EnqueueDuration,
+            unit: "ms",
+            description: "Duration of enqueue operation (writing message to storage)");
+
+        _dequeueDuration = _meter.CreateHistogram<double>(
+            MetricNames.DequeueDuration,
+            unit: "ms",
+            description: "Duration of dequeue operation (reading message from storage)");
 
         _batchSizeHistogram = _meter.CreateHistogram<int>(
             MetricNames.BatchSize,
@@ -121,6 +133,36 @@ internal sealed class QueueMetrics
         else
         {
             _batchSizeHistogram.Record(size);
+        }
+    }
+
+    public void RecordEnqueueDuration(double durationMs, string queueName, int messageCount = 1)
+    {
+        if (messageCount > 1)
+        {
+            _enqueueDuration.Record(durationMs,
+                new KeyValuePair<string, object?>("queue.name", queueName),
+                new KeyValuePair<string, object?>("message.count", messageCount));
+        }
+        else
+        {
+            _enqueueDuration.Record(durationMs,
+                new KeyValuePair<string, object?>("queue.name", queueName));
+        }
+    }
+
+    public void RecordDequeueDuration(double durationMs, string queueName, int messageCount = 1)
+    {
+        if (messageCount > 1)
+        {
+            _dequeueDuration.Record(durationMs,
+                new KeyValuePair<string, object?>("queue.name", queueName),
+                new KeyValuePair<string, object?>("message.count", messageCount));
+        }
+        else
+        {
+            _dequeueDuration.Record(durationMs,
+                new KeyValuePair<string, object?>("queue.name", queueName));
         }
     }
 }

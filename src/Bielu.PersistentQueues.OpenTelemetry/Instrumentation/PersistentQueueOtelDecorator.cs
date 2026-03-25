@@ -75,17 +75,22 @@ public class PersistentQueueOtelDecorator : IQueue
 
         await foreach (var messageContext in _queue.Receive(queueName, pollIntervalInMilliseconds, cancellationToken))
         {
-            var startTime = Stopwatch.GetTimestamp();
-
+            var dequeueStartTime = Stopwatch.GetTimestamp();
+            
             _metrics.RecordMessagesReceived(1, queueName);
+            
+            var dequeueElapsed = Stopwatch.GetElapsedTime(dequeueStartTime).TotalMilliseconds;
+            _metrics.RecordDequeueDuration(dequeueElapsed, queueName);
+
+            var processingStartTime = Stopwatch.GetTimestamp();
 
             using var messageActivity = _activitySource.StartActivity(ActivityNames.ProcessMessage, ActivityKind.Consumer);
             QueueActivitySource.SetMessageTags(messageActivity, messageContext.Message.Id.MessageIdentifier, queueName);
 
             yield return messageContext;
 
-            var elapsed = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
-            _metrics.RecordProcessingDuration(elapsed, queueName);
+            var processingElapsed = Stopwatch.GetElapsedTime(processingStartTime).TotalMilliseconds;
+            _metrics.RecordProcessingDuration(processingElapsed, queueName);
         }
     }
 
@@ -102,11 +107,16 @@ public class PersistentQueueOtelDecorator : IQueue
         await foreach (var messageContext in _queue.ReceiveBatch(queueName, maxMessages, batchTimeoutInMilliseconds,
                            pollIntervalInMilliseconds, cancellationToken))
         {
-            var startTime = Stopwatch.GetTimestamp();
+            var dequeueStartTime = Stopwatch.GetTimestamp();
             var batchSize = messageContext.Messages.Count();
 
             _metrics.RecordMessagesReceived(batchSize, queueName);
             _metrics.RecordBatchSize(batchSize, queueName);
+            
+            var dequeueElapsed = Stopwatch.GetElapsedTime(dequeueStartTime).TotalMilliseconds;
+            _metrics.RecordDequeueDuration(dequeueElapsed, queueName, batchSize);
+
+            var processingStartTime = Stopwatch.GetTimestamp();
 
             using var messageActivity = _activitySource.StartActivity(ActivityNames.ProcessBatch, ActivityKind.Consumer);
             QueueActivitySource.SetBatchTags(messageActivity, batchSize, queueName);
@@ -114,8 +124,8 @@ public class PersistentQueueOtelDecorator : IQueue
 
             yield return messageContext;
 
-            var elapsed = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
-            _metrics.RecordProcessingDuration(elapsed, queueName, batchSize);
+            var processingElapsed = Stopwatch.GetElapsedTime(processingStartTime).TotalMilliseconds;
+            _metrics.RecordProcessingDuration(processingElapsed, queueName, batchSize);
         }
     }
 
@@ -182,9 +192,19 @@ public class PersistentQueueOtelDecorator : IQueue
 
         try
         {
+            var startTime = Stopwatch.GetTimestamp();
+            
+            _queue.Send(messages);
+            
+            var elapsed = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
             _metrics.RecordMessagesSent(messages.Length);
             _metrics.RecordBatchSize(messages.Length);
-            _queue.Send(messages);
+            
+            // Record enqueue duration for batch send (uses first message's queue name if available)
+            if (messages.Length > 0)
+            {
+                _metrics.RecordEnqueueDuration(elapsed, messages[0].Queue.ToString(), messages.Length);
+            }
         }
         catch (Exception ex)
         {
@@ -201,8 +221,13 @@ public class PersistentQueueOtelDecorator : IQueue
 
         try
         {
-            _metrics.RecordMessageSent(message.Queue.ToString());
+            var startTime = Stopwatch.GetTimestamp();
+            
             _queue.Send(message);
+            
+            var elapsed = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
+            _metrics.RecordMessageSent(message.Queue.ToString());
+            _metrics.RecordEnqueueDuration(elapsed, message.Queue.ToString());
         }
         catch (Exception ex)
         {
@@ -219,8 +244,13 @@ public class PersistentQueueOtelDecorator : IQueue
 
         try
         {
-            _metrics.RecordMessageEnqueued(message.Queue.ToString());
+            var startTime = Stopwatch.GetTimestamp();
+            
             _queue.Enqueue(message);
+            
+            var elapsed = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
+            _metrics.RecordMessageEnqueued(message.Queue.ToString());
+            _metrics.RecordEnqueueDuration(elapsed, message.Queue.ToString());
         }
         catch (Exception ex)
         {
