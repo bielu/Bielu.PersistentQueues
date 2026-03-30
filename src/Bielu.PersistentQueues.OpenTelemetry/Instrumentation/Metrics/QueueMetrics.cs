@@ -8,6 +8,7 @@ public sealed class QueueMetrics
     private readonly Counter<long> _messagesSentCounter;
     private readonly Counter<long> _messagesReceivedCounter;
     private readonly Counter<long> _messagesEnqueuedCounter;
+    private readonly Counter<long> _messagesFailedCounter;
     private readonly Counter<long> _operationErrorsCounter;
     private readonly Histogram<double> _messageProcessingDuration;
     private readonly Histogram<double> _enqueueDuration;
@@ -27,7 +28,9 @@ public sealed class QueueMetrics
         _messagesReceivedCounter = _meter.CreateCounter<long>(
             MetricNames.MessagesReceived,
             description: "Total number of messages received");
-
+        _messagesBatchCounter = _meter.CreateCounter<long>(
+            MetricNames.MessagesFailed,
+            description: "Total number of failed messages");
         _messagesEnqueuedCounter = _meter.CreateCounter<long>(
             MetricNames.MessagesEnqueued,
             description: "Total number of messages enqueued");
@@ -142,15 +145,23 @@ public sealed class QueueMetrics
             _messagesBatchCounter.Add(1);
         }
     }
-    public void RecordBatchFailed(string? queueName = null)
+    public void RecordBatchFailed(string? queueName = null, int itemCount = 0)
     {
         if (queueName != null)
         {
             _messagesBatchFailedCounter.Add(1, new KeyValuePair<string, object?>("queue.name", queueName));
+            if (itemCount != 0)
+            {
+                _messagesFailedCounter.Add(itemCount, new KeyValuePair<string, object?>("queue.name", queueName));
+            }
         }
         else
         {
             _messagesBatchFailedCounter.Add(1);
+            if (itemCount != 0)
+            {
+                _messagesFailedCounter.Add(itemCount);
+            }
         }
     }
     public void RecordBatchSize(int size, string? queueName = null)

@@ -5,6 +5,7 @@ internal static class MetricNames
     public const string MeterName = "BieluPersistentQueues";
 
     public const string MessagesSent = "bielupersistentqueues.messages.sent";
+    public const string MessagesFailed = "bielupersistentqueues.messages.failed";
     public const string MessagesReceived = "bielupersistentqueues.messages.received";
     public const string MessagesEnqueued = "bielupersistentqueues.messages.enqueued";
     public const string OperationErrors = "bielupersistentqueues.operations.errors";
