@@ -8,7 +8,7 @@ public static class ServiceCollectionExtensions
     public const string MetricName = "BieluPersistentQueues";
     public const string ActivityName = "BieluPersistentQueues";
 
-    public static ServiceCollection AddBieluPersistentQueueInstrumentation(this IServiceCollection serviceCollection)
+    public static IServiceCollection AddBieluPersistentQueueInstrumentation(this IServiceCollection serviceCollection)
     {
         serviceCollection.Decorate<IQueue, PersistentQueueOtelDecorator>();
         return serviceCollection;
