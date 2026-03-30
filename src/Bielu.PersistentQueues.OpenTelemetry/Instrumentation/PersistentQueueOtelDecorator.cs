@@ -15,11 +15,11 @@ public class PersistentQueueOtelDecorator : IQueue
     private readonly QueueActivitySource _activitySource;
     private readonly ObservableGauge<int> _activeQueuesGauge;
 
-    public PersistentQueueOtelDecorator(IQueue queue)
+    public PersistentQueueOtelDecorator(IQueue queue, QueueMetrics queueMetrics, QueueActivitySource activitySource)
     {
         _queue = queue;
-        _metrics = new QueueMetrics();
-        _activitySource = new QueueActivitySource();
+        _metrics = queueMetrics;
+        _activitySource = activitySource;
         _activeQueuesGauge = _metrics.CreateActiveQueuesGauge(() => _queue.Queues.Length);
     }
 

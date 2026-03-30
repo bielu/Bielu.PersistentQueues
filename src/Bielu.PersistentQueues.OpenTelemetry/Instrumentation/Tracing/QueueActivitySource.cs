@@ -3,7 +3,7 @@ using OpenTelemetry.Trace;
 
 namespace Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing;
 
-internal sealed class QueueActivitySource
+public sealed class QueueActivitySource
 {
     private readonly ActivitySource _activitySource;
 

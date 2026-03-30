@@ -2,7 +2,7 @@ using System.Diagnostics.Metrics;
 
 namespace Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics;
 
-internal sealed class QueueMetrics
+public sealed class QueueMetrics
 {
     private readonly Meter _meter;
     private readonly Counter<long> _messagesSentCounter;
