@@ -13,4 +13,6 @@ internal static class MetricNames
     public const string DequeueDuration = "bielupersistentqueues.dequeue.duration";
     public const string BatchSize = "bielupersistentqueues.batch.size";
     public const string QueuesActive = "bielupersistentqueues.queues.active";
+    public const string BatchCount = "bielupersistentqueues.batch.count";
+    public const string FailedBatchCount = "bielupersistentqueues.batch.count";
 }

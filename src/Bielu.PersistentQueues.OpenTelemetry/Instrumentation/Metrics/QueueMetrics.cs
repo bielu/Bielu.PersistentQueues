@@ -13,6 +13,8 @@ internal sealed class QueueMetrics
     private readonly Histogram<double> _enqueueDuration;
     private readonly Histogram<double> _dequeueDuration;
     private readonly Histogram<int> _batchSizeHistogram;
+    private readonly Counter<long> _messagesBatchCounter;
+    private readonly Counter<long> _messagesBatchFailedCounter;
 
     public QueueMetrics()
     {
@@ -52,6 +54,12 @@ internal sealed class QueueMetrics
         _batchSizeHistogram = _meter.CreateHistogram<int>(
             MetricNames.BatchSize,
             description: "Number of messages in a batch");
+        _messagesBatchCounter = _meter.CreateCounter<long>(
+            MetricNames.BatchCount,
+            description: "Total number of batches processed");
+        _messagesBatchCounter = _meter.CreateCounter<long>(
+            MetricNames.FailedBatchCount,
+            description: "Total number of failed batches");
     }
 
     public ObservableGauge<int> CreateActiveQueuesGauge(Func<int> observeValue)
@@ -123,7 +131,28 @@ internal sealed class QueueMetrics
                 new KeyValuePair<string, object?>("queue.name", queueName));
         }
     }
-
+    public void RecordBatchProcessed(string? queueName = null)
+    {
+        if (queueName != null)
+        {
+            _messagesBatchCounter.Add(1, new KeyValuePair<string, object?>("queue.name", queueName));
+        }
+        else
+        {
+            _messagesBatchCounter.Add(1);
+        }
+    }
+    public void RecordBatchFailed(string? queueName = null)
+    {
+        if (queueName != null)
+        {
+            _messagesBatchFailedCounter.Add(1, new KeyValuePair<string, object?>("queue.name", queueName));
+        }
+        else
+        {
+            _messagesBatchFailedCounter.Add(1);
+        }
+    }
     public void RecordBatchSize(int size, string? queueName = null)
     {
         if (queueName != null)

@@ -76,15 +76,16 @@ public class PersistentQueueOtelDecorator : IQueue
         await foreach (var messageContext in _queue.Receive(queueName, pollIntervalInMilliseconds, cancellationToken))
         {
             var dequeueStartTime = Stopwatch.GetTimestamp();
-            
+
             _metrics.RecordMessagesReceived(1, queueName);
-            
+
             var dequeueElapsed = Stopwatch.GetElapsedTime(dequeueStartTime).TotalMilliseconds;
             _metrics.RecordDequeueDuration(dequeueElapsed, queueName);
 
             var processingStartTime = Stopwatch.GetTimestamp();
 
-            using var messageActivity = _activitySource.StartActivity(ActivityNames.ProcessMessage, ActivityKind.Consumer);
+            using var messageActivity =
+                _activitySource.StartActivity(ActivityNames.ProcessMessage, ActivityKind.Consumer);
             QueueActivitySource.SetMessageTags(messageActivity, messageContext.Message.Id.MessageIdentifier, queueName);
 
             yield return messageContext;
@@ -108,19 +109,21 @@ public class PersistentQueueOtelDecorator : IQueue
                            pollIntervalInMilliseconds, cancellationToken))
         {
             var dequeueStartTime = Stopwatch.GetTimestamp();
-            var batchSize = messageContext.Messages.Count();
+            var batchSize = messageContext.Messages.Length;
 
             _metrics.RecordMessagesReceived(batchSize, queueName);
             _metrics.RecordBatchSize(batchSize, queueName);
-            
+            _metrics.RecordBatchProcessed(queueName);
             var dequeueElapsed = Stopwatch.GetElapsedTime(dequeueStartTime).TotalMilliseconds;
             _metrics.RecordDequeueDuration(dequeueElapsed, queueName, batchSize);
 
             var processingStartTime = Stopwatch.GetTimestamp();
 
-            using var messageActivity = _activitySource.StartActivity(ActivityNames.ProcessBatch, ActivityKind.Consumer);
+            using var messageActivity =
+                _activitySource.StartActivity(ActivityNames.ProcessBatch, ActivityKind.Consumer);
             QueueActivitySource.SetBatchTags(messageActivity, batchSize, queueName);
-            messageActivity?.SetTag("message.Id.MessageIdentifiers", string.Join(",", messageContext.Messages.Select(x => x.Id)));
+            messageActivity?.SetTag("message.Id.MessageIdentifiers",
+                string.Join(",", messageContext.Messages.Select(x => x.Id)));
 
             yield return messageContext;
 
@@ -193,13 +196,13 @@ public class PersistentQueueOtelDecorator : IQueue
         try
         {
             var startTime = Stopwatch.GetTimestamp();
-            
+
             _queue.Send(messages);
-            
+
             var elapsed = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
             _metrics.RecordMessagesSent(messages.Length);
             _metrics.RecordBatchSize(messages.Length);
-            
+
             // Record enqueue duration for batch send (uses first message's queue name if available)
             if (messages.Length > 0)
             {
@@ -217,14 +220,15 @@ public class PersistentQueueOtelDecorator : IQueue
     public void Send(Message message)
     {
         using var activity = _activitySource.StartActivity(ActivityNames.Send, ActivityKind.Producer);
-        QueueActivitySource.SetMessageTags(activity, message.Id.MessageIdentifier, message.Queue.ToString(), message.Destination?.ToString());
+        QueueActivitySource.SetMessageTags(activity, message.Id.MessageIdentifier, message.Queue.ToString(),
+            message.Destination?.ToString());
 
         try
         {
             var startTime = Stopwatch.GetTimestamp();
-            
+
             _queue.Send(message);
-            
+
             var elapsed = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
             _metrics.RecordMessageSent(message.Queue.ToString());
             _metrics.RecordEnqueueDuration(elapsed, message.Queue.ToString());
@@ -245,9 +249,9 @@ public class PersistentQueueOtelDecorator : IQueue
         try
         {
             var startTime = Stopwatch.GetTimestamp();
-            
+
             _queue.Enqueue(message);
-            
+
             var elapsed = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
             _metrics.RecordMessageEnqueued(message.Queue.ToString());
             _metrics.RecordEnqueueDuration(elapsed, message.Queue.ToString());
