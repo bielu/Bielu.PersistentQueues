@@ -19,7 +19,7 @@
     <PackageVersion Include="coverlet.collector" Version="8.0.1" />
     <!-- Benchmarks -->
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
-    <PackageVersion Include="BenchmarkDotNet.Diagnostics.dotMemory" Version="0.15.0" />
+    <PackageVersion Include="BenchmarkDotNet.Diagnostics.dotMemory" Version="0.15.8" />
     <PackageVersion Include="BenchmarkDotNet.Diagnostics.dotTrace" Version="0.15.8" />
     <PackageVersion Include="Microsoft.FASTER.Core" Version="2.6.5" />
     <PackageVersion Include="ZoneTree" Version="1.8.6" />
