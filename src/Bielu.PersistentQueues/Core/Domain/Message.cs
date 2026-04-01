@@ -86,6 +86,16 @@ public readonly struct Message
     public readonly int? MaxAttempts;
 
     /// <summary>
+    /// Gets the optional partition key used to determine which partition this message is routed to.
+    /// </summary>
+    /// <remarks>
+    /// When using partitioned queues, messages with the same partition key are guaranteed
+    /// to be routed to the same partition, preserving ordering for related messages.
+    /// If empty, the partition strategy determines routing (e.g., round-robin).
+    /// </remarks>
+    public readonly ReadOnlyMemory<char> PartitionKey;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="Message"/> struct.
     /// </summary>
     public Message(
@@ -98,7 +108,8 @@ public readonly struct Message
         DateTime? deliverBy = null,
         int? maxAttempts = null,
         FixedHeaders headers = default,
-        ReadOnlySequence<byte> bytes = default)
+        ReadOnlySequence<byte> bytes = default,
+        ReadOnlyMemory<char> partitionKey = default)
     {
         Id = id;
         Data = data;
@@ -109,6 +120,7 @@ public readonly struct Message
         DeliverBy = deliverBy;
         MaxAttempts = maxAttempts;
         Headers = headers;
+        PartitionKey = partitionKey;
     }
 
     /// <summary>
@@ -122,7 +134,8 @@ public readonly struct Message
         string? destinationUri = null,
         DateTime? deliverBy = null,
         int? maxAttempts = null,
-        Dictionary<string, string>? headers = null)
+        Dictionary<string, string>? headers = null,
+        string? partitionKey = null)
     {
         return new Message(
             id: id != null ? MessageId.WithId(id.Value) : MessageId.GenerateRandom(),
@@ -132,7 +145,8 @@ public readonly struct Message
             destinationUri: destinationUri?.AsMemory() ?? default,
             deliverBy: deliverBy,
             maxAttempts: maxAttempts,
-            headers: headers != null ? FixedHeaders.FromDictionary(headers) : default
+            headers: headers != null ? FixedHeaders.FromDictionary(headers) : default,
+            partitionKey: partitionKey?.AsMemory() ?? default
         );
     }
 
@@ -153,7 +167,7 @@ public readonly struct Message
     {
         return new Message(
             Id, Data, Queue, SentAt, SubQueue, DestinationUri,
-            DeliverBy, MaxAttempts, Headers.WithSentAttempts(attempts));
+            DeliverBy, MaxAttempts, Headers.WithSentAttempts(attempts), partitionKey: PartitionKey);
     }
 
     /// <summary>
@@ -163,7 +177,7 @@ public readonly struct Message
     {
         return new Message(
             Id, Data, Queue, SentAt, SubQueue, DestinationUri,
-            DeliverBy, MaxAttempts, headers);
+            DeliverBy, MaxAttempts, headers, partitionKey: PartitionKey);
     }
 
     /// <summary>
@@ -173,7 +187,17 @@ public readonly struct Message
     {
         return new Message(
             Id, Data, Queue, SentAt, SubQueue, DestinationUri,
-            DeliverBy, MaxAttempts, Headers, bytes);
+            DeliverBy, MaxAttempts, Headers, bytes, PartitionKey);
+    }
+
+    /// <summary>
+    /// Creates a new Message with an updated partition key
+    /// </summary>
+    public Message WithPartitionKey(ReadOnlyMemory<char> partitionKey)
+    {
+        return new Message(
+            Id, Data, Queue, SentAt, SubQueue, DestinationUri,
+            DeliverBy, MaxAttempts, Headers, partitionKey: partitionKey);
     }
 
     /// <summary>
@@ -185,6 +209,11 @@ public readonly struct Message
     /// Gets the sub-queue name as a string (allocates)
     /// </summary>
     public string? SubQueueString => SubQueue.IsEmpty ? null : SubQueue.ToString();
+
+    /// <summary>
+    /// Gets the partition key as a string (allocates)
+    /// </summary>
+    public string? PartitionKeyString => PartitionKey.IsEmpty ? null : PartitionKey.ToString();
 
     /// <summary>
     /// Gets the data as a byte array (allocates)
