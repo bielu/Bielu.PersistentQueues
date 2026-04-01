@@ -5,6 +5,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Bielu.PersistentQueues.Partitioning;
+using Bielu.PersistentQueues.Serialization;
+using Bielu.PersistentQueues.Storage.LMDB;
+using LightningDB;
 using Shouldly;
 using Xunit;
 using Xunit.Abstractions;
@@ -187,7 +190,7 @@ public class PartitionedQueueTests : TestBase
     [Fact]
     public async Task enqueue_to_partition_routes_by_key()
     {
-        await QueueScenario(config => { }, async (queue, token) =>
+        await PartitionedQueueScenario(async (queue, token) =>
         {
             var partitioned = new PartitionedQueue(queue, new HashPartitionStrategy());
             partitioned.CreatePartitionedQueue("orders", 4);
@@ -222,7 +225,7 @@ public class PartitionedQueueTests : TestBase
     [Fact]
     public async Task enqueue_to_specific_partition()
     {
-        await QueueScenario(config => { }, async (queue, token) =>
+        await PartitionedQueueScenario(async (queue, token) =>
         {
             var partitioned = new PartitionedQueue(queue, new HashPartitionStrategy());
             partitioned.CreatePartitionedQueue("events", 3);
@@ -241,7 +244,7 @@ public class PartitionedQueueTests : TestBase
     [Fact]
     public async Task receive_batch_from_partition()
     {
-        await QueueScenario(config => { }, async (queue, token) =>
+        await PartitionedQueueScenario(async (queue, token) =>
         {
             var partitioned = new PartitionedQueue(queue, new RoundRobinPartitionStrategy());
             partitioned.CreatePartitionedQueue("batch-q", 2);
@@ -267,7 +270,7 @@ public class PartitionedQueueTests : TestBase
     [Fact]
     public void create_partitioned_queue_creates_all_partitions()
     {
-        StorageScenario(store =>
+        PartitionedStorageScenario(store =>
         {
             var config = new QueueConfiguration()
                 .WithDefaultsForTest(Output)
@@ -290,7 +293,7 @@ public class PartitionedQueueTests : TestBase
     [Fact]
     public void resolve_partition_is_consistent_for_same_key()
     {
-        StorageScenario(store =>
+        PartitionedStorageScenario(store =>
         {
             var config = new QueueConfiguration()
                 .WithDefaultsForTest(Output)
@@ -330,7 +333,7 @@ public class PartitionedQueueTests : TestBase
     [Fact]
     public void enqueue_to_out_of_range_partition_throws()
     {
-        StorageScenario(store =>
+        PartitionedStorageScenario(store =>
         {
             var config = new QueueConfiguration()
                 .WithDefaultsForTest(Output)
@@ -344,6 +347,17 @@ public class PartitionedQueueTests : TestBase
             Should.Throw<ArgumentOutOfRangeException>(() => partitioned.EnqueueToPartition(msg, "test", 5));
             Should.Throw<ArgumentOutOfRangeException>(() => partitioned.EnqueueToPartition(msg, "test", -1));
         });
+    }
+
+    /// <summary>
+    /// StorageScenario variant with higher MaxDatabases to support partitioned queues.
+    /// </summary>
+    private void PartitionedStorageScenario(Action<LmdbMessageStore> action)
+    {
+        using var env = new LightningEnvironment(TempPath(), new EnvironmentConfiguration { MaxDatabases = 20, MapSize = 1024 * 1024 * 100 });
+        using var store = new LmdbMessageStore(env, new MessageSerializer());
+        store.CreateQueue("test");
+        action(store);
     }
 
     [Fact]
@@ -370,5 +384,23 @@ public class PartitionedQueueTests : TestBase
         var msg = Message.Create(data: Encoding.UTF8.GetBytes("data"), queue: "test");
         msg.PartitionKey.IsEmpty.ShouldBeTrue();
         msg.PartitionKeyString.ShouldBeNull();
+    }
+
+    /// <summary>
+    /// QueueScenario variant with higher MaxDatabases to support partitioned queues.
+    /// </summary>
+    private async Task PartitionedQueueScenario(Func<IQueue, CancellationToken, Task> scenario, TimeSpan timeout, string queueName = "test")
+    {
+        using var cancellation = new CancellationTokenSource(timeout);
+        var serializer = new MessageSerializer();
+        using var env = new LightningEnvironment(TempPath(), new EnvironmentConfiguration { MaxDatabases = 20, MapSize = 1024 * 1024 * 100 });
+        var queueConfiguration = new QueueConfiguration()
+            .WithDefaults()
+            .LogWith(new Bielu.PersistentQueues.Logging.RecordingLogger(OutputWriter, Microsoft.Extensions.Logging.LogLevel.Information))
+            .SerializeWith(serializer)
+            .StoreWithLmdb(() => env);
+        using var queue = queueConfiguration.BuildAndStartQueue(queueName);
+        await scenario(queue, cancellation.Token);
+        await cancellation.CancelAsync();
     }
 }

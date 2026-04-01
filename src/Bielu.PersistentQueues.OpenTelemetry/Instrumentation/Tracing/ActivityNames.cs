@@ -15,4 +15,12 @@ internal static class ActivityNames
     public const string Send = "Send";
     public const string SendBatch = "SendBatch";
     public const string Enqueue = "Enqueue";
+
+    // Partitioning operations
+    public const string CreatePartitionedQueue = "CreatePartitionedQueue";
+    public const string EnqueueToPartition = "EnqueueToPartition";
+    public const string ReceiveFromPartition = "ReceiveFromPartition";
+    public const string ReceiveBatchFromPartition = "ReceiveBatchFromPartition";
+    public const string ReceiveFromPartitions = "ReceiveFromPartitions";
+    public const string ResolvePartition = "ResolvePartition";
 }

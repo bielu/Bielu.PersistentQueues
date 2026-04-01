@@ -16,6 +16,10 @@ public sealed class QueueMetrics
     private readonly Histogram<int> _batchSizeHistogram;
     private readonly Counter<long> _messagesBatchCounter;
     private readonly Counter<long> _messagesBatchFailedCounter;
+    private readonly Counter<long> _partitionEnqueuedCounter;
+    private readonly Counter<long> _partitionReceivedCounter;
+    private readonly Counter<long> _partitionCreatedCounter;
+    private readonly Histogram<double> _partitionEnqueueDuration;
 
     public QueueMetrics()
     {
@@ -63,6 +67,24 @@ public sealed class QueueMetrics
         _messagesBatchCounter = _meter.CreateCounter<long>(
             MetricNames.FailedBatchCount,
             description: "Total number of failed batches");
+
+        // Partitioning metrics
+        _partitionEnqueuedCounter = _meter.CreateCounter<long>(
+            MetricNames.PartitionEnqueued,
+            description: "Total number of messages enqueued to partitions");
+
+        _partitionReceivedCounter = _meter.CreateCounter<long>(
+            MetricNames.PartitionReceived,
+            description: "Total number of messages received from partitions");
+
+        _partitionCreatedCounter = _meter.CreateCounter<long>(
+            MetricNames.PartitionCreated,
+            description: "Total number of partitions created");
+
+        _partitionEnqueueDuration = _meter.CreateHistogram<double>(
+            MetricNames.PartitionEnqueueDuration,
+            unit: "ms",
+            description: "Duration of enqueue operation to a partition");
     }
 
     public ObservableGauge<int> CreateActiveQueuesGauge(Func<int> observeValue)
@@ -204,5 +226,41 @@ public sealed class QueueMetrics
             _dequeueDuration.Record(durationMs,
                 new KeyValuePair<string, object?>("queue.name", queueName));
         }
+    }
+
+    public void RecordPartitionEnqueued(string queueName, int partition, string? partitionKey = null)
+    {
+        var tags = new List<KeyValuePair<string, object?>>
+        {
+            new("queue.name", queueName),
+            new("partition", partition)
+        };
+
+        if (partitionKey != null)
+        {
+            tags.Add(new KeyValuePair<string, object?>("partition.key", partitionKey));
+        }
+
+        _partitionEnqueuedCounter.Add(1, tags.ToArray());
+    }
+
+    public void RecordPartitionReceived(int count, string queueName, int partition)
+    {
+        _partitionReceivedCounter.Add(count,
+            new KeyValuePair<string, object?>("queue.name", queueName),
+            new KeyValuePair<string, object?>("partition", partition));
+    }
+
+    public void RecordPartitionCreated(string queueName, int partitionCount)
+    {
+        _partitionCreatedCounter.Add(partitionCount,
+            new KeyValuePair<string, object?>("queue.name", queueName));
+    }
+
+    public void RecordPartitionEnqueueDuration(double durationMs, string queueName, int partition)
+    {
+        _partitionEnqueueDuration.Record(durationMs,
+            new KeyValuePair<string, object?>("queue.name", queueName),
+            new KeyValuePair<string, object?>("partition", partition));
     }
 }
