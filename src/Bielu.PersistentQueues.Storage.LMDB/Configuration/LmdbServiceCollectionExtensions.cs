@@ -78,4 +78,21 @@ public class LmdbStorageConfiguration
     /// Gets or sets the LMDB storage options.
     /// </summary>
     public LmdbStorageOptions? StorageOptions { get; set; }
+
+    /// <summary>
+    /// Sets the LMDB map size using a <see cref="StorageSize"/> value, allowing sizes in MB/GB.
+    /// This is a convenience property that sets <c>EnvironmentConfiguration.MapSize</c>.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// config.MapSize = StorageSize.MB(100);
+    /// config.MapSize = StorageSize.GB(2);
+    /// config.MapSize = StorageSize.FromMegabytes(500);
+    /// </code>
+    /// </example>
+    public StorageSize MapSize
+    {
+        get => StorageSize.FromBytes(EnvironmentConfiguration.MapSize);
+        set => EnvironmentConfiguration.MapSize = value.Bytes;
+    }
 }
