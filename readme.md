@@ -317,7 +317,7 @@ When OpenTelemetry instrumentation is enabled, storage usage metrics are automat
 services.AddPersistentQueues(builder =>
 {
     builder
-        .AddLmdbStorage("C:\\queue_path")
+        .AddLmdbStorage("./queue_data")
         .CreateQueues("my-queue");
 });
 
