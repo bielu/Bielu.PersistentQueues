@@ -26,14 +26,15 @@ public class PersistentQueueOtelDecorator : IQueue
         _activeQueuesGauge = _metrics.CreateActiveQueuesGauge(() => _queue.Queues.Length);
 
         // Register storage usage gauges if the store supports usage reporting
-        if (_queue.Store.GetStorageUsageInfo() != null)
+        var store = _queue.Store;
+        if (store.GetStorageUsageInfo() != null)
         {
             _storageUsedBytesGauge = _metrics.CreateStorageUsedBytesGauge(
-                () => _queue.Store.GetStorageUsageInfo()?.UsedBytes ?? 0);
+                () => store.GetStorageUsageInfo()?.UsedBytes ?? 0);
             _storageTotalBytesGauge = _metrics.CreateStorageTotalBytesGauge(
-                () => _queue.Store.GetStorageUsageInfo()?.TotalBytes ?? 0);
+                () => store.GetStorageUsageInfo()?.TotalBytes ?? 0);
             _storageUsagePercentGauge = _metrics.CreateStorageUsagePercentGauge(
-                () => _queue.Store.GetStorageUsageInfo()?.UsagePercentage ?? 0);
+                () => store.GetStorageUsageInfo()?.UsagePercentage ?? 0);
         }
     }
 
