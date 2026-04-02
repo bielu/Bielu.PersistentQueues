@@ -3,6 +3,7 @@ using Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics;
 using Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing;
 using Bielu.PersistentQueues.Partitioning;
 using Microsoft.Extensions.DependencyInjection;
+using System.Linq;
 
 namespace Bielu.PersistentQueues.OpenTelemetry.Configuration;
 
@@ -13,12 +14,16 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddBieluPersistentQueueInstrumentation(this IServiceCollection serviceCollection)
     {
-        serviceCollection.Decorate<IQueue, PersistentQueueOtelDecorator>();
         serviceCollection.AddSingleton<QueueMetrics>();
         serviceCollection.AddSingleton<QueueActivitySource>();
 
-        // If IPartitionedQueue is registered, decorate it too
-        serviceCollection.Decorate<IPartitionedQueue, PartitionedQueueOtelDecorator>();
+        serviceCollection.Decorate<IQueue, PersistentQueueOtelDecorator>();
+
+        // Only decorate IPartitionedQueue if it has been registered in the container
+        if (serviceCollection.Any(sd => sd.ServiceType == typeof(IPartitionedQueue)))
+        {
+            serviceCollection.Decorate<IPartitionedQueue, PartitionedQueueOtelDecorator>();
+        }
 
         return serviceCollection;
     }

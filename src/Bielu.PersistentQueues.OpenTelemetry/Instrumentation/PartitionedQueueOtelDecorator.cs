@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics;
 using Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing;
@@ -25,7 +27,15 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
         _partitionedQueue = partitionedQueue;
         _metrics = queueMetrics;
         _activitySource = activitySource;
+        _activePartitionsGauge = _metrics.CreateActivePartitionsGauge(() =>
+        {
+            // Sum up partition counts across all known queues
+            var queues = _partitionedQueue.Queues;
+            return queues.Count(q => q.Contains(Bielu.PersistentQueues.Partitioning.PartitionConstants.PartitionSeparator));
+        });
     }
+
+    private readonly ObservableGauge<int> _activePartitionsGauge;
 
     /// <inheritdoc />
     public int GetPartitionCount(string queueName)
@@ -69,6 +79,7 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
                            queueName, partition, pollIntervalInMilliseconds, cancellationToken))
         {
             _metrics.RecordPartitionReceived(1, queueName, partition);
+            _metrics.RecordPartitionConsumerStarted(queueName, partition);
 
             using var messageActivity =
                 _activitySource.StartActivity(ActivityNames.ProcessMessage, ActivityKind.Consumer);
@@ -76,6 +87,8 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
             QueueActivitySource.SetPartitionTags(messageActivity, queueName, partition);
 
             yield return messageContext;
+
+            _metrics.RecordPartitionConsumerStopped(queueName, partition);
         }
     }
 
@@ -140,7 +153,9 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
 
             QueueActivitySource.SetPartitionTags(activity, queueName, partition, message.PartitionKeyString);
 
+            _metrics.RecordPartitionProducerStarted(queueName);
             _partitionedQueue.EnqueueToPartition(message, queueName);
+            _metrics.RecordPartitionProducerStopped(queueName);
 
             var elapsed = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
             _metrics.RecordPartitionEnqueued(queueName, partition, message.PartitionKeyString);
@@ -148,6 +163,7 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
         }
         catch (Exception ex)
         {
+            _metrics.RecordPartitionProducerStopped(queueName);
             _metrics.RecordOperationError("EnqueueToPartition", queueName);
             _activitySource.RecordException(activity, ex);
             throw;
@@ -165,7 +181,9 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
         {
             var startTime = Stopwatch.GetTimestamp();
 
+            _metrics.RecordPartitionProducerStarted(queueName);
             _partitionedQueue.EnqueueToPartition(message, queueName, partition);
+            _metrics.RecordPartitionProducerStopped(queueName);
 
             var elapsed = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
             _metrics.RecordPartitionEnqueued(queueName, partition, message.PartitionKeyString);
@@ -173,6 +191,7 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
         }
         catch (Exception ex)
         {
+            _metrics.RecordPartitionProducerStopped(queueName);
             _metrics.RecordOperationError("EnqueueToPartition", queueName);
             _activitySource.RecordException(activity, ex);
             throw;

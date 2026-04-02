@@ -15,11 +15,14 @@ internal static class MetricNames
     public const string BatchSize = "bielupersistentqueues.batch.size";
     public const string QueuesActive = "bielupersistentqueues.queues.active";
     public const string BatchCount = "bielupersistentqueues.batch.count";
-    public const string FailedBatchCount = "bielupersistentqueues.batch.count";
+    public const string FailedBatchCount = "bielupersistentqueues.batch.failed.count";
 
     // Partitioning metrics
     public const string PartitionEnqueued = "bielupersistentqueues.partition.messages.enqueued";
     public const string PartitionReceived = "bielupersistentqueues.partition.messages.received";
     public const string PartitionCreated = "bielupersistentqueues.partition.created";
     public const string PartitionEnqueueDuration = "bielupersistentqueues.partition.enqueue.duration";
+    public const string PartitionsActive = "bielupersistentqueues.partitions.active";
+    public const string PartitionConsumersActive = "bielupersistentqueues.partition.consumers.active";
+    public const string PartitionProducersActive = "bielupersistentqueues.partition.producers.active";
 }

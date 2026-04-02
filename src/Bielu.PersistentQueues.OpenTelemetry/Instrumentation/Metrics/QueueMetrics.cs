@@ -20,6 +20,8 @@ public sealed class QueueMetrics
     private readonly Counter<long> _partitionReceivedCounter;
     private readonly Counter<long> _partitionCreatedCounter;
     private readonly Histogram<double> _partitionEnqueueDuration;
+    private readonly UpDownCounter<long> _partitionConsumersActive;
+    private readonly UpDownCounter<long> _partitionProducersActive;
 
     public QueueMetrics()
     {
@@ -32,7 +34,7 @@ public sealed class QueueMetrics
         _messagesReceivedCounter = _meter.CreateCounter<long>(
             MetricNames.MessagesReceived,
             description: "Total number of messages received");
-        _messagesBatchCounter = _meter.CreateCounter<long>(
+        _messagesFailedCounter = _meter.CreateCounter<long>(
             MetricNames.MessagesFailed,
             description: "Total number of failed messages");
         _messagesEnqueuedCounter = _meter.CreateCounter<long>(
@@ -64,7 +66,7 @@ public sealed class QueueMetrics
         _messagesBatchCounter = _meter.CreateCounter<long>(
             MetricNames.BatchCount,
             description: "Total number of batches processed");
-        _messagesBatchCounter = _meter.CreateCounter<long>(
+        _messagesBatchFailedCounter = _meter.CreateCounter<long>(
             MetricNames.FailedBatchCount,
             description: "Total number of failed batches");
 
@@ -85,6 +87,14 @@ public sealed class QueueMetrics
             MetricNames.PartitionEnqueueDuration,
             unit: "ms",
             description: "Duration of enqueue operation to a partition");
+
+        _partitionConsumersActive = _meter.CreateUpDownCounter<long>(
+            MetricNames.PartitionConsumersActive,
+            description: "Number of currently active partition consumers");
+
+        _partitionProducersActive = _meter.CreateUpDownCounter<long>(
+            MetricNames.PartitionProducersActive,
+            description: "Number of currently active partition producers");
     }
 
     public ObservableGauge<int> CreateActiveQueuesGauge(Func<int> observeValue)
@@ -262,5 +272,39 @@ public sealed class QueueMetrics
         _partitionEnqueueDuration.Record(durationMs,
             new KeyValuePair<string, object?>("queue.name", queueName),
             new KeyValuePair<string, object?>("partition", partition));
+    }
+
+    public ObservableGauge<int> CreateActivePartitionsGauge(Func<int> observeValue)
+    {
+        return _meter.CreateObservableGauge(
+            MetricNames.PartitionsActive,
+            () => new Measurement<int>(observeValue()),
+            description: "Number of active partitions across all queues");
+    }
+
+    public void RecordPartitionConsumerStarted(string queueName, int partition)
+    {
+        _partitionConsumersActive.Add(1,
+            new KeyValuePair<string, object?>("queue.name", queueName),
+            new KeyValuePair<string, object?>("partition", partition));
+    }
+
+    public void RecordPartitionConsumerStopped(string queueName, int partition)
+    {
+        _partitionConsumersActive.Add(-1,
+            new KeyValuePair<string, object?>("queue.name", queueName),
+            new KeyValuePair<string, object?>("partition", partition));
+    }
+
+    public void RecordPartitionProducerStarted(string queueName)
+    {
+        _partitionProducersActive.Add(1,
+            new KeyValuePair<string, object?>("queue.name", queueName));
+    }
+
+    public void RecordPartitionProducerStopped(string queueName)
+    {
+        _partitionProducersActive.Add(-1,
+            new KeyValuePair<string, object?>("queue.name", queueName));
     }
 }
