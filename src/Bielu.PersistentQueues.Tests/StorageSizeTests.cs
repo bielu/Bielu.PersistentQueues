@@ -82,7 +82,7 @@ public class StorageSizeTests
     [Fact]
     public void ToString_displays_bytes_for_non_round_values()
     {
-        StorageSize.FromBytes(12345).ToString().ShouldBe("12345 bytes");
+        StorageSize.FromBytes(12345).ToString().ShouldBe("12345 Bytes");
     }
 
     [Fact]

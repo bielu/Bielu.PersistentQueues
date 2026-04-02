@@ -81,7 +81,7 @@ public class LmdbStorageConfiguration
 
     /// <summary>
     /// Sets the LMDB map size using a <see cref="StorageSize"/> value, allowing sizes in MB/GB.
-    /// This is a convenience property that sets <see cref="EnvironmentConfiguration"/>.<see cref="EnvironmentConfiguration.MapSize"/>.
+    /// This is a convenience property that sets <c>EnvironmentConfiguration.MapSize</c>.
     /// </summary>
     /// <example>
     /// <code>

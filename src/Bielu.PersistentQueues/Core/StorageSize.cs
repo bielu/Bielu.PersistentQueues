@@ -91,7 +91,7 @@ public readonly struct StorageSize : IEquatable<StorageSize>, IComparable<Storag
             return $"{Bytes / BytesPerGigabyte} GB";
         if (Bytes >= BytesPerMegabyte && Bytes % BytesPerMegabyte == 0)
             return $"{Bytes / BytesPerMegabyte} MB";
-        return $"{Bytes} bytes";
+        return $"{Bytes} Bytes";
     }
 
     public bool Equals(StorageSize other) => Bytes == other.Bytes;
