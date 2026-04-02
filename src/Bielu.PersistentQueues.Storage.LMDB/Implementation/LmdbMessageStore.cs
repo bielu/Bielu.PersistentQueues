@@ -964,6 +964,21 @@ public class LmdbMessageStore : IMessageStore
         }
     }
 
+    /// <inheritdoc />
+    public StorageUsageInfo? GetStorageUsageInfo()
+    {
+        CheckDisposed();
+
+        var info = _environment.Info;
+        var stats = _environment.EnvironmentStats;
+
+        var totalBytes = info.MapSize;
+        // LastPageNumber is 0-based, so used pages = LastPageNumber + 1
+        var usedBytes = (info.LastPageNumber + 1) * stats.PageSize;
+
+        return new StorageUsageInfo(usedBytes, totalBytes);
+    }
+
 
 
     public void Dispose()
