@@ -7,12 +7,13 @@ namespace Bielu.PersistentQueues.Examples.Services;
 
 /// <summary>
 /// Background service that consumes messages exclusively from the non-partitioned
-/// priority-alerts queue. Kept separate from partition workers so each concern
-/// has its own service and its own async foreach loop.
+/// priority-alerts queue. Acquires the shared <see cref="BatchProcessingLock"/>
+/// before processing each batch so that no partition worker runs concurrently.
 /// </summary>
 internal sealed class PriorityAlertConsumerService(
     IPartitionedQueue queue,
-    DemoStats stats) : BackgroundService
+    DemoStats stats,
+    BatchProcessingLock batchLock) : BackgroundService
 {
     private const string PriorityQueue = "priority-alerts";
 
@@ -20,19 +21,31 @@ internal sealed class PriorityAlertConsumerService(
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            await foreach (var batch in queue.ReceiveBatch(
-                PriorityQueue,
-                maxMessages: 10,
-                batchTimeoutInMilliseconds: 100,
-                pollIntervalInMilliseconds: 10,
-                cancellationToken: stoppingToken))
+            bool lockAcquired = false;
+            try
             {
-                if (batch.Messages.Length > 0)
+                await batchLock.WaitAsync(stoppingToken);
+                lockAcquired = true;
+
+                await foreach (var batch in queue.ReceiveBatch(
+                    PriorityQueue,
+                    maxMessages: 10,
+                    batchTimeoutInMilliseconds: 100,
+                    pollIntervalInMilliseconds: 10,
+                    cancellationToken: stoppingToken))
                 {
-                    stats.AddPriorityProcessed(batch.Messages.Length);
-                    batch.SuccessfullyReceived();
+                    if (batch.Messages.Length > 0)
+                    {
+                        stats.AddPriorityProcessed(batch.Messages.Length);
+                        batch.SuccessfullyReceived();
+                    }
+                    break; // one poll per loop iteration
                 }
-                break; // one poll per loop iteration
+            }
+            catch (OperationCanceledException) { break; }
+            finally
+            {
+                if (lockAcquired) batchLock.Release();
             }
         }
     }

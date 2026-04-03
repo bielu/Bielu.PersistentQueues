@@ -15,6 +15,12 @@
     </ItemGroup>
 
     <ItemGroup>
+        <None Update="appsettings.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\Bielu.PersistentQueues\Bielu.PersistentQueues.csproj" />
         <ProjectReference Include="..\Bielu.PersistentQueues.Storage.LMDB\Bielu.PersistentQueues.Storage.LMDB.csproj" />
     </ItemGroup>
