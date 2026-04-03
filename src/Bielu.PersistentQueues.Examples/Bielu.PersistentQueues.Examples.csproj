@@ -11,6 +11,7 @@
 
     <ItemGroup>
         <PackageReference Include="LightningDB" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" />
     </ItemGroup>
 
     <ItemGroup>
