@@ -228,8 +228,13 @@ The decorator automatically collects the following metrics:
 - **`bielupersistentqueues.message.processing.duration`** - Histogram: Duration of message processing in milliseconds
 - **`bielupersistentqueues.batch.size`** - Histogram: Number of messages in batches
 - **`bielupersistentqueues.queues.active`** - Gauge: Number of currently active queues
+- **`bielupersistentqueues.storage.used_bytes`** - Gauge: Number of bytes currently used by the storage
+- **`bielupersistentqueues.storage.total_bytes`** - Gauge: Total number of bytes allocated for the storage
+- **`bielupersistentqueues.storage.usage_percent`** - Gauge: Percentage of storage currently in use (0–100%)
 
 All metrics include relevant dimensions such as `queue.name`, `operation`, and `batch.size`.
+
+> **Note:** Storage usage metrics are automatically registered when the underlying store supports usage reporting (e.g., LMDB). No additional configuration is needed beyond enabling OpenTelemetry instrumentation.
 
 ### Distributed Tracing
 
@@ -308,7 +313,7 @@ Bielu.PersistentQueues supports **Kafka-like partitioning** to enable parallel c
 ```csharp
 var queue = new QueueConfiguration()
     .WithDefaults()
-    .StoreWithLmdb("C:\\queue_path")
+    .StoreWithLmdb("C:\\queue_path", StorageSize.MB(100))
     .BuildAndStartPartitioned("orders", partitionCount: 4);
 
 // Enqueue with a partition key (routed by strategy)
@@ -336,11 +341,8 @@ services.AddPersistentQueues(builder =>
     builder
         .AddLmdbStorage("C:\\queue_path", config =>
         {
-            config.EnvironmentConfiguration = new EnvironmentConfiguration
-            {
-                MaxDatabases = 20,  // Increase for partitioned queues
-                MapSize = 1024 * 1024 * 500
-            };
+            config.MapSize = StorageSize.MB(500);  // Use StorageSize helper instead of raw bytes
+            config.EnvironmentConfiguration.MaxDatabases = 20;  // Increase for partitioned queues
         })
         .AutomaticEndpoint()
         .UsePartitioning(
@@ -400,6 +402,49 @@ public class GeoPartitionStrategy : IPartitionStrategy
 ### LMDB Configuration Note
 
 When using partitioned queues with LMDB storage, ensure `MaxDatabases` is set high enough to accommodate all partitions. Each partition creates a separate LMDB database. For example, 4 partitions + 1 outgoing database requires at least `MaxDatabases = 6`.
+
+---
+
+## Storage Usage Monitoring
+
+Bielu.PersistentQueues exposes storage usage information through the `IMessageStore.GetStorageUsageInfo()` API. This is useful for monitoring disk pressure and alerting when storage is nearing capacity.
+
+### Programmatic Access
+
+You can query storage usage directly from the store:
+
+```csharp
+var usageInfo = queue.Store.GetStorageUsageInfo();
+if (usageInfo != null)
+{
+    Console.WriteLine($"Used:  {usageInfo.Value.UsedBytes} bytes");
+    Console.WriteLine($"Total: {usageInfo.Value.TotalBytes} bytes");
+    Console.WriteLine($"Usage: {usageInfo.Value.UsagePercentage:F2}%");
+}
+```
+
+> `GetStorageUsageInfo()` returns `null` if the storage provider does not support usage reporting. The LMDB provider reports usage based on the environment's page utilization relative to the configured `MapSize`.
+
+### OpenTelemetry Integration
+
+When OpenTelemetry instrumentation is enabled, storage usage metrics are automatically collected as observable gauges — no extra configuration is needed:
+
+```csharp
+services.AddPersistentQueues(builder =>
+{
+    builder
+        .AddLmdbStorage("./queue_data", config =>
+        {
+            config.MapSize = StorageSize.MB(100);  // Use StorageSize helper
+        })
+        .CreateQueues("my-queue");
+});
+
+// Storage gauges are registered automatically
+services.AddBieluPersistentQueueInstrumentation();
+```
+
+The three storage gauges (`storage.used_bytes`, `storage.total_bytes`, `storage.usage_percent`) are polled at each metric scrape and always reflect the current state.
 
 ---
 

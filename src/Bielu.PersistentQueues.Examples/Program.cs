@@ -80,7 +80,7 @@ var config = new QueueConfiguration()
         // 2 000 partition sub-queues + 1 non-partitioned queue: LMDB needs one
         // database per logical queue, so MaxDatabases must exceed the total count.
         MaxDatabases = 5000,
-        MapSize = 512L * 1024 * 1024   // 512 MB virtual address space for the demo
+        MapSize = StorageSize.MB(512)   // 512 MB virtual address space for the demo
     });
 
 var innerQueue = config.BuildQueue();

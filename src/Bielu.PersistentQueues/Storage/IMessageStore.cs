@@ -270,4 +270,16 @@ public interface IMessageStore : IDisposable
     /// all messages and queue definitions from the store.
     /// </remarks>
     void ClearAllStorage();
+
+    /// <summary>
+    /// Gets storage usage information including used bytes, total bytes, and usage percentage.
+    /// </summary>
+    /// <returns>
+    /// A <see cref="StorageUsageInfo"/> with current usage details, or <c>null</c> if the
+    /// storage implementation does not support usage reporting.
+    /// </returns>
+    /// <remarks>
+    /// Not all storage implementations can report usage. The default implementation returns <c>null</c>.
+    /// </remarks>
+    StorageUsageInfo? GetStorageUsageInfo() => null;
 }

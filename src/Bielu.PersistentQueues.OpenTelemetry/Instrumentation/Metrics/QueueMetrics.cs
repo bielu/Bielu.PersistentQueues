@@ -105,6 +105,33 @@ public sealed class QueueMetrics
             description: "Number of active queues");
     }
 
+    public ObservableGauge<long> CreateStorageUsedBytesGauge(Func<long> observeValue)
+    {
+        return _meter.CreateObservableGauge(
+            MetricNames.StorageUsedBytes,
+            () => new Measurement<long>(observeValue()),
+            unit: "By",
+            description: "Number of bytes currently used by the storage");
+    }
+
+    public ObservableGauge<long> CreateStorageTotalBytesGauge(Func<long> observeValue)
+    {
+        return _meter.CreateObservableGauge(
+            MetricNames.StorageTotalBytes,
+            () => new Measurement<long>(observeValue()),
+            unit: "By",
+            description: "Total number of bytes allocated for the storage");
+    }
+
+    public ObservableGauge<double> CreateStorageUsagePercentGauge(Func<double> observeValue)
+    {
+        return _meter.CreateObservableGauge(
+            MetricNames.StorageUsagePercent,
+            () => new Measurement<double>(observeValue()),
+            unit: "%",
+            description: "Percentage of storage currently in use");
+    }
+
     public void RecordMessageSent(string? queueName = null)
     {
         if (queueName != null)
