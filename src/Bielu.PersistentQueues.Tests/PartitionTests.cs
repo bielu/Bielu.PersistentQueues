@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -347,6 +348,59 @@ public class PartitionedQueueTests : TestBase
             Should.Throw<ArgumentOutOfRangeException>(() => partitioned.EnqueueToPartition(msg, "test", 5));
             Should.Throw<ArgumentOutOfRangeException>(() => partitioned.EnqueueToPartition(msg, "test", -1));
         });
+    }
+
+    [Fact]
+    public async Task concurrent_receive_from_same_partition_does_not_duplicate()
+    {
+        await PartitionedQueueScenario(async (queue, token) =>
+        {
+            var partitioned = new PartitionedQueue(queue, new HashPartitionStrategy());
+            partitioned.CreatePartitionedQueue("orders", 2);
+
+            // Enqueue 5 messages to partition 0
+            for (int i = 0; i < 5; i++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "orders");
+                partitioned.EnqueueToPartition(msg, "orders", 0);
+            }
+
+            var allReceived = new ConcurrentBag<string>();
+
+            // Two consumers try to receive from partition 0 concurrently.
+            // Per-partition locking ensures they are serialised: the first consumer
+            // processes and commits all messages, the second gets an empty batch.
+            async Task ConsumeAsync(CancellationToken ct)
+            {
+                try
+                {
+                    await foreach (var batch in partitioned.ReceiveBatchFromPartition("orders", 0,
+                        maxMessages: 5, batchTimeoutInMilliseconds: 200,
+                        pollIntervalInMilliseconds: 50, cancellationToken: ct))
+                    {
+                        foreach (var msg in batch.Messages)
+                            allReceived.Add(Encoding.UTF8.GetString(msg.DataArray!));
+                        if (batch.Messages.Length > 0)
+                        {
+                            batch.SuccessfullyReceived();
+                            batch.CommitChanges();
+                        }
+                        break;
+                    }
+                }
+                catch (OperationCanceledException) { }
+            }
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            var ct = cts.Token;
+
+            await Task.WhenAll(ConsumeAsync(ct), ConsumeAsync(ct));
+
+            // Each message should be received exactly once (no duplicates from concurrent access)
+            allReceived.Count.ShouldBe(5);
+            allReceived.Distinct().Count().ShouldBe(5);
+        }, TimeSpan.FromSeconds(10));
     }
 
     /// <summary>

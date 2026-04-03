@@ -33,6 +33,7 @@ public class PartitionedQueue : IPartitionedQueue
 {
     private readonly IQueue _innerQueue;
     private readonly ConcurrentDictionary<string, int> _partitionCounts = new();
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _partitionLocks = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PartitionedQueue"/> class.
@@ -103,11 +104,21 @@ public class PartitionedQueue : IPartitionedQueue
 
     /// <inheritdoc />
     public void Dispose()
-        => _innerQueue.Dispose();
+    {
+        foreach (var semaphore in _partitionLocks.Values)
+            semaphore.Dispose();
+        _partitionLocks.Clear();
+        _innerQueue.Dispose();
+    }
 
     /// <inheritdoc />
-    public ValueTask DisposeAsync()
-        => _innerQueue.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var semaphore in _partitionLocks.Values)
+            semaphore.Dispose();
+        _partitionLocks.Clear();
+        await _innerQueue.DisposeAsync();
+    }
 
     // ---- IPartitionedQueue operations ----
 
@@ -147,23 +158,49 @@ public class PartitionedQueue : IPartitionedQueue
     }
 
     /// <inheritdoc />
-    public IAsyncEnumerable<IMessageContext> ReceiveFromPartition(string queueName, int partition,
+    public async IAsyncEnumerable<IMessageContext> ReceiveFromPartition(string queueName, int partition,
         int pollIntervalInMilliseconds = 200,
-        CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ValidatePartition(queueName, partition);
         var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
-        return _innerQueue.Receive(partitionQueueName, pollIntervalInMilliseconds, cancellationToken);
+        var partitionLock = GetPartitionLock(partitionQueueName);
+
+        await partitionLock.WaitAsync(cancellationToken);
+        try
+        {
+            await foreach (var ctx in _innerQueue.Receive(partitionQueueName, pollIntervalInMilliseconds, cancellationToken))
+            {
+                yield return ctx;
+            }
+        }
+        finally
+        {
+            partitionLock.Release();
+        }
     }
 
     /// <inheritdoc />
-    public IAsyncEnumerable<IBatchQueueContext> ReceiveBatchFromPartition(string queueName, int partition,
+    public async IAsyncEnumerable<IBatchQueueContext> ReceiveBatchFromPartition(string queueName, int partition,
         int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200,
-        CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ValidatePartition(queueName, partition);
         var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
-        return _innerQueue.ReceiveBatch(partitionQueueName, maxMessages, batchTimeoutInMilliseconds, pollIntervalInMilliseconds, cancellationToken);
+        var partitionLock = GetPartitionLock(partitionQueueName);
+
+        await partitionLock.WaitAsync(cancellationToken);
+        try
+        {
+            await foreach (var batch in _innerQueue.ReceiveBatch(partitionQueueName, maxMessages, batchTimeoutInMilliseconds, pollIntervalInMilliseconds, cancellationToken))
+            {
+                yield return batch;
+            }
+        }
+        finally
+        {
+            partitionLock.Release();
+        }
     }
 
     /// <inheritdoc />
@@ -190,17 +227,26 @@ public class PartitionedQueue : IPartitionedQueue
                 if (cancellationToken.IsCancellationRequested)
                     yield break;
 
-                var messages = Store.PersistedIncoming(pqn)
-                    .Where(m => m.Queue.Span.SequenceEqual(pqn.AsSpan()))
-                    .ToList();
-
-                foreach (var message in messages)
+                var partitionLock = GetPartitionLock(pqn);
+                await partitionLock.WaitAsync(cancellationToken);
+                try
                 {
-                    if (cancellationToken.IsCancellationRequested)
-                        yield break;
+                    var messages = Store.PersistedIncoming(pqn)
+                        .Where(m => m.Queue.Span.SequenceEqual(pqn.AsSpan()))
+                        .ToList();
 
-                    foundAny = true;
-                    yield return new MessageContext(message, (Queue)_innerQueue);
+                    foreach (var message in messages)
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                            yield break;
+
+                        foundAny = true;
+                        yield return new MessageContext(message, (Queue)_innerQueue);
+                    }
+                }
+                finally
+                {
+                    partitionLock.Release();
                 }
             }
 
@@ -271,4 +317,12 @@ public class PartitionedQueue : IPartitionedQueue
             throw new ArgumentOutOfRangeException(nameof(partition),
                 $"Partition index {partition} is out of range. Queue '{queueName}' has {partitionCount} partitions (0-{partitionCount - 1}).");
     }
+
+    /// <summary>
+    /// Gets or creates a per-partition lock that ensures only one consumer can receive
+    /// from a given partition at any time. This prevents two workers from picking up the
+    /// same batch during rescaling or concurrent access.
+    /// </summary>
+    private SemaphoreSlim GetPartitionLock(string partitionQueueName)
+        => _partitionLocks.GetOrAdd(partitionQueueName, _ => new SemaphoreSlim(1, 1));
 }
