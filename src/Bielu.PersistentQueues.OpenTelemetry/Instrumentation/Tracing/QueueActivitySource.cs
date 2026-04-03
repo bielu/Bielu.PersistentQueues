@@ -67,4 +67,19 @@ public sealed class QueueActivitySource
     {
         activity?.SetTag("poll.interval", pollIntervalInMilliseconds);
     }
+
+    public static void SetPartitionTags(Activity? activity, string queueName, int partition, string? partitionKey = null)
+    {
+        activity?.SetTag("queue.name", queueName);
+        activity?.SetTag("partition", partition);
+        if (partitionKey != null)
+        {
+            activity?.SetTag("partition.key", partitionKey);
+        }
+    }
+
+    public static void SetPartitionCountTag(Activity? activity, int partitionCount)
+    {
+        activity?.SetTag("partition.count", partitionCount);
+    }
 }

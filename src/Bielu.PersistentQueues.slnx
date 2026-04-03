@@ -5,6 +5,9 @@
   <Folder Name="/benchmarks/">
     <Project Path="Bielu.PersistentQueues.Benchmarks/Bielu.PersistentQueues.Benchmarks.csproj" />
   </Folder>
+  <Folder Name="/examples/">
+    <Project Path="Bielu.PersistentQueues.Examples/Bielu.PersistentQueues.Examples.csproj" />
+  </Folder>
   <Folder Name="/Solution Files/">
     <File Path="../.gitignore" />
     <File Path="../CODEOWNERS" />

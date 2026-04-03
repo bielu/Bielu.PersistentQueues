@@ -6,6 +6,7 @@
   <ItemGroup>
     <!-- Core dependencies -->
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.5" />
     <PackageVersion Include="LightningDB" Version="0.21.0" />
     <!-- Test frameworks -->

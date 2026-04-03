@@ -289,6 +289,122 @@ services.AddBieluPersistentQueueInstrumentation();
 
 ---
 
+## Partitioned Queues (Kafka-like Partitioning)
+
+Bielu.PersistentQueues supports **Kafka-like partitioning** to enable parallel consumption and message ordering guarantees within a partition key.
+
+### Concepts
+
+- A **partitioned queue** divides a logical queue into N **partitions** (e.g., `orders:partition-0`, `orders:partition-1`, ...).
+- Messages are routed to partitions using a configurable **partition strategy**.
+- Messages with the **same partition key** are guaranteed to land in the **same partition**, preserving ordering for related messages.
+- Consumers can receive from **all partitions**, a **specific partition**, or a **subset of partitions**.
+
+### Built-in Partition Strategies
+
+| Strategy | Description |
+|----------|-------------|
+| `HashPartitionStrategy` (default) | Routes messages based on FNV-1a hash of the partition key. Same key → same partition. Messages without a key use the message ID for distribution. |
+| `RoundRobinPartitionStrategy` | Distributes messages evenly across partitions in round-robin order, ignoring partition keys. |
+| `ExplicitPartitionStrategy` | Routes messages to the partition index specified in the partition key (e.g., key `"2"` → partition 2). |
+
+### Manual Configuration
+
+```csharp
+var queue = new QueueConfiguration()
+    .WithDefaults()
+    .StoreWithLmdb("C:\\queue_path", StorageSize.MB(100))
+    .BuildAndStartPartitioned("orders", partitionCount: 4);
+
+// Enqueue with a partition key (routed by strategy)
+var message = Message.Create(
+    data: "order-data"u8.ToArray(),
+    queue: "orders",
+    partitionKey: "customer-123"
+);
+queue.EnqueueToPartition(message, "orders");
+
+// Receive from a specific partition
+await foreach (var ctx in queue.ReceiveFromPartition("orders", partition: 0, cancellationToken: token))
+{
+    // Process message
+    ctx.QueueContext.SuccessfullyReceived();
+    ctx.QueueContext.CommitChanges();
+}
+```
+
+### Using Dependency Injection
+
+```csharp
+services.AddPersistentQueues(builder =>
+{
+    builder
+        .AddLmdbStorage("C:\\queue_path", config =>
+        {
+            config.MapSize = StorageSize.MB(500);  // Use StorageSize helper instead of raw bytes
+            config.EnvironmentConfiguration.MaxDatabases = 20;  // Increase for partitioned queues
+        })
+        .AutomaticEndpoint()
+        .UsePartitioning(
+            new HashPartitionStrategy(),
+            ("orders", 4),       // 4 partitions for "orders"
+            ("events", 8)        // 8 partitions for "events"
+        );
+});
+
+// Inject IPartitionedQueue
+public class MyService(IPartitionedQueue queue)
+{
+    public void ProcessOrder(string customerId, byte[] data)
+    {
+        var message = Message.Create(
+            data: data,
+            queue: "orders",
+            partitionKey: customerId  // Same customer → same partition → ordered
+        );
+        queue.EnqueueToPartition(message, "orders");
+    }
+
+    public async Task ConsumePartition(int partition, CancellationToken token)
+    {
+        await foreach (var ctx in queue.ReceiveFromPartition("orders", partition, cancellationToken: token))
+        {
+            // Process — messages from same partition key arrive in order
+            ctx.QueueContext.SuccessfullyReceived();
+            ctx.QueueContext.CommitChanges();
+        }
+    }
+}
+```
+
+### Custom Partition Strategy
+
+Implement `IPartitionStrategy` to create your own routing logic:
+
+```csharp
+public class GeoPartitionStrategy : IPartitionStrategy
+{
+    public int GetPartition(Message message, int partitionCount)
+    {
+        // Route by geographic region from partition key
+        var region = message.PartitionKeyString;
+        return region switch
+        {
+            "us-east" => 0 % partitionCount,
+            "us-west" => 1 % partitionCount,
+            "eu" => 2 % partitionCount,
+            _ => 0
+        };
+    }
+}
+```
+
+### LMDB Configuration Note
+
+When using partitioned queues with LMDB storage, ensure `MaxDatabases` is set high enough to accommodate all partitions. Each partition creates a separate LMDB database. For example, 4 partitions + 1 outgoing database requires at least `MaxDatabases = 6`.
+
+---
+
 ## Storage Usage Monitoring
 
 Bielu.PersistentQueues exposes storage usage information through the `IMessageStore.GetStorageUsageInfo()` API. This is useful for monitoring disk pressure and alerting when storage is nearing capacity.
@@ -317,7 +433,10 @@ When OpenTelemetry instrumentation is enabled, storage usage metrics are automat
 services.AddPersistentQueues(builder =>
 {
     builder
-        .AddLmdbStorage("./queue_data")
+        .AddLmdbStorage("./queue_data", config =>
+        {
+            config.MapSize = StorageSize.MB(100);  // Use StorageSize helper
+        })
         .CreateQueues("my-queue");
 });
 
