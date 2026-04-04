@@ -189,7 +189,8 @@ public class PersistentQueuesBuilder
             var sender = sp.GetRequiredService<Sender>();
             var store = sp.GetRequiredService<IMessageStore>();
             var logger = sp.GetRequiredService<ILogger<Queue>>();
-            var queue = new Queue(receiver, sender, store, logger);
+            var contentSerializer = sp.GetRequiredService<IContentSerializer>();
+            var queue = new Queue(receiver, sender, store, logger, contentSerializer);
             if (queueNames != null)
             {
                 foreach (var name in queueNames)

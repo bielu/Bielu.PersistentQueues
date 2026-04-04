@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Bielu.PersistentQueues.Serialization;
 using Bielu.PersistentQueues.Storage;
 
 namespace Bielu.PersistentQueues;
@@ -65,6 +66,44 @@ public class BatchQueueContext : IBatchQueueContext
     public void Enqueue(Message message)
     {
         _actions.Add(new EnqueueAction(_queue, message));
+    }
+
+    /// <inheritdoc />
+    public void Send<T>(
+        T content,
+        string? destinationUri = null,
+        string? queueName = null,
+        Dictionary<string, string>? headers = null,
+        DateTime? deliverBy = null,
+        int? maxAttempts = null,
+        string? partitionKey = null)
+    {
+        var message = Message.Create(
+            content,
+            contentSerializer: _queue._contentSerializer,
+            queue: queueName,
+            destinationUri: destinationUri,
+            deliverBy: deliverBy,
+            maxAttempts: maxAttempts,
+            headers: headers,
+            partitionKey: partitionKey);
+        Send(message);
+    }
+
+    /// <inheritdoc />
+    public void Enqueue<T>(
+        T content,
+        string? queueName = null,
+        Dictionary<string, string>? headers = null,
+        string? partitionKey = null)
+    {
+        var message = Message.Create(
+            content,
+            contentSerializer: _queue._contentSerializer,
+            queue: queueName,
+            headers: headers,
+            partitionKey: partitionKey);
+        Enqueue(message);
     }
 
     /// <inheritdoc />

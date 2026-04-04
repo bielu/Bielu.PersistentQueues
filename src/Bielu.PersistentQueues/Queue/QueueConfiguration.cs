@@ -62,6 +62,7 @@ public class QueueConfiguration
     private IReceivingProtocol? _receivingProtocol;
     private ISendingProtocol? _sendingProtocol;
     private IMessageSerializer? _serializer;
+    private IContentSerializer? _contentSerializer;
     private ILogger? _logger;
     private TimeSpan _timeoutBatchAfter;
     
@@ -160,6 +161,21 @@ public class QueueConfiguration
     }
 
     /// <summary>
+    /// Configures the content serializer used for strongly-typed message content.
+    /// </summary>
+    /// <param name="contentSerializer">The content serializer to use.</param>
+    /// <returns>The configuration object for method chaining.</returns>
+    /// <remarks>
+    /// The content serializer handles conversion of strongly-typed objects to binary format
+    /// for message data payloads. If not configured, defaults to <see cref="JsonContentSerializer"/>.
+    /// </remarks>
+    public QueueConfiguration SerializeContentWith(IContentSerializer contentSerializer)
+    {
+        _contentSerializer = contentSerializer;
+        return this;
+    }
+
+    /// <summary>
     /// Configures the logger used for queue operations.
     /// </summary>
     /// <param name="logger">The logger instance to use.</param>
@@ -251,7 +267,7 @@ public class QueueConfiguration
 
         var receiver = new Receiver(_endpoint, _receivingProtocol, _logger);
         var sender = new Sender(_sendingProtocol, serializer, _logger, _timeoutBatchAfter);
-        var queue = new Queue(receiver, sender, store, _logger);
+        var queue = new Queue(receiver, sender, store, _logger, _contentSerializer);
         return queue;
     }
 

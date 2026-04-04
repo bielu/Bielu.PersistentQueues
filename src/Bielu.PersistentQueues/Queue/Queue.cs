@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Bielu.PersistentQueues.Network;
 using Bielu.PersistentQueues.Network.Tcp;
+using Bielu.PersistentQueues.Serialization;
 using Bielu.PersistentQueues.Storage;
 
 namespace Bielu.PersistentQueues;
@@ -24,6 +25,7 @@ public class Queue : IQueue
     private readonly Channel<Message> _receivingChannel;
     private readonly CancellationTokenSource _cancelOnDispose;
     private readonly ILogger _logger;
+    internal readonly IContentSerializer _contentSerializer;
     private Task? _sendingTask;
     private Task? _receivingTask;
 
@@ -34,7 +36,8 @@ public class Queue : IQueue
     /// <param name="sender">The component responsible for sending messages over the network.</param>
     /// <param name="messageStore">The storage system for persisting messages.</param>
     /// <param name="logger">The logger for recording queue operations.</param>
-    public Queue(Receiver receiver, Sender sender, IMessageStore messageStore, ILogger logger)
+    /// <param name="contentSerializer">The content serializer for strongly-typed message operations. If null, defaults to <see cref="JsonContentSerializer.Default"/>.</param>
+    public Queue(Receiver receiver, Sender sender, IMessageStore messageStore, ILogger logger, IContentSerializer? contentSerializer = null)
     {
         _receiver = receiver;
         _sender = sender;
@@ -42,6 +45,7 @@ public class Queue : IQueue
         Store = messageStore;
         _receivingChannel = Channel.CreateUnbounded<Message>();
         _logger = logger;
+        _contentSerializer = contentSerializer ?? JsonContentSerializer.Default;
     }
 
     /// <summary>
@@ -433,6 +437,44 @@ public class Queue : IQueue
         {
             _logger.QueueSendError(message.Id, ex);
         }
+    }
+
+    /// <inheritdoc />
+    public void Send<T>(
+        T content,
+        string? destinationUri = null,
+        string? queueName = null,
+        Dictionary<string, string>? headers = null,
+        DateTime? deliverBy = null,
+        int? maxAttempts = null,
+        string? partitionKey = null)
+    {
+        var message = Message.Create(
+            content,
+            contentSerializer: _contentSerializer,
+            queue: queueName,
+            destinationUri: destinationUri,
+            deliverBy: deliverBy,
+            maxAttempts: maxAttempts,
+            headers: headers,
+            partitionKey: partitionKey);
+        Send(message);
+    }
+
+    /// <inheritdoc />
+    public void Enqueue<T>(
+        T content,
+        string? queueName = null,
+        Dictionary<string, string>? headers = null,
+        string? partitionKey = null)
+    {
+        var message = Message.Create(
+            content,
+            contentSerializer: _contentSerializer,
+            queue: queueName,
+            headers: headers,
+            partitionKey: partitionKey);
+        Enqueue(message);
     }
 
     /// <summary>

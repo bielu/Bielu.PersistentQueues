@@ -5,30 +5,26 @@ using Bielu.PersistentQueues.Serialization;
 namespace Bielu.PersistentQueues;
 
 /// <summary>
-/// Extension methods for <see cref="IQueueContext"/> that provide strongly-typed message operations.
+/// Extension methods for <see cref="IQueueContext"/> that provide strongly-typed message operations
+/// with an explicit content serializer override.
 /// </summary>
+/// <remarks>
+/// For most use cases, prefer the built-in <see cref="IQueueContext.Send{T}"/> and
+/// <see cref="IQueueContext.Enqueue{T}"/> methods which use the DI-configured serializer.
+/// These extension methods are only needed when you want to use a different serializer
+/// than the one configured in the queue.
+/// </remarks>
 public static class QueueContextExtensions
 {
     /// <summary>
-    /// Sends a strongly-typed content object to its destination from within a queue context.
-    /// The content is serialized to a message using the specified or default content serializer.
+    /// Sends a strongly-typed content object using a specific content serializer.
     /// </summary>
-    /// <typeparam name="T">The type of the content to send.</typeparam>
-    /// <param name="context">The queue context.</param>
-    /// <param name="content">The content object to serialize and send.</param>
-    /// <param name="destinationUri">The destination URI (e.g., "lq.tcp://hostname:port").</param>
-    /// <param name="queueName">Optional queue name for the message.</param>
-    /// <param name="contentSerializer">The content serializer to use. If null, <see cref="JsonContentSerializer.Default"/> is used.</param>
-    /// <param name="headers">Optional message headers.</param>
-    /// <param name="deliverBy">Optional delivery deadline.</param>
-    /// <param name="maxAttempts">Optional maximum delivery attempts.</param>
-    /// <param name="partitionKey">Optional partition key.</param>
     public static void Send<T>(
         this IQueueContext context,
         T content,
+        IContentSerializer contentSerializer,
         string? destinationUri = null,
         string? queueName = null,
-        IContentSerializer? contentSerializer = null,
         Dictionary<string, string>? headers = null,
         DateTime? deliverBy = null,
         int? maxAttempts = null,
@@ -47,21 +43,13 @@ public static class QueueContextExtensions
     }
 
     /// <summary>
-    /// Adds a strongly-typed content object to the current queue from within a queue context.
-    /// The content is serialized to a message using the specified or default content serializer.
+    /// Enqueues a strongly-typed content object using a specific content serializer.
     /// </summary>
-    /// <typeparam name="T">The type of the content to enqueue.</typeparam>
-    /// <param name="context">The queue context.</param>
-    /// <param name="content">The content object to serialize and enqueue.</param>
-    /// <param name="queueName">Optional queue name. If null, the message is enqueued without a specific queue name.</param>
-    /// <param name="contentSerializer">The content serializer to use. If null, <see cref="JsonContentSerializer.Default"/> is used.</param>
-    /// <param name="headers">Optional message headers.</param>
-    /// <param name="partitionKey">Optional partition key.</param>
     public static void Enqueue<T>(
         this IQueueContext context,
         T content,
+        IContentSerializer contentSerializer,
         string? queueName = null,
-        IContentSerializer? contentSerializer = null,
         Dictionary<string, string>? headers = null,
         string? partitionKey = null)
     {
