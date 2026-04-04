@@ -65,6 +65,7 @@ public class QueueConfiguration
     private IContentSerializer? _contentSerializer;
     private ILogger? _logger;
     private TimeSpan _timeoutBatchAfter;
+    private readonly DeadLetterOptions _deadLetterOptions = new();
     
     /// <summary>
     /// Gets the message serializer used for converting messages to and from binary format.
@@ -208,6 +209,30 @@ public class QueueConfiguration
     }
 
     /// <summary>
+    /// Enables the dead letter queue (default).
+    /// Messages that exceed their <see cref="Message.MaxAttempts"/> or fail all send
+    /// retries are automatically moved to a <c>:dead-letter</c> queue.
+    /// </summary>
+    /// <returns>The configuration object for method chaining.</returns>
+    public QueueConfiguration EnableDeadLetterQueue()
+    {
+        _deadLetterOptions.Enabled = true;
+        return this;
+    }
+
+    /// <summary>
+    /// Disables the dead letter queue.
+    /// When disabled, messages that cannot be processed are silently discarded instead of
+    /// being moved to a dead letter queue.
+    /// </summary>
+    /// <returns>The configuration object for method chaining.</returns>
+    public QueueConfiguration DisableDeadLetterQueue()
+    {
+        _deadLetterOptions.Enabled = false;
+        return this;
+    }
+
+    /// <summary>
     /// Configures the queue with sensible default settings.
     /// </summary>
     /// <returns>The configuration object for method chaining.</returns>
@@ -267,7 +292,7 @@ public class QueueConfiguration
 
         var receiver = new Receiver(_endpoint, _receivingProtocol, _logger);
         var sender = new Sender(_sendingProtocol, serializer, _logger, _timeoutBatchAfter);
-        var queue = new Queue(receiver, sender, store, _logger, _contentSerializer);
+        var queue = new Queue(receiver, sender, store, _logger, _contentSerializer, _deadLetterOptions);
         return queue;
     }
 

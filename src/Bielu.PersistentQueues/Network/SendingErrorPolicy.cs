@@ -15,13 +15,15 @@ public class SendingErrorPolicy
     private readonly IMessageStore _store;
     private readonly Channel<OutgoingMessageFailure> _failedToConnect;
     private readonly Channel<Message> _retries;
+    private readonly DeadLetterOptions _deadLetterOptions;
 
-    public SendingErrorPolicy(ILogger logger, IMessageStore store, Channel<OutgoingMessageFailure> failedToConnect)
+    public SendingErrorPolicy(ILogger logger, IMessageStore store, Channel<OutgoingMessageFailure> failedToConnect, DeadLetterOptions? deadLetterOptions = null)
     {
         _logger = logger;
         _store = store;
         _failedToConnect = failedToConnect;
         _retries = Channel.CreateUnbounded<Message>();
+        _deadLetterOptions = deadLetterOptions ?? new DeadLetterOptions();
     }
 
     public ChannelReader<Message> Retries => _retries.Reader;
@@ -44,7 +46,8 @@ public class SendingErrorPolicy
         {
             if (!ShouldRetry(message, shouldRetry))
             {
-                MoveToDeadLetter(message);
+                if (_deadLetterOptions.Enabled)
+                    MoveToDeadLetter(message);
                 continue;
             }
             await Task.Delay(TimeSpan.FromSeconds(message.SentAttempts * message.SentAttempts), cancellationToken).ConfigureAwait(false);

@@ -111,7 +111,7 @@ public class BatchQueueContext : IBatchQueueContext
     {
         ValidateAndMarkMessages(Messages, "ReceiveLater");
         var updatedMessages = UpdateProcessingAttempts(Messages);
-        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages);
+        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
         if (dlqMessages.Length > 0)
         {
             EnsureDeadLetterQueues(dlqMessages);
@@ -126,7 +126,7 @@ public class BatchQueueContext : IBatchQueueContext
     {
         ValidateAndMarkMessages(Messages, "ReceiveLater");
         var updatedMessages = UpdateProcessingAttempts(Messages);
-        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages);
+        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
         if (dlqMessages.Length > 0)
         {
             EnsureDeadLetterQueues(dlqMessages);
@@ -155,7 +155,7 @@ public class BatchQueueContext : IBatchQueueContext
     {
         ValidateAndMarkMessages(messages, "ReceiveLater");
         var updatedMessages = UpdateProcessingAttempts(messages);
-        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages);
+        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
         if (dlqMessages.Length > 0)
         {
             EnsureDeadLetterQueues(dlqMessages);
@@ -170,7 +170,7 @@ public class BatchQueueContext : IBatchQueueContext
         var messages = Messages.Where(x => messageIds.Contains(x.Id.MessageIdentifier)).ToArray();
         ValidateAndMarkMessages(messages, "ReceiveLater");
         var updatedMessages = UpdateProcessingAttempts(messages);
-        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages);
+        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
         if (dlqMessages.Length > 0)
         {
             EnsureDeadLetterQueues(dlqMessages);
@@ -185,7 +185,7 @@ public class BatchQueueContext : IBatchQueueContext
     {
         ValidateAndMarkMessages(messages, "ReceiveLater");
         var updatedMessages = UpdateProcessingAttempts(messages);
-        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages);
+        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
         if (dlqMessages.Length > 0)
         {
             EnsureDeadLetterQueues(dlqMessages);
@@ -200,7 +200,7 @@ public class BatchQueueContext : IBatchQueueContext
         var messages = Messages.Where(x => messageIds.Contains(x.Id.MessageIdentifier)).ToArray();
         ValidateAndMarkMessages(messages, "ReceiveLater");
         var updatedMessages = UpdateProcessingAttempts(messages);
-        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages);
+        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
         if (dlqMessages.Length > 0)
         {
             EnsureDeadLetterQueues(dlqMessages);
@@ -274,8 +274,10 @@ public class BatchQueueContext : IBatchQueueContext
         return updated;
     }
 
-    private static (Message[] dlq, Message[] retry) SplitByMaxAttempts(Message[] updatedMessages)
+    private static (Message[] dlq, Message[] retry) SplitByMaxAttempts(Message[] updatedMessages, bool dlqEnabled)
     {
+        if (!dlqEnabled)
+            return ([], updatedMessages);
         var dlq = updatedMessages.Where(m => m.MaxAttempts.HasValue && m.ProcessingAttempts >= m.MaxAttempts.Value).ToArray();
         var retry = updatedMessages.Where(m => !m.MaxAttempts.HasValue || m.ProcessingAttempts < m.MaxAttempts.Value).ToArray();
         return (dlq, retry);

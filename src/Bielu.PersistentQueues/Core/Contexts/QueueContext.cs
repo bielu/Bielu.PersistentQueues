@@ -71,7 +71,7 @@ internal class QueueContext : IQueueContext
             throw new InvalidOperationException("Cannot call ReceiveLater after SuccessfullyReceived or MoveTo has been called on this message.");
         _messageDisposed = true;
         var updatedMessage = _message.WithProcessingAttempts(_message.ProcessingAttempts + 1);
-        if (_message.MaxAttempts.HasValue && updatedMessage.ProcessingAttempts >= _message.MaxAttempts.Value)
+        if (_queue._deadLetterOptions.Enabled && _message.MaxAttempts.HasValue && updatedMessage.ProcessingAttempts >= _message.MaxAttempts.Value)
         {
             var dlqName = DeadLetterConstants.GetDeadLetterQueueName(_message.QueueString ?? "unknown");
             _queue.Store.CreateQueue(dlqName);
@@ -87,7 +87,7 @@ internal class QueueContext : IQueueContext
             throw new InvalidOperationException("Cannot call ReceiveLater after SuccessfullyReceived or MoveTo has been called on this message.");
         _messageDisposed = true;
         var updatedMessage = _message.WithProcessingAttempts(_message.ProcessingAttempts + 1);
-        if (_message.MaxAttempts.HasValue && updatedMessage.ProcessingAttempts >= _message.MaxAttempts.Value)
+        if (_queue._deadLetterOptions.Enabled && _message.MaxAttempts.HasValue && updatedMessage.ProcessingAttempts >= _message.MaxAttempts.Value)
         {
             var dlqName = DeadLetterConstants.GetDeadLetterQueueName(_message.QueueString ?? "unknown");
             _queue.Store.CreateQueue(dlqName);
@@ -115,6 +115,8 @@ internal class QueueContext : IQueueContext
 
     public void MoveToDeadLetter()
     {
+        if (!_queue._deadLetterOptions.Enabled)
+            throw new InvalidOperationException("Dead letter queue is disabled. Enable it via EnableDeadLetterQueue() in the queue configuration.");
         if (_messageDisposed)
             throw new InvalidOperationException("Cannot call MoveToDeadLetter after SuccessfullyReceived, ReceiveLater, or MoveTo has been called on this message.");
         _messageDisposed = true;
