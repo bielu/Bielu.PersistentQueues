@@ -18,6 +18,7 @@ excellent choice for lightweight and cross-platform message queuing needs.
 ## Why Bielu.PersistentQueues?
 
 - **Simple API**: Easily interact with the message queue through an intuitive API.
+- **Strongly-Typed Messages**: Send, enqueue, and receive messages as C# objects — serialization is handled automatically via DI.
 - **Pluggable Storage**: Choose from multiple storage backends (LMDB included, more coming).
 - **Microsoft DI Integration**: First-class support for `Microsoft.Extensions.DependencyInjection` with a fluent builder API.
 - **No Administration**: Unlike MSMQ or other Server / Brokers, it requires zero administrative setup.
@@ -96,15 +97,31 @@ public class MyService(IQueue queue)
 {
     public void SendMessage()
     {
-        queue.Send(new Message
-        {
-            Data = "hello"u8.ToArray(),
-            Id = MessageId.GenerateRandom(),
-            Queue = "my-queue",
-            Destination = new Uri("lq.tcp://localhost:5050")
-        });
+        // Strongly-typed: serialization is handled automatically
+        queue.Send(new OrderMessage("ORD-001", 99.99m, "USD"),
+            destinationUri: "lq.tcp://localhost:5050",
+            queueName: "my-queue");
+    }
+
+    public void EnqueueMessage()
+    {
+        // Enqueue a typed object for local processing
+        queue.Enqueue(new OrderMessage("ORD-002", 49.99m, "EUR"),
+            queueName: "my-queue");
     }
 }
+```
+
+You can also send raw `Message` objects if you need full control:
+
+```csharp
+queue.Send(new Message
+{
+    Data = "hello"u8.ToArray(),
+    Id = MessageId.GenerateRandom(),
+    Queue = "my-queue",
+    Destination = new Uri("lq.tcp://localhost:5050")
+});
 ```
 
 ### Manual Configuration (Without DI)
@@ -122,6 +139,21 @@ var queue = new QueueConfiguration()
 
 ### Sending Messages
 
+Send strongly-typed objects — the content serializer (configured via DI or defaulting to JSON) handles serialization automatically:
+
+```csharp
+// Strongly-typed: serialize and send a C# object
+queue.Send(new OrderMessage("ORD-001", 99.99m, "USD"),
+    destinationUri: "lq.tcp://localhost:port",
+    queueName: "queue-name");
+
+// Strongly-typed: enqueue for local processing
+queue.Enqueue(new OrderMessage("ORD-002", 49.99m, "EUR"),
+    queueName: "queue-name");
+```
+
+Or send raw `Message` objects when you need full control over serialization:
+
 ```csharp
 var message = new Message
 {
@@ -138,12 +170,20 @@ queue.Send(message);
 ```csharp
 await foreach (var msg in queue.Receive("queue-name", token))
 {
+    // Deserialize the message payload to a strongly-typed object
+    var order = msg.Message.GetContent<OrderMessage>();
+
     // Process the message and respond with one or more of the following:
     msg.QueueContext.SuccessfullyReceived();  // Done processing
     msg.QueueContext.ReceiveLater(TimeSpan.FromSeconds(1));  // Retry later
     msg.QueueContext.Enqueue(msg.Message);    // Re-enqueue to same/other queue
     msg.QueueContext.Send(msg.Message);       // Send to another endpoint
     msg.QueueContext.MoveTo("other-queue");   // Move to different queue
+
+    // Strongly-typed context operations (serializer resolved from DI):
+    msg.QueueContext.Enqueue(new FollowUpMessage(...), queueName: "follow-ups");
+    msg.QueueContext.Send(new ResponseMessage(...), destinationUri: "lq.tcp://...");
+
     msg.QueueContext.CommitChanges();         // Commit all changes atomically
 }
 ```
@@ -183,6 +223,86 @@ public static PersistentQueuesBuilder AddMyStorage(
     });
     return builder;
 }
+```
+
+---
+
+## Strongly-Typed Messages
+
+Bielu.PersistentQueues supports sending, enqueuing, and receiving **strongly-typed C# objects** as message payloads. Serialization is handled automatically — the content serializer is resolved from DI, so you never need to manually serialize or pass a serializer instance.
+
+### Sending and Enqueuing Typed Objects
+
+The `IQueue` and `IQueueContext` interfaces include `Send<T>` and `Enqueue<T>` methods that accept any object and serialize it using the DI-configured `IContentSerializer` (JSON by default):
+
+```csharp
+// Send a typed object to a remote endpoint
+queue.Send(new OrderMessage("ORD-001", 99.99m, "USD"),
+    destinationUri: "lq.tcp://localhost:5050",
+    queueName: "orders");
+
+// Enqueue a typed object for local processing
+queue.Enqueue(new OrderMessage("ORD-002", 49.99m, "EUR"),
+    queueName: "orders");
+```
+
+Inside a message handler, the same methods are available on `IQueueContext`:
+
+```csharp
+await foreach (var msg in queue.Receive("orders", token))
+{
+    var order = msg.Message.GetContent<OrderMessage>();
+
+    // Enqueue a follow-up message (serializer from DI)
+    msg.QueueContext.Enqueue(new AuditEvent(order.OrderId, "processed"),
+        queueName: "audit");
+
+    // Send a response to another endpoint
+    msg.QueueContext.Send(new OrderConfirmation(order.OrderId),
+        destinationUri: "lq.tcp://notifications:5050",
+        queueName: "confirmations");
+
+    msg.QueueContext.SuccessfullyReceived();
+    msg.QueueContext.CommitChanges();
+}
+```
+
+### Deserializing Message Content
+
+Use `Message.GetContent<T>()` to deserialize the `Data` payload:
+
+```csharp
+var order = message.GetContent<OrderMessage>();
+```
+
+### Custom Content Serializer
+
+The default serializer uses `System.Text.Json`. You can replace it globally by registering your own `IContentSerializer` before calling `AddPersistentQueues`:
+
+```csharp
+// Register a custom serializer (e.g., MessagePack, Protobuf)
+services.AddSingleton<IContentSerializer, MyMessagePackSerializer>();
+
+// Queue will automatically use it for all Send<T>/Enqueue<T>/GetContent<T> calls
+services.AddPersistentQueues(builder => { ... });
+```
+
+For one-off overrides, extension methods accept an explicit serializer:
+
+```csharp
+var msgPackSerializer = new MyMessagePackSerializer();
+queue.Send(order, msgPackSerializer, destinationUri: "lq.tcp://...", queueName: "orders");
+queue.Enqueue(order, msgPackSerializer, queueName: "orders");
+```
+
+When using manual configuration (without DI), you can configure the serializer via the builder:
+
+```csharp
+var queue = new QueueConfiguration()
+    .WithDefaults()
+    .SerializeContentWith(new MyMessagePackSerializer())
+    .StoreWithLmdb("C:\\queue_path")
+    .BuildAndStart("queue-name");
 ```
 
 ---
@@ -369,6 +489,9 @@ public class MyService(IPartitionedQueue queue)
     {
         await foreach (var ctx in queue.ReceiveFromPartition("orders", partition, cancellationToken: token))
         {
+            // Deserialize to a strongly-typed object
+            var order = ctx.Message.GetContent<OrderMessage>();
+
             // Process — messages from same partition key arrive in order
             ctx.QueueContext.SuccessfullyReceived();
             ctx.QueueContext.CommitChanges();
