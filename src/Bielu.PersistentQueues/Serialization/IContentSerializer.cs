@@ -24,6 +24,7 @@ public interface IContentSerializer
     /// </summary>
     /// <typeparam name="T">The type to deserialize the data to.</typeparam>
     /// <param name="data">The raw binary data to deserialize.</param>
-    /// <returns>The deserialized object, or default if deserialization fails.</returns>
+    /// <returns>The deserialized object, or default if the data represents a null value.</returns>
+    /// <exception cref="System.Exception">Thrown when deserialization fails (e.g., invalid format or type mismatch).</exception>
     T? Deserialize<T>(ReadOnlySpan<byte> data);
 }
