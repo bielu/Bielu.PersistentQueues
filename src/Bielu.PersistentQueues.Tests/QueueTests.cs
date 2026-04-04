@@ -243,7 +243,8 @@ public class QueueTests : TestBase
             var queueNames = queue.Queues;
             
             // Verify all queues are listed (including the default "test" queue)
-            queueNames.Length.ShouldBe(4); 
+            // Each queue also gets a :dead-letter companion when DLQ is enabled (default)
+            queueNames.Length.ShouldBe(8); 
             queueNames.ShouldContain("test");
             queueNames.ShouldContain("queue1");
             queueNames.ShouldContain("queue2");

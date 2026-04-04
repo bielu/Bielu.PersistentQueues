@@ -73,10 +73,16 @@ public class Queue : IQueue
     /// <remarks>
     /// Queue names must be unique within a queue instance. This method creates the 
     /// underlying storage structures needed for the queue.
+    /// When the dead letter queue is enabled and the queue is not itself a DLQ,
+    /// the corresponding <c>:dead-letter</c> companion queue is also created automatically.
     /// </remarks>
     public void CreateQueue(string queueName)
     {
         Store.CreateQueue(queueName);
+        if (_deadLetterOptions.Enabled && !DeadLetterConstants.IsDeadLetterQueue(queueName))
+        {
+            Store.CreateQueue(DeadLetterConstants.GetDeadLetterQueueName(queueName));
+        }
     }
 
     /// <summary>
@@ -494,6 +500,35 @@ public class Queue : IQueue
     public void ReceiveLater(Message message, DateTimeOffset time)
     {
         ReceiveLater(message, time - DateTimeOffset.Now);
+    }
+
+    /// <inheritdoc />
+    public int RequeueDeadLetterMessages(string deadLetterQueueName)
+    {
+        if (!DeadLetterConstants.IsDeadLetterQueue(deadLetterQueueName))
+            throw new ArgumentException(
+                $"'{deadLetterQueueName}' is not a dead letter queue. Dead letter queue names must end with '{DeadLetterConstants.DeadLetterSuffix}'.",
+                nameof(deadLetterQueueName));
+
+        var sourceQueue = deadLetterQueueName[..^DeadLetterConstants.DeadLetterSuffix.Length];
+
+        var messages = Store.PersistedIncoming(deadLetterQueueName).ToList();
+        if (messages.Count == 0)
+            return 0;
+
+        using var transaction = Store.BeginTransaction();
+        foreach (var message in messages)
+        {
+            // Use the original-queue header if present, otherwise fall back to inferred source queue
+            var targetQueue = message.OriginalQueue ?? sourceQueue;
+
+            // Reset processing attempts and move back to the source queue
+            var requeuedMessage = message.WithProcessingAttempts(0);
+            Store.MoveToQueue(transaction, targetQueue, requeuedMessage);
+        }
+        transaction.Commit();
+
+        return messages.Count;
     }
 
     /// <summary>

@@ -190,6 +190,142 @@ await foreach (var msg in queue.Receive("queue-name", token))
 
 ---
 
+## Dead Letter Queue (DLQ)
+
+Bielu.PersistentQueues has built-in support for **dead letter queues**. When a message cannot be processed after a configurable number of attempts, it is automatically moved to a dedicated DLQ — or you can explicitly dead-letter it from your consumer code.
+
+### How It Works
+
+- Each source queue has a corresponding DLQ named `<queue>:dead-letter` (e.g., `orders:dead-letter`).
+- DLQ queues are created automatically when needed.
+- Dead-lettered messages carry an `original-queue` header so you always know where they came from.
+- A **processing-attempts** counter is incremented on every `ReceiveLater` call.
+
+### Automatic Dead-Lettering (MaxAttempts)
+
+Set `maxAttempts` when creating a message. When `ReceiveLater` is called and the processing attempt count reaches the limit, the message is moved to the DLQ automatically:
+
+```csharp
+// Create a message that will be dead-lettered after 3 failed processing attempts
+var message = Message.Create(
+    data: Encoding.UTF8.GetBytes("order-data"),
+    queue: "orders",
+    maxAttempts: 3);
+queue.Enqueue(message);
+
+// Consumer — each ReceiveLater call increments the processing attempt counter.
+// After 3 attempts, the message is auto-moved to "orders:dead-letter".
+await foreach (var ctx in queue.Receive("orders", cancellationToken: token))
+{
+    try
+    {
+        ProcessOrder(ctx.Message);
+        ctx.QueueContext.SuccessfullyReceived();
+    }
+    catch
+    {
+        ctx.QueueContext.ReceiveLater(TimeSpan.FromSeconds(5));
+    }
+    ctx.QueueContext.CommitChanges();
+}
+```
+
+### Explicit Dead-Lettering
+
+You can also move a message to the DLQ manually:
+
+```csharp
+await foreach (var ctx in queue.Receive("orders", cancellationToken: token))
+{
+    if (IsPoisonMessage(ctx.Message))
+    {
+        ctx.QueueContext.MoveToDeadLetter();  // → "orders:dead-letter"
+        ctx.QueueContext.CommitChanges();
+        continue;
+    }
+    // normal processing …
+}
+```
+
+Batch consumers can dead-letter individual messages or the entire batch:
+
+```csharp
+await foreach (var batch in queue.ReceiveBatch("orders", maxMessages: 10, cancellationToken: token))
+{
+    var poison = batch.Messages.Where(IsPoisonMessage).ToArray();
+    var good   = batch.Messages.Except(poison).ToArray();
+
+    batch.MoveToDeadLetter(poison);     // dead-letter the bad ones
+    batch.SuccessfullyReceived(good);   // acknowledge the good ones
+    batch.CommitChanges();
+}
+```
+
+### Inspecting DLQ Messages
+
+```csharp
+var dlqName = DeadLetterConstants.GetDeadLetterQueueName("orders"); // "orders:dead-letter"
+foreach (var msg in queue.Store.PersistedIncoming(dlqName))
+{
+    Console.WriteLine($"Original queue: {msg.OriginalQueue}");
+    Console.WriteLine($"Attempts:       {msg.ProcessingAttempts}");
+    Console.WriteLine($"Data:           {Encoding.UTF8.GetString(msg.Data.Span)}");
+}
+```
+
+### Requeuing DLQ Messages
+
+Once you've fixed the underlying issue, you can move all messages from a DLQ back to their original queue in a single call. Processing attempt counters are reset to zero:
+
+```csharp
+int count = queue.RequeueDeadLetterMessages("orders:dead-letter");
+Console.WriteLine($"Requeued {count} messages back to 'orders'");
+```
+
+### Enabling / Disabling the DLQ
+
+The DLQ is **enabled by default**. You can disable it via the builder API:
+
+**Using DI:**
+
+```csharp
+services.AddPersistentQueues(builder =>
+{
+    builder
+        .AddLmdbStorage("./queue_data")
+        .DisableDeadLetterQueue()   // ← messages that fail are silently discarded
+        .CreateQueues("my-queue");
+});
+```
+
+**Manual configuration:**
+
+```csharp
+var queue = new QueueConfiguration()
+    .WithDefaults()
+    .DisableDeadLetterQueue()
+    .StoreWithLmdb("./queue_data")
+    .BuildAndStart("my-queue");
+```
+
+When the DLQ is disabled:
+- `ReceiveLater` never auto-moves messages to a DLQ, even when `MaxAttempts` is exceeded — the message is retried indefinitely.
+- Outgoing messages that fail all send retries are silently discarded.
+- Calling `MoveToDeadLetter()` throws `InvalidOperationException`.
+
+### DLQ Metrics (OpenTelemetry)
+
+When OpenTelemetry is enabled, the following DLQ-specific metrics are emitted:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `bielupersistentqueues.messages.dead_lettered` | Counter | Total dead-lettered messages (tags: `queue.name`, `reason`) |
+| `bielupersistentqueues.dead_letter.queue.depth` | Gauge | Current message count per DLQ (tag: `queue.name`) |
+
+Reason values: `manual`, `max_processing_attempts`, `send_failed`.
+
+---
+
 ## Architecture
 
 ### Pluggable Storage

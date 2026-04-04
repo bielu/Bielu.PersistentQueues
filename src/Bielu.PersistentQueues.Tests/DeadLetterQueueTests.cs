@@ -193,8 +193,9 @@ public class DeadLetterQueueTests : TestBase
             ctx.QueueContext.CommitChanges();
 
             var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
-            // DLQ should not have been created at all
-            queue.Queues.ShouldNotContain(dlqName);
+            // DLQ exists (auto-created) but should be empty
+            var store = (LmdbMessageStore)queue.Store;
+            store.PersistedIncoming(dlqName).ShouldBeEmpty();
         }, TimeSpan.FromSeconds(3));
     }
 
@@ -313,5 +314,165 @@ public class DeadLetterQueueTests : TestBase
         moved.QueueString.ShouldBe("other-queue");
         moved.DestinationUri.IsEmpty.ShouldBeTrue();
         moved.Id.ShouldBe(message.Id);
+    }
+
+    // ─── DLQ auto-creation on CreateQueue ─────────────────────────────────
+
+    [Fact]
+    public async Task CreateQueue_WhenDlqEnabled_AutoCreatesDlqCompanion()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            queue.Queues.ShouldContain(dlqName);
+            await Task.CompletedTask;
+        }, TimeSpan.FromSeconds(3));
+    }
+
+    [Fact]
+    public async Task CreateQueue_WhenDlqDisabled_DoesNotCreateDlqCompanion()
+    {
+        await QueueScenario(
+            config => config.DisableDeadLetterQueue(),
+            async (queue, token) =>
+            {
+                var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+                queue.Queues.ShouldNotContain(dlqName);
+                await Task.CompletedTask;
+            }, TimeSpan.FromSeconds(3));
+    }
+
+    [Fact]
+    public async Task CreateQueue_DoesNotDoubleCreateDlqForDlqName()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            // Creating the DLQ explicitly should not create "test:dead-letter:dead-letter"
+            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            queue.CreateQueue(dlqName); // no-op since it already exists
+            queue.Queues.ShouldNotContain(dlqName + DeadLetterConstants.DeadLetterSuffix);
+            await Task.CompletedTask;
+        }, TimeSpan.FromSeconds(3));
+    }
+
+    // ─── DLQ disabled guards ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task MoveToDeadLetter_WhenDlqDisabled_Throws()
+    {
+        await QueueScenario(
+            config => config.DisableDeadLetterQueue(),
+            async (queue, token) =>
+            {
+                queue.Enqueue(NewMessage("test"));
+
+                var ctx = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+                Should.Throw<InvalidOperationException>(() => ctx.QueueContext.MoveToDeadLetter());
+            }, TimeSpan.FromSeconds(3));
+    }
+
+    [Fact]
+    public async Task ReceiveLater_WhenDlqDisabled_DoesNotDlqEvenAtMaxAttempts()
+    {
+        await QueueScenario(
+            config => config.DisableDeadLetterQueue(),
+            async (queue, token) =>
+            {
+                var message = Message.Create(
+                    data: Encoding.UTF8.GetBytes("hello"),
+                    queue: "test",
+                    maxAttempts: 1);
+                queue.Enqueue(message);
+
+                var ctx = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+                // With DLQ disabled, ReceiveLater should schedule retry instead of DLQ
+                ctx.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(1));
+                ctx.QueueContext.CommitChanges();
+
+                // The DLQ should not exist (was never created since DLQ is disabled)
+                queue.Queues.ShouldNotContain(DeadLetterConstants.GetDeadLetterQueueName("test"));
+            }, TimeSpan.FromSeconds(3));
+    }
+
+    // ─── RequeueDeadLetterMessages ────────────────────────────────────────
+
+    [Fact]
+    public async Task RequeueDeadLetterMessages_MovesMessagesBackToOriginalQueue()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.Enqueue(NewMessage("test", "msg1"));
+            queue.Enqueue(NewMessage("test", "msg2"));
+
+            // Dead-letter both messages
+            var ctx = await queue.ReceiveBatch("test", maxMessages: 2, cancellationToken: token).FirstAsync(token);
+            ctx.MoveToDeadLetter();
+            ctx.CommitChanges();
+
+            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var store = (LmdbMessageStore)queue.Store;
+            store.PersistedIncoming(dlqName).Count().ShouldBe(2);
+            store.PersistedIncoming("test").ShouldBeEmpty();
+
+            // Requeue
+            var count = queue.RequeueDeadLetterMessages(dlqName);
+            count.ShouldBe(2);
+
+            store.PersistedIncoming(dlqName).ShouldBeEmpty();
+            store.PersistedIncoming("test").Count().ShouldBe(2);
+        }, TimeSpan.FromSeconds(3));
+    }
+
+    [Fact]
+    public async Task RequeueDeadLetterMessages_ResetsProcessingAttempts()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            var message = Message.Create(
+                data: Encoding.UTF8.GetBytes("hello"),
+                queue: "test",
+                maxAttempts: 1);
+            queue.Enqueue(message);
+
+            // Trigger auto-DLQ via ReceiveLater
+            var ctx = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            ctx.QueueContext.ReceiveLater(TimeSpan.FromHours(1));
+            ctx.QueueContext.CommitChanges();
+
+            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var store = (LmdbMessageStore)queue.Store;
+            store.PersistedIncoming(dlqName).Single().ProcessingAttempts.ShouldBe(1);
+
+            // Requeue
+            queue.RequeueDeadLetterMessages(dlqName);
+
+            var requeued = store.PersistedIncoming("test").Single();
+            requeued.ProcessingAttempts.ShouldBe(0);
+        }, TimeSpan.FromSeconds(3));
+    }
+
+    [Fact]
+    public void RequeueDeadLetterMessages_ThrowsForNonDlqName()
+    {
+        Should.Throw<ArgumentException>(() =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaults()
+                .StoreWithLmdb(TempPath(), new LightningDB.EnvironmentConfiguration { MaxDatabases = 5, MapSize = 1024 * 1024 * 100 });
+            using var queue = config.BuildAndStart("test");
+            queue.RequeueDeadLetterMessages("not-a-dlq");
+        });
+    }
+
+    [Fact]
+    public async Task RequeueDeadLetterMessages_ReturnsZeroForEmptyDlq()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var count = queue.RequeueDeadLetterMessages(dlqName);
+            count.ShouldBe(0);
+            await Task.CompletedTask;
+        }, TimeSpan.FromSeconds(3));
     }
 }

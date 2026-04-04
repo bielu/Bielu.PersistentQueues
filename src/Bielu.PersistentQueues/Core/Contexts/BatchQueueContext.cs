@@ -233,6 +233,8 @@ public class BatchQueueContext : IBatchQueueContext
     /// <inheritdoc />
     public void MoveToDeadLetter()
     {
+        if (!_queue._deadLetterOptions.Enabled)
+            throw new InvalidOperationException("Dead letter queue is disabled. Enable it via EnableDeadLetterQueue() in the queue configuration.");
         ValidateAndMarkMessages(Messages, "MoveToDeadLetter");
         EnsureDeadLetterQueues(Messages);
         _actions.Add(new DeadLetterAllAction(_queue, Messages, DeadLetterDiagnostics.Reasons.Manual));
@@ -241,6 +243,8 @@ public class BatchQueueContext : IBatchQueueContext
     /// <inheritdoc />
     public void MoveToDeadLetter(Message[] messages)
     {
+        if (!_queue._deadLetterOptions.Enabled)
+            throw new InvalidOperationException("Dead letter queue is disabled. Enable it via EnableDeadLetterQueue() in the queue configuration.");
         ValidateAndMarkMessages(messages, "MoveToDeadLetter");
         EnsureDeadLetterQueues(messages);
         _actions.Add(new DeadLetterAllAction(_queue, messages, DeadLetterDiagnostics.Reasons.Manual));
@@ -249,6 +253,8 @@ public class BatchQueueContext : IBatchQueueContext
     /// <inheritdoc />
     public void MoveToDeadLetter(Guid[] messageIds)
     {
+        if (!_queue._deadLetterOptions.Enabled)
+            throw new InvalidOperationException("Dead letter queue is disabled. Enable it via EnableDeadLetterQueue() in the queue configuration.");
         var messages = Messages.Where(x => messageIds.Contains(x.Id.MessageIdentifier)).ToArray();
         ValidateAndMarkMessages(messages, "MoveToDeadLetter");
         EnsureDeadLetterQueues(messages);

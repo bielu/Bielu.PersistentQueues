@@ -319,4 +319,8 @@ public class PersistentQueueOtelDecorator : IQueue
     public IMessageStore Store => _queue.Store;
     public string[] Queues => _queue.Queues;
     public IPEndPoint Endpoint => _queue.Endpoint;
+
+    /// <inheritdoc />
+    public int RequeueDeadLetterMessages(string deadLetterQueueName)
+        => _queue.RequeueDeadLetterMessages(deadLetterQueueName);
 }
