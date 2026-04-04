@@ -281,9 +281,9 @@ int count = queue.RequeueDeadLetterMessages();
 Console.WriteLine($"Requeued {count} messages back to their original queues");
 ```
 
-### Enabling / Disabling the DLQ
+### Enabling the DLQ
 
-The DLQ is **enabled by default**. You can disable it via the builder API:
+The DLQ is **disabled by default**. Enable it via the builder API:
 
 **Using DI:**
 
@@ -292,7 +292,7 @@ services.AddPersistentQueues(builder =>
 {
     builder
         .AddLmdbStorage("./queue_data")
-        .WithDeadLetterQueue(false)   // ← messages that fail are silently discarded
+        .WithDeadLetterQueue()   // ← enable dead letter queue
         .CreateQueues("my-queue");
 });
 ```
@@ -302,12 +302,12 @@ services.AddPersistentQueues(builder =>
 ```csharp
 var queue = new QueueConfiguration()
     .WithDefaults()
-    .WithDeadLetterQueue(false)
+    .WithDeadLetterQueue()
     .StoreWithLmdb("./queue_data")
     .BuildAndStart("my-queue");
 ```
 
-When the DLQ is disabled:
+When the DLQ is not enabled:
 - `ReceiveLater` never auto-moves messages to the DLQ, even when `MaxAttempts` is exceeded — the message is retried indefinitely.
 - Outgoing messages that fail all send retries are silently discarded.
 - Calling `MoveToDeadLetter()` throws `InvalidOperationException`.

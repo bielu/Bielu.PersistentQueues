@@ -14,7 +14,7 @@ public sealed class DeadLetterOptions
 {
     /// <summary>
     /// Gets or sets a value indicating whether the dead letter queue is enabled.
-    /// Defaults to <c>true</c>.
+    /// Defaults to <c>false</c>.
     /// </summary>
     /// <remarks>
     /// When <c>true</c>:
@@ -27,5 +27,5 @@ public sealed class DeadLetterOptions
     /// </list>
     /// When <c>false</c>, all of the above operations are no-ops or throw.
     /// </remarks>
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; set; }
 }

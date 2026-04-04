@@ -137,16 +137,15 @@ public class PersistentQueuesBuilder
     }
 
     /// <summary>
-    /// Configures whether the dead letter queue is enabled.
-    /// When enabled (default), messages that exceed their <see cref="Message.MaxAttempts"/> or
-    /// fail all send retries are automatically moved to the shared <c>dead-letter</c> queue.
-    /// When disabled, such messages are silently discarded.
+    /// Enables the dead letter queue.
+    /// Messages that exceed their <see cref="Message.MaxAttempts"/> or fail all send
+    /// retries are automatically moved to the shared <c>dead-letter</c> queue.
+    /// The DLQ is disabled by default.
     /// </summary>
-    /// <param name="enabled">Whether to enable the dead letter queue. Defaults to <c>true</c>.</param>
     /// <returns>The builder for chaining.</returns>
-    public PersistentQueuesBuilder WithDeadLetterQueue(bool enabled = true)
+    public PersistentQueuesBuilder WithDeadLetterQueue()
     {
-        _deadLetterOptions.Enabled = enabled;
+        _deadLetterOptions.Enabled = true;
         return this;
     }
 
