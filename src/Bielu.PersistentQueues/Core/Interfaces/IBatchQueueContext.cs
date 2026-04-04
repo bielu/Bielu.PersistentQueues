@@ -62,22 +62,22 @@ public interface IBatchQueueContext : IQueueContext
     void MoveTo(string queueName, Message[] messages);
 
     /// <summary>
-    /// Moves all messages in this batch to their dead letter queue.
+    /// Moves all messages in this batch to the dead letter queue.
     /// </summary>
     /// <remarks>
-    /// The dead letter queue name is derived from each message's source queue by appending
-    /// <c>:dead-letter</c>. The dead letter queue is created automatically if it does not exist.
+    /// Messages are moved to the shared <c>dead-letter</c> queue. Each message's
+    /// <c>original-queue</c> header is stamped with its source queue name.
     /// </remarks>
     new void MoveToDeadLetter();
 
     /// <summary>
-    /// Moves a subset of messages in this batch to their dead letter queue.
+    /// Moves a subset of messages in this batch to the dead letter queue.
     /// </summary>
     /// <param name="messages">The messages to dead-letter.</param>
     void MoveToDeadLetter(Message[] messages);
 
     /// <summary>
-    /// Moves a subset of messages in this batch to their dead letter queue, identified by ID.
+    /// Moves a subset of messages in this batch to the dead letter queue, identified by ID.
     /// </summary>
     /// <param name="messageIds">The IDs of the messages to dead-letter.</param>
     void MoveToDeadLetter(Guid[] messageIds);

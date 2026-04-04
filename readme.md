@@ -192,12 +192,12 @@ await foreach (var msg in queue.Receive("queue-name", token))
 
 ## Dead Letter Queue (DLQ)
 
-Bielu.PersistentQueues has built-in support for **dead letter queues**. When a message cannot be processed after a configurable number of attempts, it is automatically moved to a dedicated DLQ — or you can explicitly dead-letter it from your consumer code.
+Bielu.PersistentQueues has built-in support for a **dead letter queue**. When a message cannot be processed after a configurable number of attempts, it is automatically moved to the DLQ — or you can explicitly dead-letter it from your consumer code.
 
 ### How It Works
 
-- Each source queue has a corresponding DLQ named `<queue>:dead-letter` (e.g., `orders:dead-letter`).
-- DLQ queues are created automatically when needed.
+- There is a single, shared dead letter queue named `dead-letter`.
+- The DLQ is created automatically when any queue is created (and DLQ is enabled).
 - Dead-lettered messages carry an `original-queue` header so you always know where they came from.
 - A **processing-attempts** counter is incremented on every `ReceiveLater` call.
 
@@ -214,7 +214,7 @@ var message = Message.Create(
 queue.Enqueue(message);
 
 // Consumer — each ReceiveLater call increments the processing attempt counter.
-// After 3 attempts, the message is auto-moved to "orders:dead-letter".
+// After 3 attempts, the message is auto-moved to "dead-letter".
 await foreach (var ctx in queue.Receive("orders", cancellationToken: token))
 {
     try
@@ -239,7 +239,7 @@ await foreach (var ctx in queue.Receive("orders", cancellationToken: token))
 {
     if (IsPoisonMessage(ctx.Message))
     {
-        ctx.QueueContext.MoveToDeadLetter();  // → "orders:dead-letter"
+        ctx.QueueContext.MoveToDeadLetter();  // → "dead-letter" queue
         ctx.QueueContext.CommitChanges();
         continue;
     }
@@ -264,8 +264,7 @@ await foreach (var batch in queue.ReceiveBatch("orders", maxMessages: 10, cancel
 ### Inspecting DLQ Messages
 
 ```csharp
-var dlqName = DeadLetterConstants.GetDeadLetterQueueName("orders"); // "orders:dead-letter"
-foreach (var msg in queue.Store.PersistedIncoming(dlqName))
+foreach (var msg in queue.Store.PersistedIncoming(DeadLetterConstants.QueueName))
 {
     Console.WriteLine($"Original queue: {msg.OriginalQueue}");
     Console.WriteLine($"Attempts:       {msg.ProcessingAttempts}");
@@ -275,11 +274,11 @@ foreach (var msg in queue.Store.PersistedIncoming(dlqName))
 
 ### Requeuing DLQ Messages
 
-Once you've fixed the underlying issue, you can move all messages from a DLQ back to their original queue in a single call. Processing attempt counters are reset to zero:
+Once you've fixed the underlying issue, you can move all messages from the DLQ back to their original queues in a single call. Processing attempt counters are reset to zero:
 
 ```csharp
-int count = queue.RequeueDeadLetterMessages("orders:dead-letter");
-Console.WriteLine($"Requeued {count} messages back to 'orders'");
+int count = queue.RequeueDeadLetterMessages(DeadLetterConstants.QueueName);
+Console.WriteLine($"Requeued {count} messages back to their original queues");
 ```
 
 ### Enabling / Disabling the DLQ
@@ -309,7 +308,7 @@ var queue = new QueueConfiguration()
 ```
 
 When the DLQ is disabled:
-- `ReceiveLater` never auto-moves messages to a DLQ, even when `MaxAttempts` is exceeded — the message is retried indefinitely.
+- `ReceiveLater` never auto-moves messages to the DLQ, even when `MaxAttempts` is exceeded — the message is retried indefinitely.
 - Outgoing messages that fail all send retries are silently discarded.
 - Calling `MoveToDeadLetter()` throws `InvalidOperationException`.
 
@@ -320,7 +319,7 @@ When OpenTelemetry is enabled, the following DLQ-specific metrics are emitted:
 | Metric | Type | Description |
 |--------|------|-------------|
 | `bielupersistentqueues.messages.dead_lettered` | Counter | Total dead-lettered messages (tags: `queue.name`, `reason`) |
-| `bielupersistentqueues.dead_letter.queue.depth` | Gauge | Current message count per DLQ (tag: `queue.name`) |
+| `bielupersistentqueues.dead_letter.queue.depth` | Gauge | Current message count in the DLQ |
 
 Reason values: `manual`, `max_processing_attempts`, `send_failed`.
 

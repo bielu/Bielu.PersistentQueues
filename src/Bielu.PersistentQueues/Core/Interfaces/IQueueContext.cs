@@ -93,12 +93,12 @@ public interface IQueueContext
     void MoveTo(string queueName);
 
     /// <summary>
-    /// Moves the current message to its dead letter queue.
+    /// Moves the current message to the dead letter queue.
     /// </summary>
     /// <remarks>
-    /// The dead letter queue name is derived from the message's source queue by appending
-    /// <c>:dead-letter</c> (e.g., <c>orders:dead-letter</c>). The dead letter queue is
-    /// created automatically if it does not already exist.
+    /// The message is moved to the shared <c>dead-letter</c> queue. The dead letter queue is
+    /// created automatically when the queue is first set up (if DLQ is enabled).
+    /// The message's <c>original-queue</c> header is stamped with the source queue name.
     /// Use this method when a message cannot be processed and should not be retried.
     /// </remarks>
     void MoveToDeadLetter();

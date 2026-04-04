@@ -40,7 +40,7 @@ public class PersistentQueueOtelDecorator : IQueue
                 () => store.GetStorageUsageInfo()?.UsagePercentage ?? 0);
         }
 
-        // Register dead letter queue depth gauge — reports per-DLQ message counts
+        // Register dead letter queue depth gauge — reports message count in the shared DLQ
         _deadLetterQueueDepthGauge = _metrics.CreateDeadLetterQueueDepthGauge(() =>
         {
             var measurements = new List<Measurement<long>>();
