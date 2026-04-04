@@ -110,14 +110,30 @@ public class BatchQueueContext : IBatchQueueContext
     public void ReceiveLater(TimeSpan timeSpan)
     {
         ValidateAndMarkMessages(Messages, "ReceiveLater");
-        _actions.Add(new ReceiveLaterTimeSpanAction(_queue, Messages, timeSpan));
+        var updatedMessages = UpdateProcessingAttempts(Messages);
+        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
+        if (dlqMessages.Length > 0)
+        {
+            EnsureDeadLetterQueues(dlqMessages);
+            _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
+        }
+        if (retryMessages.Length > 0)
+            _actions.Add(new ReceiveLaterTimeSpanAction(_queue, retryMessages, timeSpan));
     }
 
     /// <inheritdoc />
     public void ReceiveLater(DateTimeOffset time)
     {
         ValidateAndMarkMessages(Messages, "ReceiveLater");
-        _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, Messages, time));
+        var updatedMessages = UpdateProcessingAttempts(Messages);
+        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
+        if (dlqMessages.Length > 0)
+        {
+            EnsureDeadLetterQueues(dlqMessages);
+            _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
+        }
+        if (retryMessages.Length > 0)
+            _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, retryMessages, time));
     }
 
     /// <inheritdoc />
@@ -138,28 +154,60 @@ public class BatchQueueContext : IBatchQueueContext
     public void ReceiveLater(Message[] messages, TimeSpan timeSpan)
     {
         ValidateAndMarkMessages(messages, "ReceiveLater");
-        _actions.Add(new ReceiveLaterTimeSpanAction(_queue, messages, timeSpan));
+        var updatedMessages = UpdateProcessingAttempts(messages);
+        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
+        if (dlqMessages.Length > 0)
+        {
+            EnsureDeadLetterQueues(dlqMessages);
+            _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
+        }
+        if (retryMessages.Length > 0)
+            _actions.Add(new ReceiveLaterTimeSpanAction(_queue, retryMessages, timeSpan));
     }
 
     public void ReceiveLater(Guid[] messageIds, TimeSpan timeSpan)
     {
         var messages = Messages.Where(x => messageIds.Contains(x.Id.MessageIdentifier)).ToArray();
         ValidateAndMarkMessages(messages, "ReceiveLater");
-        _actions.Add(new ReceiveLaterTimeSpanAction(_queue, messages, timeSpan));
+        var updatedMessages = UpdateProcessingAttempts(messages);
+        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
+        if (dlqMessages.Length > 0)
+        {
+            EnsureDeadLetterQueues(dlqMessages);
+            _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
+        }
+        if (retryMessages.Length > 0)
+            _actions.Add(new ReceiveLaterTimeSpanAction(_queue, retryMessages, timeSpan));
     }
 
     /// <inheritdoc />
     public void ReceiveLater(Message[] messages, DateTimeOffset time)
     {
         ValidateAndMarkMessages(messages, "ReceiveLater");
-        _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, messages, time));
+        var updatedMessages = UpdateProcessingAttempts(messages);
+        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
+        if (dlqMessages.Length > 0)
+        {
+            EnsureDeadLetterQueues(dlqMessages);
+            _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
+        }
+        if (retryMessages.Length > 0)
+            _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, retryMessages, time));
     }
 
     public void ReceiveLater(Guid[] messageIds, DateTimeOffset time)
     {
         var messages = Messages.Where(x => messageIds.Contains(x.Id.MessageIdentifier)).ToArray();
         ValidateAndMarkMessages(messages, "ReceiveLater");
-        _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, messages, time));
+        var updatedMessages = UpdateProcessingAttempts(messages);
+        var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
+        if (dlqMessages.Length > 0)
+        {
+            EnsureDeadLetterQueues(dlqMessages);
+            _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
+        }
+        if (retryMessages.Length > 0)
+            _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, retryMessages, time));
     }
 
     /// <inheritdoc />
@@ -182,6 +230,37 @@ public class BatchQueueContext : IBatchQueueContext
         _actions.Add(new MoveAllAction(_queue, messages, queueName));
     }
 
+    /// <inheritdoc />
+    public void MoveToDeadLetter()
+    {
+        if (!_queue._deadLetterOptions.Enabled)
+            throw new InvalidOperationException("Dead letter queue is disabled. Enable it via WithDeadLetterQueue() in the queue configuration.");
+        ValidateAndMarkMessages(Messages, "MoveToDeadLetter");
+        EnsureDeadLetterQueues(Messages);
+        _actions.Add(new DeadLetterAllAction(_queue, Messages, DeadLetterDiagnostics.Reasons.Manual));
+    }
+
+    /// <inheritdoc />
+    public void MoveToDeadLetter(Message[] messages)
+    {
+        if (!_queue._deadLetterOptions.Enabled)
+            throw new InvalidOperationException("Dead letter queue is disabled. Enable it via WithDeadLetterQueue() in the queue configuration.");
+        ValidateAndMarkMessages(messages, "MoveToDeadLetter");
+        EnsureDeadLetterQueues(messages);
+        _actions.Add(new DeadLetterAllAction(_queue, messages, DeadLetterDiagnostics.Reasons.Manual));
+    }
+
+    /// <inheritdoc />
+    public void MoveToDeadLetter(Guid[] messageIds)
+    {
+        if (!_queue._deadLetterOptions.Enabled)
+            throw new InvalidOperationException("Dead letter queue is disabled. Enable it via WithDeadLetterQueue() in the queue configuration.");
+        var messages = Messages.Where(x => messageIds.Contains(x.Id.MessageIdentifier)).ToArray();
+        ValidateAndMarkMessages(messages, "MoveToDeadLetter");
+        EnsureDeadLetterQueues(messages);
+        _actions.Add(new DeadLetterAllAction(_queue, messages, DeadLetterDiagnostics.Reasons.Manual));
+    }
+
     private void ValidateAndMarkMessages(Message[] messages, string operationName)
     {
         foreach (var message in messages)
@@ -191,6 +270,28 @@ public class BatchQueueContext : IBatchQueueContext
                 throw new InvalidOperationException($"Cannot call {operationName} on message {message.Id.MessageIdentifier} - it has already been processed by another operation (SuccessfullyReceived, MoveTo, or ReceiveLater).");
             }
         }
+    }
+
+    private static Message[] UpdateProcessingAttempts(Message[] messages)
+    {
+        var updated = new Message[messages.Length];
+        for (var i = 0; i < messages.Length; i++)
+            updated[i] = messages[i].WithProcessingAttempts(messages[i].ProcessingAttempts + 1);
+        return updated;
+    }
+
+    private static (Message[] dlq, Message[] retry) SplitByMaxAttempts(Message[] updatedMessages, bool dlqEnabled)
+    {
+        if (!dlqEnabled)
+            return ([], updatedMessages);
+        var dlq = updatedMessages.Where(m => m.MaxAttempts.HasValue && m.ProcessingAttempts >= m.MaxAttempts.Value).ToArray();
+        var retry = updatedMessages.Where(m => !m.MaxAttempts.HasValue || m.ProcessingAttempts < m.MaxAttempts.Value).ToArray();
+        return (dlq, retry);
+    }
+
+    private void EnsureDeadLetterQueues(Message[] messages)
+    {
+        _queue.Store.CreateQueue(DeadLetterConstants.QueueName);
     }
 
     private interface IBatchAction
@@ -284,7 +385,8 @@ public class BatchQueueContext : IBatchQueueContext
 
         public void Execute(IStoreTransaction transaction)
         {
-            // Remove the messages from current queue before scheduling them for later
+            // Remove the messages from current queue before scheduling them for later.
+            // IDs are unchanged by WithProcessingAttempts, so deletion is correct.
             _queue.Store.SuccessfullyReceived(transaction, _messages);
         }
 
@@ -310,7 +412,8 @@ public class BatchQueueContext : IBatchQueueContext
 
         public void Execute(IStoreTransaction transaction)
         {
-            // Remove the messages from current queue before scheduling them for later
+            // Remove the messages from current queue before scheduling them for later.
+            // IDs are unchanged by WithProcessingAttempts, so deletion is correct.
             _queue.Store.SuccessfullyReceived(transaction, _messages);
         }
 
@@ -318,6 +421,39 @@ public class BatchQueueContext : IBatchQueueContext
         {
             foreach (var message in _messages)
                 _queue.ReceiveLater(message, _time);
+        }
+    }
+
+    private class DeadLetterAllAction : IBatchAction
+    {
+        private readonly Queue _queue;
+        private readonly Message[] _messages;
+        private readonly string _reason;
+
+        public DeadLetterAllAction(Queue queue, Message[] messages, string reason)
+        {
+            _queue = queue;
+            _messages = messages;
+            _reason = reason;
+        }
+
+        public void Execute(IStoreTransaction transaction)
+        {
+            foreach (var message in _messages)
+            {
+                var sourceQueue = message.QueueString ?? "unknown";
+                var messageWithOrigin = message.WithOriginalQueue(sourceQueue);
+                _queue.Store.MoveToQueue(transaction, DeadLetterConstants.QueueName, messageWithOrigin);
+            }
+        }
+
+        public void Success()
+        {
+            foreach (var message in _messages)
+            {
+                DeadLetterDiagnostics.RecordMessageDeadLettered(
+                    message.QueueString ?? "unknown", _reason);
+            }
         }
     }
 }

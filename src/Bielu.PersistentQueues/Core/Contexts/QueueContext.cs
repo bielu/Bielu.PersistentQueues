@@ -70,7 +70,15 @@ internal class QueueContext : IQueueContext
         if (_messageDisposed)
             throw new InvalidOperationException("Cannot call ReceiveLater after SuccessfullyReceived or MoveTo has been called on this message.");
         _messageDisposed = true;
-        _queueActions.Add(new ReceiveLaterTimeSpanAction(this, timeSpan));
+        var updatedMessage = _message.WithProcessingAttempts(_message.ProcessingAttempts + 1);
+        if (_queue._deadLetterOptions.Enabled && _message.MaxAttempts.HasValue && updatedMessage.ProcessingAttempts >= _message.MaxAttempts.Value)
+        {
+            var dlqName = DeadLetterConstants.QueueName;
+            _queue.Store.CreateQueue(dlqName);
+            _queueActions.Add(new DeadLetterAction(this, dlqName, updatedMessage, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
+            return;
+        }
+        _queueActions.Add(new ReceiveLaterTimeSpanAction(this, updatedMessage, timeSpan));
     }
 
     public void ReceiveLater(DateTimeOffset time)
@@ -78,7 +86,15 @@ internal class QueueContext : IQueueContext
         if (_messageDisposed)
             throw new InvalidOperationException("Cannot call ReceiveLater after SuccessfullyReceived or MoveTo has been called on this message.");
         _messageDisposed = true;
-        _queueActions.Add(new ReceiveLaterDateTimeOffsetAction(this, time));
+        var updatedMessage = _message.WithProcessingAttempts(_message.ProcessingAttempts + 1);
+        if (_queue._deadLetterOptions.Enabled && _message.MaxAttempts.HasValue && updatedMessage.ProcessingAttempts >= _message.MaxAttempts.Value)
+        {
+            var dlqName = DeadLetterConstants.QueueName;
+            _queue.Store.CreateQueue(dlqName);
+            _queueActions.Add(new DeadLetterAction(this, dlqName, updatedMessage, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
+            return;
+        }
+        _queueActions.Add(new ReceiveLaterDateTimeOffsetAction(this, updatedMessage, time));
     }
 
     public void SuccessfullyReceived()
@@ -95,6 +111,18 @@ internal class QueueContext : IQueueContext
             throw new InvalidOperationException("Cannot call MoveTo after SuccessfullyReceived or ReceiveLater has been called on this message.");
         _messageDisposed = true;
         _queueActions.Add(new MoveAction(this, queueName));
+    }
+
+    public void MoveToDeadLetter()
+    {
+        if (!_queue._deadLetterOptions.Enabled)
+            throw new InvalidOperationException("Dead letter queue is disabled. Enable it via WithDeadLetterQueue() in the queue configuration.");
+        if (_messageDisposed)
+            throw new InvalidOperationException("Cannot call MoveToDeadLetter after SuccessfullyReceived, ReceiveLater, or MoveTo has been called on this message.");
+        _messageDisposed = true;
+        var dlqName = DeadLetterConstants.QueueName;
+        _queue.Store.CreateQueue(dlqName);
+        _queueActions.Add(new DeadLetterAction(this, dlqName, _message, DeadLetterDiagnostics.Reasons.Manual));
     }
 
     public void Enqueue(Message message)
@@ -231,11 +259,13 @@ internal class QueueContext : IQueueContext
     private class ReceiveLaterTimeSpanAction : IQueueAction
     {
         private readonly QueueContext _context;
+        private readonly Message _updatedMessage;
         private readonly TimeSpan _timeSpan;
 
-        public ReceiveLaterTimeSpanAction(QueueContext context, TimeSpan timeSpan)
+        public ReceiveLaterTimeSpanAction(QueueContext context, Message updatedMessage, TimeSpan timeSpan)
         {
             _context = context;
+            _updatedMessage = updatedMessage;
             _timeSpan = timeSpan;
         }
 
@@ -247,21 +277,22 @@ internal class QueueContext : IQueueContext
 
         public void Success()
         {
-            _context._queue.ReceiveLater(_context._message, _timeSpan);
+            _context._queue.ReceiveLater(_updatedMessage, _timeSpan);
         }
     }
 
     private class ReceiveLaterDateTimeOffsetAction : IQueueAction
     {
         private readonly QueueContext _context;
+        private readonly Message _updatedMessage;
         private readonly DateTimeOffset _time;
 
-        public ReceiveLaterDateTimeOffsetAction(QueueContext context, DateTimeOffset time)
+        public ReceiveLaterDateTimeOffsetAction(QueueContext context, Message updatedMessage, DateTimeOffset time)
         {
             _context = context;
+            _updatedMessage = updatedMessage;
             _time = time;
         }
-
 
         public void Execute(IStoreTransaction transaction)
         {
@@ -271,7 +302,36 @@ internal class QueueContext : IQueueContext
 
         public void Success()
         {
-            _context._queue.ReceiveLater(_context._message, _time);
+            _context._queue.ReceiveLater(_updatedMessage, _time);
+        }
+    }
+
+    private class DeadLetterAction : IQueueAction
+    {
+        private readonly QueueContext _context;
+        private readonly string _dlqName;
+        private readonly Message _messageToStore;
+        private readonly string _reason;
+
+        public DeadLetterAction(QueueContext context, string dlqName, Message messageToStore, string reason)
+        {
+            _context = context;
+            _dlqName = dlqName;
+            _messageToStore = messageToStore;
+            _reason = reason;
+        }
+
+        public void Execute(IStoreTransaction transaction)
+        {
+            var messageWithOrigin = _messageToStore.WithOriginalQueue(
+                _context._message.QueueString ?? "unknown");
+            _context._queue.Store.MoveToQueue(transaction, _dlqName, messageWithOrigin);
+        }
+
+        public void Success()
+        {
+            DeadLetterDiagnostics.RecordMessageDeadLettered(
+                _context._message.QueueString ?? "unknown", _reason);
         }
     }
 }

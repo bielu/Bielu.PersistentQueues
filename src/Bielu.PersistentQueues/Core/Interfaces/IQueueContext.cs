@@ -91,6 +91,17 @@ public interface IQueueContext
     /// where messages need to be routed to different queues based on processing results.
     /// </remarks>
     void MoveTo(string queueName);
+
+    /// <summary>
+    /// Moves the current message to the dead letter queue.
+    /// </summary>
+    /// <remarks>
+    /// The message is moved to the shared <c>dead-letter</c> queue. The dead letter queue is
+    /// created automatically when the queue is first set up (if DLQ is enabled).
+    /// The message's <c>original-queue</c> header is stamped with the source queue name.
+    /// Use this method when a message cannot be processed and should not be retried.
+    /// </remarks>
+    void MoveToDeadLetter();
     
     /// <summary>
     /// Adds a new message to the current queue.

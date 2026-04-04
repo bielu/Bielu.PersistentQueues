@@ -48,6 +48,7 @@ public class PersistentQueuesBuilder
     private string[] _queueNames = [];
     private bool _autoStart { get; set; }
     private Func<IServiceProvider, IMessageStore>? _storeFactory;
+    private readonly DeadLetterOptions _deadLetterOptions = new();
 
     /// <summary>
     /// Initializes a new instance of <see cref="PersistentQueuesBuilder"/>.
@@ -135,6 +136,19 @@ public class PersistentQueuesBuilder
         return this;
     }
 
+    /// <summary>
+    /// Enables the dead letter queue.
+    /// Messages that exceed their <see cref="Message.MaxAttempts"/> or fail all send
+    /// retries are automatically moved to the shared <c>dead-letter</c> queue.
+    /// The DLQ is disabled by default.
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    public PersistentQueuesBuilder WithDeadLetterQueue()
+    {
+        _deadLetterOptions.Enabled = true;
+        return this;
+    }
+
     internal void Build()
     {
         var endpoint = _endpoint ?? new IPEndPoint(IPAddress.Loopback, PortFinder.FindPort());
@@ -190,7 +204,7 @@ public class PersistentQueuesBuilder
             var store = sp.GetRequiredService<IMessageStore>();
             var logger = sp.GetRequiredService<ILogger<Queue>>();
             var contentSerializer = sp.GetRequiredService<IContentSerializer>();
-            var queue = new Queue(receiver, sender, store, logger, contentSerializer);
+            var queue = new Queue(receiver, sender, store, logger, contentSerializer, _deadLetterOptions);
             if (queueNames != null)
             {
                 foreach (var name in queueNames)

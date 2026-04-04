@@ -86,7 +86,7 @@ public class TestBase
 
    protected LightningEnvironment LightningEnvironment(string? path = null)
    {
-      return new LightningEnvironment(path ?? TempPath(), new EnvironmentConfiguration { MaxDatabases = 5, MapSize = 1024 * 1024 * 100 });
+      return new LightningEnvironment(path ?? TempPath(), new EnvironmentConfiguration { MaxDatabases = 20, MapSize = 1024 * 1024 * 100 });
    }
 
    protected static Message NewMessage(string queueName = "test", string payload = "hello")

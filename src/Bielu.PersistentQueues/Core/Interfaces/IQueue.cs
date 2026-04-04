@@ -144,4 +144,15 @@ public interface IQueue : IDisposable, IAsyncDisposable
         string? queueName = null,
         Dictionary<string, string>? headers = null,
         string? partitionKey = null);
+
+    /// <summary>
+    /// Moves all messages from the dead letter queue back to their original source queues.
+    /// </summary>
+    /// <returns>The number of messages that were requeued.</returns>
+    /// <remarks>
+    /// Each message is moved back to the queue recorded in its <c>original-queue</c> header.
+    /// The processing attempt counter is reset to zero so the message can be retried.
+    /// All moves happen in a single atomic transaction.
+    /// </remarks>
+    int RequeueDeadLetterMessages();
 }

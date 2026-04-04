@@ -26,6 +26,7 @@ public class Queue : IQueue
     private readonly CancellationTokenSource _cancelOnDispose;
     private readonly ILogger _logger;
     internal readonly IContentSerializer _contentSerializer;
+    internal readonly DeadLetterOptions _deadLetterOptions;
     private Task? _sendingTask;
     private Task? _receivingTask;
 
@@ -37,7 +38,8 @@ public class Queue : IQueue
     /// <param name="messageStore">The storage system for persisting messages.</param>
     /// <param name="logger">The logger for recording queue operations.</param>
     /// <param name="contentSerializer">The content serializer for strongly-typed message operations. If null, defaults to <see cref="JsonContentSerializer.Default"/>.</param>
-    public Queue(Receiver receiver, Sender sender, IMessageStore messageStore, ILogger logger, IContentSerializer? contentSerializer = null)
+    /// <param name="deadLetterOptions">Dead letter queue options. If null, DLQ is enabled by default.</param>
+    public Queue(Receiver receiver, Sender sender, IMessageStore messageStore, ILogger logger, IContentSerializer? contentSerializer = null, DeadLetterOptions? deadLetterOptions = null)
     {
         _receiver = receiver;
         _sender = sender;
@@ -46,6 +48,12 @@ public class Queue : IQueue
         _receivingChannel = Channel.CreateUnbounded<Message>();
         _logger = logger;
         _contentSerializer = contentSerializer ?? JsonContentSerializer.Default;
+        _deadLetterOptions = deadLetterOptions ?? new DeadLetterOptions();
+        
+        if (_deadLetterOptions.Enabled)
+        {
+            Store.CreateQueue(DeadLetterConstants.QueueName);
+        }
     }
 
     /// <summary>
@@ -105,7 +113,7 @@ public class Queue : IQueue
     private async Task StartSendingAsync(CancellationToken token)
     {
         _logger.QueueStarting();
-        var errorPolicy = new SendingErrorPolicy(_logger, Store, _sender.FailedToSend());
+        var errorPolicy = new SendingErrorPolicy(_logger, Store, _sender.FailedToSend(), _deadLetterOptions);
         var errorTask = errorPolicy.StartRetries(token);
         
         // Task to handle retry messages by putting them back into outgoing storage
@@ -491,6 +499,27 @@ public class Queue : IQueue
     public void ReceiveLater(Message message, DateTimeOffset time)
     {
         ReceiveLater(message, time - DateTimeOffset.Now);
+    }
+
+    /// <inheritdoc />
+    public int RequeueDeadLetterMessages()
+    {
+        var messages = Store.PersistedIncoming(DeadLetterConstants.QueueName).ToList();
+        if (messages.Count == 0)
+            return 0;
+
+        using var transaction = Store.BeginTransaction();
+        foreach (var message in messages)
+        {
+            var targetQueue = message.OriginalQueue ?? throw new InvalidOperationException($"Message {message.Id} in DLQ has no original-queue header and cannot be requeued.");
+
+            // Reset processing attempts and move back to the source queue
+            var requeuedMessage = message.WithProcessingAttempts(0);
+            Store.MoveToQueue(transaction, targetQueue, requeuedMessage);
+        }
+        transaction.Commit();
+
+        return messages.Count;
     }
 
     /// <summary>

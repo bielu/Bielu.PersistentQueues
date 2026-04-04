@@ -15,13 +15,15 @@ public class SendingErrorPolicy
     private readonly IMessageStore _store;
     private readonly Channel<OutgoingMessageFailure> _failedToConnect;
     private readonly Channel<Message> _retries;
+    private readonly DeadLetterOptions _deadLetterOptions;
 
-    public SendingErrorPolicy(ILogger logger, IMessageStore store, Channel<OutgoingMessageFailure> failedToConnect)
+    public SendingErrorPolicy(ILogger logger, IMessageStore store, Channel<OutgoingMessageFailure> failedToConnect, DeadLetterOptions? deadLetterOptions = null)
     {
         _logger = logger;
         _store = store;
         _failedToConnect = failedToConnect;
         _retries = Channel.CreateUnbounded<Message>();
+        _deadLetterOptions = deadLetterOptions ?? new DeadLetterOptions();
     }
 
     public ChannelReader<Message> Retries => _retries.Reader;
@@ -42,8 +44,12 @@ public class SendingErrorPolicy
     {
         foreach (var message in messages)
         {
-            if (!ShouldRetry(message, shouldRetry)) 
+            if (!ShouldRetry(message, shouldRetry))
+            {
+                if (_deadLetterOptions.Enabled)
+                    MoveToDeadLetter(message);
                 continue;
+            }
             await Task.Delay(TimeSpan.FromSeconds(message.SentAttempts * message.SentAttempts), cancellationToken).ConfigureAwait(false);
             await _retries.Writer.WriteAsync(message, cancellationToken).ConfigureAwait(false);
         }
@@ -80,6 +86,22 @@ public class SendingErrorPolicy
         foreach (var message in messages)
         {
             yield return message.WithSentAttempts(message.SentAttempts + 1);
+        }
+    }
+
+    private void MoveToDeadLetter(Message message)
+    {
+        var sourceQueue = message.QueueString ?? "unknown";
+        var dlqName = DeadLetterConstants.QueueName;
+        try
+        {
+            _store.CreateQueue(dlqName);
+            _store.StoreIncoming(message.WithOriginalQueue(sourceQueue).WithQueue(dlqName));
+            DeadLetterDiagnostics.RecordMessageDeadLettered(sourceQueue, DeadLetterDiagnostics.Reasons.SendFailed);
+        }
+        catch (Exception ex)
+        {
+            _logger.PolicyIncrementFailureError(ex);
         }
     }
 }
