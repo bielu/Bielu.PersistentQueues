@@ -279,6 +279,25 @@ public class PersistentQueueOtelDecorator : IQueue
         }
     }
 
+    /// <inheritdoc />
+    public void Send<T>(
+        T content,
+        string? destinationUri = null,
+        string? queueName = null,
+        Dictionary<string, string>? headers = null,
+        DateTime? deliverBy = null,
+        int? maxAttempts = null,
+        string? partitionKey = null)
+        => _queue.Send(content, destinationUri, queueName, headers, deliverBy, maxAttempts, partitionKey);
+
+    /// <inheritdoc />
+    public void Enqueue<T>(
+        T content,
+        string? queueName = null,
+        Dictionary<string, string>? headers = null,
+        string? partitionKey = null)
+        => _queue.Enqueue(content, queueName, headers, partitionKey);
+
     public IMessageStore Store => _queue.Store;
     public string[] Queues => _queue.Queues;
     public IPEndPoint Endpoint => _queue.Endpoint;

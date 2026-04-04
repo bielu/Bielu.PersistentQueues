@@ -103,6 +103,25 @@ public class PartitionedQueue : IPartitionedQueue
         => _innerQueue.Enqueue(message);
 
     /// <inheritdoc />
+    public void Send<T>(
+        T content,
+        string? destinationUri = null,
+        string? queueName = null,
+        Dictionary<string, string>? headers = null,
+        DateTime? deliverBy = null,
+        int? maxAttempts = null,
+        string? partitionKey = null)
+        => _innerQueue.Send(content, destinationUri, queueName, headers, deliverBy, maxAttempts, partitionKey);
+
+    /// <inheritdoc />
+    public void Enqueue<T>(
+        T content,
+        string? queueName = null,
+        Dictionary<string, string>? headers = null,
+        string? partitionKey = null)
+        => _innerQueue.Enqueue(content, queueName, headers, partitionKey);
+
+    /// <inheritdoc />
     public void Dispose()
     {
         foreach (var semaphore in _partitionLocks.Values)

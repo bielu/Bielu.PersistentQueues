@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using Bielu.PersistentQueues.Serialization;
 
 namespace Bielu.PersistentQueues;
 
@@ -30,7 +32,28 @@ public interface IQueueContext
     /// after processing the current message.
     /// </remarks>
     void Send(Message message);
-    
+
+    /// <summary>
+    /// Sends a strongly-typed content object to its destination.
+    /// The content is serialized using the queue's configured content serializer.
+    /// </summary>
+    /// <typeparam name="T">The type of the content to send.</typeparam>
+    /// <param name="content">The content object to serialize and send.</param>
+    /// <param name="destinationUri">The destination URI (e.g., "lq.tcp://hostname:port").</param>
+    /// <param name="queueName">Optional queue name for the message.</param>
+    /// <param name="headers">Optional message headers.</param>
+    /// <param name="deliverBy">Optional delivery deadline.</param>
+    /// <param name="maxAttempts">Optional maximum delivery attempts.</param>
+    /// <param name="partitionKey">Optional partition key.</param>
+    void Send<T>(
+        T content,
+        string? destinationUri = null,
+        string? queueName = null,
+        Dictionary<string, string>? headers = null,
+        DateTime? deliverBy = null,
+        int? maxAttempts = null,
+        string? partitionKey = null);
+
     /// <summary>
     /// Schedules the current message to be processed again after a specified delay.
     /// </summary>
@@ -78,4 +101,19 @@ public interface IQueueContext
     /// for local processing, without sending it over the network.
     /// </remarks>
     void Enqueue(Message message);
+
+    /// <summary>
+    /// Adds a strongly-typed content object to the current queue.
+    /// The content is serialized using the queue's configured content serializer.
+    /// </summary>
+    /// <typeparam name="T">The type of the content to enqueue.</typeparam>
+    /// <param name="content">The content object to serialize and enqueue.</param>
+    /// <param name="queueName">Optional queue name.</param>
+    /// <param name="headers">Optional message headers.</param>
+    /// <param name="partitionKey">Optional partition key.</param>
+    void Enqueue<T>(
+        T content,
+        string? queueName = null,
+        Dictionary<string, string>? headers = null,
+        string? partitionKey = null);
 }
