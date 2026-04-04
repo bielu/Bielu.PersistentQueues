@@ -321,7 +321,9 @@ internal class QueueContext : IQueueContext
 
         public void Execute(IStoreTransaction transaction)
         {
-            _context._queue.Store.MoveToQueue(transaction, _dlqName, _messageToStore);
+            var messageWithOrigin = _messageToStore.WithOriginalQueue(
+                _context._message.QueueString ?? "unknown");
+            _context._queue.Store.MoveToQueue(transaction, _dlqName, messageWithOrigin);
         }
 
         public void Success()

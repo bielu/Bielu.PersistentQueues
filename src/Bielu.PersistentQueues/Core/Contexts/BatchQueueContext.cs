@@ -118,7 +118,7 @@ public class BatchQueueContext : IBatchQueueContext
             _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
         }
         if (retryMessages.Length > 0)
-            _actions.Add(new ReceiveLaterTimeSpanAction(_queue, Messages, retryMessages, timeSpan));
+            _actions.Add(new ReceiveLaterTimeSpanAction(_queue, retryMessages, timeSpan));
     }
 
     /// <inheritdoc />
@@ -133,7 +133,7 @@ public class BatchQueueContext : IBatchQueueContext
             _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
         }
         if (retryMessages.Length > 0)
-            _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, Messages, retryMessages, time));
+            _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, retryMessages, time));
     }
 
     /// <inheritdoc />
@@ -162,7 +162,7 @@ public class BatchQueueContext : IBatchQueueContext
             _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
         }
         if (retryMessages.Length > 0)
-            _actions.Add(new ReceiveLaterTimeSpanAction(_queue, messages, retryMessages, timeSpan));
+            _actions.Add(new ReceiveLaterTimeSpanAction(_queue, retryMessages, timeSpan));
     }
 
     public void ReceiveLater(Guid[] messageIds, TimeSpan timeSpan)
@@ -177,7 +177,7 @@ public class BatchQueueContext : IBatchQueueContext
             _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
         }
         if (retryMessages.Length > 0)
-            _actions.Add(new ReceiveLaterTimeSpanAction(_queue, messages, retryMessages, timeSpan));
+            _actions.Add(new ReceiveLaterTimeSpanAction(_queue, retryMessages, timeSpan));
     }
 
     /// <inheritdoc />
@@ -192,7 +192,7 @@ public class BatchQueueContext : IBatchQueueContext
             _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
         }
         if (retryMessages.Length > 0)
-            _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, messages, retryMessages, time));
+            _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, retryMessages, time));
     }
 
     public void ReceiveLater(Guid[] messageIds, DateTimeOffset time)
@@ -207,7 +207,7 @@ public class BatchQueueContext : IBatchQueueContext
             _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
         }
         if (retryMessages.Length > 0)
-            _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, messages, retryMessages, time));
+            _actions.Add(new ReceiveLaterDateTimeOffsetAction(_queue, retryMessages, time));
     }
 
     /// <inheritdoc />
@@ -369,27 +369,26 @@ public class BatchQueueContext : IBatchQueueContext
     private class ReceiveLaterTimeSpanAction : IBatchAction
     {
         private readonly Queue _queue;
-        private readonly Message[] _originalMessages;
-        private readonly Message[] _updatedMessages;
+        private readonly Message[] _messages;
         private readonly TimeSpan _timeSpan;
 
-        public ReceiveLaterTimeSpanAction(Queue queue, Message[] originalMessages, Message[] updatedMessages, TimeSpan timeSpan)
+        public ReceiveLaterTimeSpanAction(Queue queue, Message[] messages, TimeSpan timeSpan)
         {
             _queue = queue;
-            _originalMessages = originalMessages;
-            _updatedMessages = updatedMessages;
+            _messages = messages;
             _timeSpan = timeSpan;
         }
 
         public void Execute(IStoreTransaction transaction)
         {
-            // Remove the messages from current queue before scheduling them for later
-            _queue.Store.SuccessfullyReceived(transaction, _originalMessages);
+            // Remove the messages from current queue before scheduling them for later.
+            // IDs are unchanged by WithProcessingAttempts, so deletion is correct.
+            _queue.Store.SuccessfullyReceived(transaction, _messages);
         }
 
         public void Success()
         {
-            foreach (var message in _updatedMessages)
+            foreach (var message in _messages)
                 _queue.ReceiveLater(message, _timeSpan);
         }
     }
@@ -397,27 +396,26 @@ public class BatchQueueContext : IBatchQueueContext
     private class ReceiveLaterDateTimeOffsetAction : IBatchAction
     {
         private readonly Queue _queue;
-        private readonly Message[] _originalMessages;
-        private readonly Message[] _updatedMessages;
+        private readonly Message[] _messages;
         private readonly DateTimeOffset _time;
 
-        public ReceiveLaterDateTimeOffsetAction(Queue queue, Message[] originalMessages, Message[] updatedMessages, DateTimeOffset time)
+        public ReceiveLaterDateTimeOffsetAction(Queue queue, Message[] messages, DateTimeOffset time)
         {
             _queue = queue;
-            _originalMessages = originalMessages;
-            _updatedMessages = updatedMessages;
+            _messages = messages;
             _time = time;
         }
 
         public void Execute(IStoreTransaction transaction)
         {
-            // Remove the messages from current queue before scheduling them for later
-            _queue.Store.SuccessfullyReceived(transaction, _originalMessages);
+            // Remove the messages from current queue before scheduling them for later.
+            // IDs are unchanged by WithProcessingAttempts, so deletion is correct.
+            _queue.Store.SuccessfullyReceived(transaction, _messages);
         }
 
         public void Success()
         {
-            foreach (var message in _updatedMessages)
+            foreach (var message in _messages)
                 _queue.ReceiveLater(message, _time);
         }
     }
@@ -439,8 +437,10 @@ public class BatchQueueContext : IBatchQueueContext
         {
             foreach (var message in _messages)
             {
-                var dlqName = DeadLetterConstants.GetDeadLetterQueueName(message.QueueString ?? "unknown");
-                _queue.Store.MoveToQueue(transaction, dlqName, message);
+                var sourceQueue = message.QueueString ?? "unknown";
+                var dlqName = DeadLetterConstants.GetDeadLetterQueueName(sourceQueue);
+                var messageWithOrigin = message.WithOriginalQueue(sourceQueue);
+                _queue.Store.MoveToQueue(transaction, dlqName, messageWithOrigin);
             }
         }
 

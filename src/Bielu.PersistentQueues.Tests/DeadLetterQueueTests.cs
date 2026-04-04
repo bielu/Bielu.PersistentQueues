@@ -99,6 +99,24 @@ public class DeadLetterQueueTests : TestBase
     }
 
     [Fact]
+    public async Task MoveToDeadLetter_DlqMessageHasOriginalQueueHeader()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.Enqueue(NewMessage("test"));
+
+            var ctx = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            ctx.QueueContext.MoveToDeadLetter();
+            ctx.QueueContext.CommitChanges();
+
+            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var store = (LmdbMessageStore)queue.Store;
+            var dlqMessage = store.PersistedIncoming(dlqName).Single();
+            dlqMessage.OriginalQueue.ShouldBe("test");
+        }, TimeSpan.FromSeconds(3));
+    }
+
+    [Fact]
     public async Task MoveToDeadLetter_CannotBeCalledAfterSuccessfullyReceived()
     {
         await QueueScenario(async (queue, token) =>
@@ -138,6 +156,28 @@ public class DeadLetterQueueTests : TestBase
     }
 
     [Fact]
+    public async Task ReceiveLater_WhenMaxAttemptsReached_DlqMessageHasOriginalQueueHeader()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            var message = Message.Create(
+                data: Encoding.UTF8.GetBytes("hello"),
+                queue: "test",
+                maxAttempts: 1);
+            queue.Enqueue(message);
+
+            var ctx = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            ctx.QueueContext.ReceiveLater(TimeSpan.FromHours(1));
+            ctx.QueueContext.CommitChanges();
+
+            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var store = (LmdbMessageStore)queue.Store;
+            var dlqMessage = store.PersistedIncoming(dlqName).Single();
+            dlqMessage.OriginalQueue.ShouldBe("test");
+        }, TimeSpan.FromSeconds(3));
+    }
+
+    [Fact]
     public async Task ReceiveLater_WhenBelowMaxAttempts_DoesNotMoveToDlq()
     {
         await QueueScenario(async (queue, token) =>
@@ -153,8 +193,8 @@ public class DeadLetterQueueTests : TestBase
             ctx.QueueContext.CommitChanges();
 
             var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
-            var store = (LmdbMessageStore)queue.Store;
-            store.PersistedIncoming(dlqName).ShouldBeEmpty();
+            // DLQ should not have been created at all
+            queue.Queues.ShouldNotContain(dlqName);
         }, TimeSpan.FromSeconds(3));
     }
 
@@ -245,7 +285,25 @@ public class DeadLetterQueueTests : TestBase
         }, TimeSpan.FromSeconds(3));
     }
 
-    // ─── WithQueue helper ─────────────────────────────────────────────────
+    [Fact]
+    public async Task Batch_MoveToDeadLetter_DlqMessagesHaveOriginalQueueHeader()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.Enqueue(NewMessage("test", "msg1"));
+            queue.Enqueue(NewMessage("test", "msg2"));
+
+            var ctx = await queue.ReceiveBatch("test", maxMessages: 2, cancellationToken: token).FirstAsync(token);
+            ctx.MoveToDeadLetter();
+            ctx.CommitChanges();
+
+            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var store = (LmdbMessageStore)queue.Store;
+            store.PersistedIncoming(dlqName)
+                .All(m => m.OriginalQueue == "test")
+                .ShouldBeTrue();
+        }, TimeSpan.FromSeconds(3));
+    }
 
     [Fact]
     public void WithQueue_ChangesQueueName()

@@ -93,7 +93,7 @@ public class SendingErrorPolicy
         try
         {
             _store.CreateQueue(dlqName);
-            _store.StoreIncoming(message.WithQueue(dlqName));
+            _store.StoreIncoming(message.WithOriginalQueue(sourceQueue).WithQueue(dlqName));
             DeadLetterDiagnostics.RecordMessageDeadLettered(sourceQueue, DeadLetterDiagnostics.Reasons.SendFailed);
         }
         catch (Exception ex)
