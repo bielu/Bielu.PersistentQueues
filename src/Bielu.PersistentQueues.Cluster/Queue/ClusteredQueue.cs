@@ -245,13 +245,14 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
                 if (replicaNode != null && replicaNode.State == NodeState.Active)
                 {
                     var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
-                    var replicaEndpoint = new IPEndPoint(
-                        replicaNode.QueueEndpoint.Address,
-                        replicaNode.QueueEndpoint.Port + _config.GossipPortOffset + 1);
+                    var replicaEndpoint = GetReplicationEndpoint(replicaNode);
 
                     if (_config.ReplicationMode == ReplicationMode.Synchronous)
                     {
-                        // Block until replica acknowledges
+                        // Intentional synchronous wait: IQueue.Enqueue/EnqueueToPartition are
+                        // synchronous by design (matching the existing IQueue contract). In sync
+                        // replication mode, we block until the replica acknowledges to guarantee
+                        // RF=2 durability before returning to the caller.
                         var acked = _replication.ReplicateAsync(
                             replicaEndpoint, partitionQueueName, new[] { message },
                             partitionAssignment.Epoch).GetAwaiter().GetResult();
@@ -426,9 +427,7 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
     {
         try
         {
-            var sourceEndpoint = new IPEndPoint(
-                primaryNode.QueueEndpoint.Address,
-                primaryNode.QueueEndpoint.Port + _config.GossipPortOffset + 1);
+            var sourceEndpoint = GetReplicationEndpoint(primaryNode);
 
             _logger.LogInformation("Starting catch-up sync for {Partition} from {PrimaryNode}",
                 partition.PartitionKey, primaryNode.NodeId);
@@ -451,6 +450,13 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
     }
 
     // ---- Disposal ----
+
+    /// <summary>
+    /// Gets the replication endpoint for a given node.
+    /// The replication port is the queue port + gossip offset + 1.
+    /// </summary>
+    private IPEndPoint GetReplicationEndpoint(NodeInfo node) =>
+        new(node.QueueEndpoint.Address, node.QueueEndpoint.Port + _config.GossipPortOffset + 1);
 
     /// <inheritdoc />
     public void Dispose()
