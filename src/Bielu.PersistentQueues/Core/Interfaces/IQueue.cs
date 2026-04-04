@@ -148,17 +148,11 @@ public interface IQueue : IDisposable, IAsyncDisposable
     /// <summary>
     /// Moves all messages from the dead letter queue back to their original source queues.
     /// </summary>
-    /// <param name="deadLetterQueueName">
-    /// The name of the dead letter queue (must be <see cref="DeadLetterConstants.QueueName"/>).
-    /// </param>
     /// <returns>The number of messages that were requeued.</returns>
-    /// <exception cref="ArgumentException">
-    /// Thrown when <paramref name="deadLetterQueueName"/> does not match the shared dead letter queue name.
-    /// </exception>
     /// <remarks>
     /// Each message is moved back to the queue recorded in its <c>original-queue</c> header.
     /// The processing attempt counter is reset to zero so the message can be retried.
     /// All moves happen in a single atomic transaction.
     /// </remarks>
-    int RequeueDeadLetterMessages(string deadLetterQueueName);
+    int RequeueDeadLetterMessages();
 }

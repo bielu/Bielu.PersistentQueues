@@ -49,6 +49,11 @@ public class Queue : IQueue
         _logger = logger;
         _contentSerializer = contentSerializer ?? JsonContentSerializer.Default;
         _deadLetterOptions = deadLetterOptions ?? new DeadLetterOptions();
+        
+        if (_deadLetterOptions.Enabled)
+        {
+            Store.CreateQueue(DeadLetterConstants.QueueName);
+        }
     }
 
     /// <summary>
@@ -73,16 +78,10 @@ public class Queue : IQueue
     /// <remarks>
     /// Queue names must be unique within a queue instance. This method creates the 
     /// underlying storage structures needed for the queue.
-    /// When the dead letter queue is enabled and the queue is not itself a DLQ,
-    /// the corresponding <c>:dead-letter</c> companion queue is also created automatically.
     /// </remarks>
     public void CreateQueue(string queueName)
     {
         Store.CreateQueue(queueName);
-        if (_deadLetterOptions.Enabled && !DeadLetterConstants.IsDeadLetterQueue(queueName))
-        {
-            Store.CreateQueue(DeadLetterConstants.QueueName);
-        }
     }
 
     /// <summary>
@@ -503,14 +502,9 @@ public class Queue : IQueue
     }
 
     /// <inheritdoc />
-    public int RequeueDeadLetterMessages(string deadLetterQueueName)
+    public int RequeueDeadLetterMessages()
     {
-        if (!DeadLetterConstants.IsDeadLetterQueue(deadLetterQueueName))
-            throw new ArgumentException(
-                $"'{deadLetterQueueName}' is not the dead letter queue. The dead letter queue name is '{DeadLetterConstants.QueueName}'.",
-                nameof(deadLetterQueueName));
-
-        var messages = Store.PersistedIncoming(deadLetterQueueName).ToList();
+        var messages = Store.PersistedIncoming(DeadLetterConstants.QueueName).ToList();
         if (messages.Count == 0)
             return 0;
 

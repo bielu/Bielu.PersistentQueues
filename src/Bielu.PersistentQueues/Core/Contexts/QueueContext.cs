@@ -116,7 +116,7 @@ internal class QueueContext : IQueueContext
     public void MoveToDeadLetter()
     {
         if (!_queue._deadLetterOptions.Enabled)
-            throw new InvalidOperationException("Dead letter queue is disabled. Enable it via EnableDeadLetterQueue() in the queue configuration.");
+            throw new InvalidOperationException("Dead letter queue is disabled. Enable it via WithDeadLetterQueue() in the queue configuration.");
         if (_messageDisposed)
             throw new InvalidOperationException("Cannot call MoveToDeadLetter after SuccessfullyReceived, ReceiveLater, or MoveTo has been called on this message.");
         _messageDisposed = true;

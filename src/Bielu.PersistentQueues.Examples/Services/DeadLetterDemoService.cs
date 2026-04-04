@@ -119,7 +119,7 @@ public class DeadLetterDemoService : BackgroundService
 
         // ── 5. Requeue all messages from the DLQ ─────────────────────────────
         Console.WriteLine("[5] Requeuing all DLQ messages back to original queue …");
-        var requeued = _queue.RequeueDeadLetterMessages(dlqName);
+        var requeued = _queue.RequeueDeadLetterMessages();
         Console.WriteLine($"    Requeued {requeued} message(s).");
 
         var remaining = _queue.Store.PersistedIncoming(dlqName).Count();

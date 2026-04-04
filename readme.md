@@ -277,7 +277,7 @@ foreach (var msg in queue.Store.PersistedIncoming(DeadLetterConstants.QueueName)
 Once you've fixed the underlying issue, you can move all messages from the DLQ back to their original queues in a single call. Processing attempt counters are reset to zero:
 
 ```csharp
-int count = queue.RequeueDeadLetterMessages(DeadLetterConstants.QueueName);
+int count = queue.RequeueDeadLetterMessages();
 Console.WriteLine($"Requeued {count} messages back to their original queues");
 ```
 
@@ -292,7 +292,7 @@ services.AddPersistentQueues(builder =>
 {
     builder
         .AddLmdbStorage("./queue_data")
-        .DisableDeadLetterQueue()   // ← messages that fail are silently discarded
+        .WithDeadLetterQueue(false)   // ← messages that fail are silently discarded
         .CreateQueues("my-queue");
 });
 ```
@@ -302,7 +302,7 @@ services.AddPersistentQueues(builder =>
 ```csharp
 var queue = new QueueConfiguration()
     .WithDefaults()
-    .DisableDeadLetterQueue()
+    .WithDeadLetterQueue(false)
     .StoreWithLmdb("./queue_data")
     .BuildAndStart("my-queue");
 ```

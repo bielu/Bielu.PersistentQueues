@@ -209,26 +209,16 @@ public class QueueConfiguration
     }
 
     /// <summary>
-    /// Enables the dead letter queue (default).
-    /// Messages that exceed their <see cref="Message.MaxAttempts"/> or fail all send
-    /// retries are automatically moved to a <c>:dead-letter</c> queue.
+    /// Configures whether the dead letter queue is enabled.
+    /// When enabled (default), messages that exceed their <see cref="Message.MaxAttempts"/> or
+    /// fail all send retries are automatically moved to the shared <c>dead-letter</c> queue.
+    /// When disabled, such messages are silently discarded.
     /// </summary>
+    /// <param name="enabled">Whether to enable the dead letter queue. Defaults to <c>true</c>.</param>
     /// <returns>The configuration object for method chaining.</returns>
-    public QueueConfiguration EnableDeadLetterQueue()
+    public QueueConfiguration WithDeadLetterQueue(bool enabled = true)
     {
-        _deadLetterOptions.Enabled = true;
-        return this;
-    }
-
-    /// <summary>
-    /// Disables the dead letter queue.
-    /// When disabled, messages that cannot be processed are silently discarded instead of
-    /// being moved to a dead letter queue.
-    /// </summary>
-    /// <returns>The configuration object for method chaining.</returns>
-    public QueueConfiguration DisableDeadLetterQueue()
-    {
-        _deadLetterOptions.Enabled = false;
+        _deadLetterOptions.Enabled = enabled;
         return this;
     }
 

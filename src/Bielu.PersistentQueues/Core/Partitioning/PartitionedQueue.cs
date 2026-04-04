@@ -122,8 +122,8 @@ public class PartitionedQueue : IPartitionedQueue
         => _innerQueue.Enqueue(content, queueName, headers, partitionKey);
 
     /// <inheritdoc />
-    public int RequeueDeadLetterMessages(string deadLetterQueueName)
-        => _innerQueue.RequeueDeadLetterMessages(deadLetterQueueName);
+    public int RequeueDeadLetterMessages()
+        => _innerQueue.RequeueDeadLetterMessages();
 
     /// <inheritdoc />
     public void Dispose()

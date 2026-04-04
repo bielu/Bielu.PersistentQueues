@@ -333,7 +333,7 @@ public class DeadLetterQueueTests : TestBase
     public async Task CreateQueue_WhenDlqDisabled_DoesNotCreateDlqCompanion()
     {
         await QueueScenario(
-            config => config.DisableDeadLetterQueue(),
+            config => config.WithDeadLetterQueue(false),
             async (queue, token) =>
             {
                 var dlqName = DeadLetterConstants.QueueName;
@@ -360,7 +360,7 @@ public class DeadLetterQueueTests : TestBase
     public async Task MoveToDeadLetter_WhenDlqDisabled_Throws()
     {
         await QueueScenario(
-            config => config.DisableDeadLetterQueue(),
+            config => config.WithDeadLetterQueue(false),
             async (queue, token) =>
             {
                 queue.Enqueue(NewMessage("test"));
@@ -374,7 +374,7 @@ public class DeadLetterQueueTests : TestBase
     public async Task ReceiveLater_WhenDlqDisabled_DoesNotDlqEvenAtMaxAttempts()
     {
         await QueueScenario(
-            config => config.DisableDeadLetterQueue(),
+            config => config.WithDeadLetterQueue(false),
             async (queue, token) =>
             {
                 var message = Message.Create(
@@ -414,7 +414,7 @@ public class DeadLetterQueueTests : TestBase
             store.PersistedIncoming("test").ShouldBeEmpty();
 
             // Requeue
-            var count = queue.RequeueDeadLetterMessages(dlqName);
+            var count = queue.RequeueDeadLetterMessages();
             count.ShouldBe(2);
 
             store.PersistedIncoming(dlqName).ShouldBeEmpty();
@@ -443,7 +443,7 @@ public class DeadLetterQueueTests : TestBase
             store.PersistedIncoming(dlqName).Single().ProcessingAttempts.ShouldBe(1);
 
             // Requeue
-            queue.RequeueDeadLetterMessages(dlqName);
+            queue.RequeueDeadLetterMessages();
 
             var requeued = store.PersistedIncoming("test").Single();
             requeued.ProcessingAttempts.ShouldBe(0);
@@ -451,25 +451,11 @@ public class DeadLetterQueueTests : TestBase
     }
 
     [Fact]
-    public void RequeueDeadLetterMessages_ThrowsForNonDlqName()
-    {
-        Should.Throw<ArgumentException>(() =>
-        {
-            var config = new QueueConfiguration()
-                .WithDefaults()
-                .StoreWithLmdb(TempPath(), new LightningDB.EnvironmentConfiguration { MaxDatabases = 5, MapSize = 1024 * 1024 * 100 });
-            using var queue = config.BuildAndStart("test");
-            queue.RequeueDeadLetterMessages("not-a-dlq");
-        });
-    }
-
-    [Fact]
     public async Task RequeueDeadLetterMessages_ReturnsZeroForEmptyDlq()
     {
         await QueueScenario(async (queue, token) =>
         {
-            var dlqName = DeadLetterConstants.QueueName;
-            var count = queue.RequeueDeadLetterMessages(dlqName);
+            var count = queue.RequeueDeadLetterMessages();
             count.ShouldBe(0);
             await Task.CompletedTask;
         }, TimeSpan.FromSeconds(3));

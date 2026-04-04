@@ -321,6 +321,6 @@ public class PersistentQueueOtelDecorator : IQueue
     public IPEndPoint Endpoint => _queue.Endpoint;
 
     /// <inheritdoc />
-    public int RequeueDeadLetterMessages(string deadLetterQueueName)
-        => _queue.RequeueDeadLetterMessages(deadLetterQueueName);
+    public int RequeueDeadLetterMessages()
+        => _queue.RequeueDeadLetterMessages();
 }
