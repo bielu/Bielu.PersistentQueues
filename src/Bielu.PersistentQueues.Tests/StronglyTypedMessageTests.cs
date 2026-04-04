@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Bielu.PersistentQueues.Serialization;
 using Shouldly;
 using Xunit;
 
@@ -63,14 +65,15 @@ public class StronglyTypedMessageTests
     }
 
     [Fact]
-    public void create_with_strongly_typed_content_and_custom_serializer_options()
+    public void create_with_strongly_typed_content_and_custom_json_serializer_options()
     {
-        var order = new OrderMessage("ORD-789", 123.45m, "GBP");
         var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+        var jsonSerializer = new JsonContentSerializer(options);
+        var order = new OrderMessage("ORD-789", 123.45m, "GBP");
 
-        var message = Message.Create(order, jsonSerializerOptions: options, queue: "orders");
+        var message = Message.Create(order, contentSerializer: jsonSerializer, queue: "orders");
 
-        var deserialized = message.GetContent<OrderMessage>(options);
+        var deserialized = message.GetContent<OrderMessage>(jsonSerializer);
         deserialized.ShouldNotBeNull();
         deserialized.OrderId.ShouldBe("ORD-789");
         deserialized.Amount.ShouldBe(123.45m);
@@ -117,14 +120,16 @@ public class StronglyTypedMessageTests
     }
 
     [Fact]
-    public void create_with_anonymous_type_and_deserialize_to_dictionary()
+    public void create_with_anonymous_type_and_deserialize_to_json_node()
     {
         var content = new { Name = "Test", Value = 42 };
 
         var message = Message.Create(content, queue: "test");
 
-        var deserialized = message.GetContent<Dictionary<string, object>>();
+        var deserialized = message.GetContent<JsonObject>();
         deserialized.ShouldNotBeNull();
+        deserialized["Name"]!.GetValue<string>().ShouldBe("Test");
+        deserialized["Value"]!.GetValue<int>().ShouldBe(42);
     }
 
     [Fact]
@@ -144,5 +149,62 @@ public class StronglyTypedMessageTests
         message.DeliverBy.ShouldBe(deliverBy);
         message.MaxAttempts.ShouldBe(3);
         message.GetContent<OrderMessage>()!.OrderId.ShouldBe("ORD-003");
+    }
+
+    [Fact]
+    public void create_with_custom_content_serializer()
+    {
+        var customSerializer = new UpperCaseTestSerializer();
+        var order = new OrderMessage("ORD-100", 42.00m, "SEK");
+
+        var message = Message.Create(order, contentSerializer: customSerializer, queue: "test");
+
+        // The custom serializer uppercases the JSON
+        var rawContent = Encoding.UTF8.GetString(message.DataArray!);
+        rawContent.ShouldBe(rawContent.ToUpperInvariant());
+
+        // Deserialize with same custom serializer
+        var deserialized = message.GetContent<OrderMessage>(customSerializer);
+        deserialized.ShouldNotBeNull();
+        deserialized.OrderId.ShouldBe("ORD-100");
+        deserialized.Amount.ShouldBe(42.00m);
+    }
+
+    [Fact]
+    public void default_serializer_is_json()
+    {
+        var order = new OrderMessage("ORD-200", 10.00m, "USD");
+
+        // No serializer specified — should use JsonContentSerializer.Default
+        var message = Message.Create(order, queue: "test");
+
+        var rawJson = Encoding.UTF8.GetString(message.DataArray!);
+        rawJson.ShouldContain("ORD-200");
+
+        // Should be valid JSON
+        var parsed = JsonDocument.Parse(rawJson);
+        parsed.RootElement.GetProperty("OrderId").GetString().ShouldBe("ORD-200");
+    }
+
+    /// <summary>
+    /// A test serializer that uppercases JSON for serialization and lowercases for deserialization.
+    /// Demonstrates that custom serializers are properly invoked.
+    /// </summary>
+    private class UpperCaseTestSerializer : IContentSerializer
+    {
+        public byte[] Serialize<T>(T content)
+        {
+            var json = JsonSerializer.Serialize(content);
+            return Encoding.UTF8.GetBytes(json.ToUpperInvariant());
+        }
+
+        public T? Deserialize<T>(ReadOnlySpan<byte> data)
+        {
+            var json = Encoding.UTF8.GetString(data);
+            return JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
     }
 }

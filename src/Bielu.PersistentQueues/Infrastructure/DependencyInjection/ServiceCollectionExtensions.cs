@@ -145,6 +145,7 @@ public class PersistentQueuesBuilder
         var storeFactory = _storeFactory;
 
         Services.TryAddSingleton<IMessageSerializer, MessageSerializer>();
+        Services.TryAddSingleton<IContentSerializer>(JsonContentSerializer.Default);
 
         if (storeFactory != null)
         {

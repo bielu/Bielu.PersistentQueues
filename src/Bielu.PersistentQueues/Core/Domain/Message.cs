@@ -2,7 +2,7 @@
 using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Text.Json;
+using Bielu.PersistentQueues.Serialization;
 
 namespace Bielu.PersistentQueues;
 
@@ -152,11 +152,11 @@ public readonly struct Message
     }
 
     /// <summary>
-    /// Creates a new message with a strongly-typed content object that is serialized to JSON.
+    /// Creates a new message with a strongly-typed content object that is serialized using the specified serializer.
     /// </summary>
     /// <typeparam name="T">The type of the content to serialize.</typeparam>
     /// <param name="content">The content object to serialize as the message data.</param>
-    /// <param name="jsonSerializerOptions">Optional JSON serializer options. If null, default options are used.</param>
+    /// <param name="contentSerializer">The content serializer to use. If null, <see cref="JsonContentSerializer.Default"/> is used.</param>
     /// <param name="id">Optional message identifier. If null, a new random identifier is generated.</param>
     /// <param name="queue">Optional queue name.</param>
     /// <param name="subQueue">Optional sub-queue name.</param>
@@ -165,10 +165,10 @@ public readonly struct Message
     /// <param name="maxAttempts">Optional maximum delivery attempts.</param>
     /// <param name="headers">Optional message headers.</param>
     /// <param name="partitionKey">Optional partition key.</param>
-    /// <returns>A new <see cref="Message"/> with the content serialized as JSON bytes.</returns>
+    /// <returns>A new <see cref="Message"/> with the content serialized to bytes.</returns>
     public static Message Create<T>(
         T content,
-        JsonSerializerOptions? jsonSerializerOptions = null,
+        IContentSerializer? contentSerializer = null,
         Guid? id = null,
         string? queue = null,
         string? subQueue = null,
@@ -178,7 +178,8 @@ public readonly struct Message
         Dictionary<string, string>? headers = null,
         string? partitionKey = null)
     {
-        var data = JsonSerializer.SerializeToUtf8Bytes(content, jsonSerializerOptions);
+        var serializer = contentSerializer ?? JsonContentSerializer.Default;
+        var data = serializer.Serialize(content);
         return Create(
             id: id,
             data: data,
@@ -193,17 +194,18 @@ public readonly struct Message
     }
 
     /// <summary>
-    /// Deserializes the message data from JSON to a strongly-typed object.
+    /// Deserializes the message data to a strongly-typed object using the specified serializer.
     /// </summary>
     /// <typeparam name="T">The type to deserialize the data to.</typeparam>
-    /// <param name="jsonSerializerOptions">Optional JSON serializer options. If null, default options are used.</param>
+    /// <param name="contentSerializer">The content serializer to use. If null, <see cref="JsonContentSerializer.Default"/> is used.</param>
     /// <returns>The deserialized object, or default if the data is empty.</returns>
-    public T? GetContent<T>(JsonSerializerOptions? jsonSerializerOptions = null)
+    public T? GetContent<T>(IContentSerializer? contentSerializer = null)
     {
         if (Data.IsEmpty)
             return default;
 
-        return JsonSerializer.Deserialize<T>(Data.Span, jsonSerializerOptions);
+        var serializer = contentSerializer ?? JsonContentSerializer.Default;
+        return serializer.Deserialize<T>(Data.Span);
     }
 
     /// <summary>
