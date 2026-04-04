@@ -102,6 +102,7 @@ internal class QueueContext : IQueueContext
         _queueActions.Add(new EnqueueAction(this, message));
     }
 
+    /// <inheritdoc />
     public void Send<T>(
         T content,
         string? destinationUri = null,
@@ -123,6 +124,7 @@ internal class QueueContext : IQueueContext
         Send(message);
     }
 
+    /// <inheritdoc />
     public void Enqueue<T>(
         T content,
         string? queueName = null,

@@ -279,6 +279,7 @@ public class PersistentQueueOtelDecorator : IQueue
         }
     }
 
+    /// <inheritdoc />
     public void Send<T>(
         T content,
         string? destinationUri = null,
@@ -289,6 +290,7 @@ public class PersistentQueueOtelDecorator : IQueue
         string? partitionKey = null)
         => _queue.Send(content, destinationUri, queueName, headers, deliverBy, maxAttempts, partitionKey);
 
+    /// <inheritdoc />
     public void Enqueue<T>(
         T content,
         string? queueName = null,
