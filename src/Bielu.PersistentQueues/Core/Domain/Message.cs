@@ -275,6 +275,17 @@ public readonly struct Message
     }
 
     /// <summary>
+    /// Creates a new Message reassigned to a different queue.
+    /// The destination URI is cleared since the message becomes a local incoming message.
+    /// </summary>
+    public Message WithQueue(string queueName)
+    {
+        return new Message(
+            Id, Data, queueName.AsMemory(), SentAt, SubQueue, default,
+            DeliverBy, MaxAttempts, Headers, partitionKey: PartitionKey);
+    }
+
+    /// <summary>
     /// Gets the queue name as a string (allocates)
     /// </summary>
     public string? QueueString => Queue.IsEmpty ? null : Queue.ToString();

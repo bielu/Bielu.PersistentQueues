@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Linq;
 using System.Net;
 using System.Runtime.CompilerServices;
 using Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics;
@@ -17,6 +19,7 @@ public class PersistentQueueOtelDecorator : IQueue
     private readonly ObservableGauge<long>? _storageUsedBytesGauge;
     private readonly ObservableGauge<long>? _storageTotalBytesGauge;
     private readonly ObservableGauge<double>? _storageUsagePercentGauge;
+    private readonly ObservableGauge<long> _deadLetterQueueDepthGauge;
 
     public PersistentQueueOtelDecorator(IQueue queue, QueueMetrics queueMetrics, QueueActivitySource activitySource)
     {
@@ -36,6 +39,21 @@ public class PersistentQueueOtelDecorator : IQueue
             _storageUsagePercentGauge = _metrics.CreateStorageUsagePercentGauge(
                 () => store.GetStorageUsageInfo()?.UsagePercentage ?? 0);
         }
+
+        // Register dead letter queue depth gauge — reports per-DLQ message counts
+        _deadLetterQueueDepthGauge = _metrics.CreateDeadLetterQueueDepthGauge(() =>
+        {
+            var measurements = new List<Measurement<long>>();
+            foreach (var queueName in store.GetAllQueues())
+            {
+                if (!DeadLetterConstants.IsDeadLetterQueue(queueName))
+                    continue;
+                var depth = store.PersistedIncoming(queueName).Count();
+                measurements.Add(new Measurement<long>(depth,
+                    new KeyValuePair<string, object?>("queue.name", queueName)));
+            }
+            return measurements;
+        });
     }
 
     public void Dispose()

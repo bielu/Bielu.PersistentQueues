@@ -28,4 +28,8 @@ internal static class MetricNames
     public const string PartitionsActive = "bielupersistentqueues.partitions.active";
     public const string PartitionConsumersActive = "bielupersistentqueues.partition.consumers.active";
     public const string PartitionProducersActive = "bielupersistentqueues.partition.producers.active";
+
+    // Dead letter queue metrics
+    public const string MessagesDeadLettered = "bielupersistentqueues.messages.dead_lettered";
+    public const string DeadLetterQueueDepth = "bielupersistentqueues.dead_letter.queue.depth";
 }

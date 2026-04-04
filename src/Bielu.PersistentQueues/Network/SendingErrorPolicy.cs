@@ -42,8 +42,11 @@ public class SendingErrorPolicy
     {
         foreach (var message in messages)
         {
-            if (!ShouldRetry(message, shouldRetry)) 
+            if (!ShouldRetry(message, shouldRetry))
+            {
+                MoveToDeadLetter(message);
                 continue;
+            }
             await Task.Delay(TimeSpan.FromSeconds(message.SentAttempts * message.SentAttempts), cancellationToken).ConfigureAwait(false);
             await _retries.Writer.WriteAsync(message, cancellationToken).ConfigureAwait(false);
         }
@@ -80,6 +83,22 @@ public class SendingErrorPolicy
         foreach (var message in messages)
         {
             yield return message.WithSentAttempts(message.SentAttempts + 1);
+        }
+    }
+
+    private void MoveToDeadLetter(Message message)
+    {
+        var sourceQueue = message.QueueString ?? "unknown";
+        var dlqName = DeadLetterConstants.GetDeadLetterQueueName(sourceQueue);
+        try
+        {
+            _store.CreateQueue(dlqName);
+            _store.StoreIncoming(message.WithQueue(dlqName));
+            DeadLetterDiagnostics.RecordMessageDeadLettered(sourceQueue, DeadLetterDiagnostics.Reasons.SendFailed);
+        }
+        catch (Exception ex)
+        {
+            _logger.PolicyIncrementFailureError(ex);
         }
     }
 }

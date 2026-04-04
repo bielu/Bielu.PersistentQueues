@@ -75,7 +75,7 @@ internal class QueueContext : IQueueContext
         {
             var dlqName = DeadLetterConstants.GetDeadLetterQueueName(_message.QueueString ?? "unknown");
             _queue.Store.CreateQueue(dlqName);
-            _queueActions.Add(new DeadLetterAction(this, dlqName, updatedMessage));
+            _queueActions.Add(new DeadLetterAction(this, dlqName, updatedMessage, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
             return;
         }
         _queueActions.Add(new ReceiveLaterTimeSpanAction(this, updatedMessage, timeSpan));
@@ -91,7 +91,7 @@ internal class QueueContext : IQueueContext
         {
             var dlqName = DeadLetterConstants.GetDeadLetterQueueName(_message.QueueString ?? "unknown");
             _queue.Store.CreateQueue(dlqName);
-            _queueActions.Add(new DeadLetterAction(this, dlqName, updatedMessage));
+            _queueActions.Add(new DeadLetterAction(this, dlqName, updatedMessage, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
             return;
         }
         _queueActions.Add(new ReceiveLaterDateTimeOffsetAction(this, updatedMessage, time));
@@ -120,7 +120,7 @@ internal class QueueContext : IQueueContext
         _messageDisposed = true;
         var dlqName = DeadLetterConstants.GetDeadLetterQueueName(_message.QueueString ?? "unknown");
         _queue.Store.CreateQueue(dlqName);
-        _queueActions.Add(new DeadLetterAction(this, dlqName, _message));
+        _queueActions.Add(new DeadLetterAction(this, dlqName, _message, DeadLetterDiagnostics.Reasons.Manual));
     }
 
     public void Enqueue(Message message)
@@ -257,11 +257,13 @@ internal class QueueContext : IQueueContext
     private class ReceiveLaterTimeSpanAction : IQueueAction
     {
         private readonly QueueContext _context;
+        private readonly Message _updatedMessage;
         private readonly TimeSpan _timeSpan;
 
-        public ReceiveLaterTimeSpanAction(QueueContext context, TimeSpan timeSpan)
+        public ReceiveLaterTimeSpanAction(QueueContext context, Message updatedMessage, TimeSpan timeSpan)
         {
             _context = context;
+            _updatedMessage = updatedMessage;
             _timeSpan = timeSpan;
         }
 
@@ -273,21 +275,22 @@ internal class QueueContext : IQueueContext
 
         public void Success()
         {
-            _context._queue.ReceiveLater(_context._message, _timeSpan);
+            _context._queue.ReceiveLater(_updatedMessage, _timeSpan);
         }
     }
 
     private class ReceiveLaterDateTimeOffsetAction : IQueueAction
     {
         private readonly QueueContext _context;
+        private readonly Message _updatedMessage;
         private readonly DateTimeOffset _time;
 
-        public ReceiveLaterDateTimeOffsetAction(QueueContext context, DateTimeOffset time)
+        public ReceiveLaterDateTimeOffsetAction(QueueContext context, Message updatedMessage, DateTimeOffset time)
         {
             _context = context;
+            _updatedMessage = updatedMessage;
             _time = time;
         }
-
 
         public void Execute(IStoreTransaction transaction)
         {
@@ -297,7 +300,34 @@ internal class QueueContext : IQueueContext
 
         public void Success()
         {
-            _context._queue.ReceiveLater(_context._message, _time);
+            _context._queue.ReceiveLater(_updatedMessage, _time);
+        }
+    }
+
+    private class DeadLetterAction : IQueueAction
+    {
+        private readonly QueueContext _context;
+        private readonly string _dlqName;
+        private readonly Message _messageToStore;
+        private readonly string _reason;
+
+        public DeadLetterAction(QueueContext context, string dlqName, Message messageToStore, string reason)
+        {
+            _context = context;
+            _dlqName = dlqName;
+            _messageToStore = messageToStore;
+            _reason = reason;
+        }
+
+        public void Execute(IStoreTransaction transaction)
+        {
+            _context._queue.Store.MoveToQueue(transaction, _dlqName, _messageToStore);
+        }
+
+        public void Success()
+        {
+            DeadLetterDiagnostics.RecordMessageDeadLettered(
+                _context._message.QueueString ?? "unknown", _reason);
         }
     }
 }

@@ -309,6 +309,18 @@ public sealed class QueueMetrics
             description: "Number of active partitions across all queues");
     }
 
+    /// <summary>
+    /// Creates an observable gauge that reports the current number of messages in each
+    /// dead letter queue as separate measurements tagged with the DLQ name.
+    /// </summary>
+    public ObservableGauge<long> CreateDeadLetterQueueDepthGauge(Func<IEnumerable<Measurement<long>>> observeValues)
+    {
+        return _meter.CreateObservableGauge(
+            MetricNames.DeadLetterQueueDepth,
+            observeValues,
+            description: "Number of messages currently waiting in dead letter queues");
+    }
+
     public void RecordPartitionConsumerStarted(string queueName, int partition)
     {
         _partitionConsumersActive.Add(1,
