@@ -229,6 +229,22 @@ public readonly struct Message
     }
 
     /// <summary>
+    /// Gets the number of times this message has been attempted for processing by a consumer.
+    /// This counter is incremented each time <see cref="IQueueContext.ReceiveLater"/> is called.
+    /// </summary>
+    public int ProcessingAttempts => Headers.GetProcessingAttempts();
+
+    /// <summary>
+    /// Creates a new Message with the updated processing attempts counter.
+    /// </summary>
+    public Message WithProcessingAttempts(int attempts)
+    {
+        return new Message(
+            Id, Data, Queue, SentAt, SubQueue, DestinationUri,
+            DeliverBy, MaxAttempts, Headers.WithProcessingAttempts(attempts), partitionKey: PartitionKey);
+    }
+
+    /// <summary>
     /// Creates a new Message with updated headers
     /// </summary>
     public Message WithHeaders(FixedHeaders headers)
@@ -297,16 +313,22 @@ public readonly struct FixedHeaders
 {
     private const int MaxHeaders = 4; // Most messages have 0-2 headers
     private const string SentAttemptsKey = "sent-attempts";
+    private const string ProcessingAttemptsKey = "processing-attempts";
 
     // Cache common sent attempt values to avoid string allocations
     private static readonly ReadOnlyMemory<char>[] CachedSentAttempts = new ReadOnlyMemory<char>[11];
     private static readonly ReadOnlyMemory<char> SentAttemptsKeyMemory = SentAttemptsKey.AsMemory();
+
+    // Cache common processing attempt values to avoid string allocations
+    private static readonly ReadOnlyMemory<char>[] CachedProcessingAttempts = new ReadOnlyMemory<char>[11];
+    private static readonly ReadOnlyMemory<char> ProcessingAttemptsKeyMemory = ProcessingAttemptsKey.AsMemory();
 
     static FixedHeaders()
     {
         for (int i = 0; i <= 10; i++)
         {
             CachedSentAttempts[i] = i.ToString().AsMemory();
+            CachedProcessingAttempts[i] = i.ToString().AsMemory();
         }
     }
 
@@ -433,6 +455,64 @@ public readonly struct FixedHeaders
         }
 
         // No space - return unchanged (sent-attempts will be ignored)
+        return this;
+    }
+
+    public int GetProcessingAttempts()
+    {
+        if (_count > 0 && _h0.Key.Span.SequenceEqual(ProcessingAttemptsKey))
+            return int.TryParse(_h0.Value.Span, out var val0) ? val0 : 0;
+        if (_count > 1 && _h1.Key.Span.SequenceEqual(ProcessingAttemptsKey))
+            return int.TryParse(_h1.Value.Span, out var val1) ? val1 : 0;
+        if (_count > 2 && _h2.Key.Span.SequenceEqual(ProcessingAttemptsKey))
+            return int.TryParse(_h2.Value.Span, out var val2) ? val2 : 0;
+        if (_count > 3 && _h3.Key.Span.SequenceEqual(ProcessingAttemptsKey))
+            return int.TryParse(_h3.Value.Span, out var val3) ? val3 : 0;
+
+        return 0;
+    }
+
+    public FixedHeaders WithProcessingAttempts(int attempts)
+    {
+        var attemptsStr = attempts <= 10 ? CachedProcessingAttempts[attempts] : attempts.ToString().AsMemory();
+
+        var foundIndex = -1;
+        var keySpan = ProcessingAttemptsKey.AsSpan();
+
+        if (_count > 0 && !_h0.IsEmpty && _h0.Key.Span.SequenceEqual(keySpan))
+            foundIndex = 0;
+        else if (_count > 1 && !_h1.IsEmpty && _h1.Key.Span.SequenceEqual(keySpan))
+            foundIndex = 1;
+        else if (_count > 2 && !_h2.IsEmpty && _h2.Key.Span.SequenceEqual(keySpan))
+            foundIndex = 2;
+        else if (_count > 3 && !_h3.IsEmpty && _h3.Key.Span.SequenceEqual(keySpan))
+            foundIndex = 3;
+
+        if (foundIndex >= 0)
+        {
+            return foundIndex switch
+            {
+                0 => new FixedHeaders(new HeaderEntry(ProcessingAttemptsKeyMemory, attemptsStr), _h1, _h2, _h3, _count),
+                1 => new FixedHeaders(_h0, new HeaderEntry(ProcessingAttemptsKeyMemory, attemptsStr), _h2, _h3, _count),
+                2 => new FixedHeaders(_h0, _h1, new HeaderEntry(ProcessingAttemptsKeyMemory, attemptsStr), _h3, _count),
+                3 => new FixedHeaders(_h0, _h1, _h2, new HeaderEntry(ProcessingAttemptsKeyMemory, attemptsStr), _count),
+                _ => this
+            };
+        }
+
+        if (_count < MaxHeaders)
+        {
+            return _count switch
+            {
+                0 => new FixedHeaders(new HeaderEntry(ProcessingAttemptsKeyMemory, attemptsStr), default, default, default, 1),
+                1 => new FixedHeaders(_h0, new HeaderEntry(ProcessingAttemptsKeyMemory, attemptsStr), default, default, 2),
+                2 => new FixedHeaders(_h0, _h1, new HeaderEntry(ProcessingAttemptsKeyMemory, attemptsStr), default, 3),
+                3 => new FixedHeaders(_h0, _h1, _h2, new HeaderEntry(ProcessingAttemptsKeyMemory, attemptsStr), 4),
+                _ => this
+            };
+        }
+
+        // No space - return unchanged
         return this;
     }
 

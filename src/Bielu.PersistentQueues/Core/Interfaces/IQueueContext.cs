@@ -91,6 +91,17 @@ public interface IQueueContext
     /// where messages need to be routed to different queues based on processing results.
     /// </remarks>
     void MoveTo(string queueName);
+
+    /// <summary>
+    /// Moves the current message to its dead letter queue.
+    /// </summary>
+    /// <remarks>
+    /// The dead letter queue name is derived from the message's source queue by appending
+    /// <c>:dead-letter</c> (e.g., <c>orders:dead-letter</c>). The dead letter queue is
+    /// created automatically if it does not already exist.
+    /// Use this method when a message cannot be processed and should not be retried.
+    /// </remarks>
+    void MoveToDeadLetter();
     
     /// <summary>
     /// Adds a new message to the current queue.

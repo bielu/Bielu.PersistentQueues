@@ -70,7 +70,15 @@ internal class QueueContext : IQueueContext
         if (_messageDisposed)
             throw new InvalidOperationException("Cannot call ReceiveLater after SuccessfullyReceived or MoveTo has been called on this message.");
         _messageDisposed = true;
-        _queueActions.Add(new ReceiveLaterTimeSpanAction(this, timeSpan));
+        var updatedMessage = _message.WithProcessingAttempts(_message.ProcessingAttempts + 1);
+        if (_message.MaxAttempts.HasValue && updatedMessage.ProcessingAttempts >= _message.MaxAttempts.Value)
+        {
+            var dlqName = DeadLetterConstants.GetDeadLetterQueueName(_message.QueueString ?? "unknown");
+            _queue.Store.CreateQueue(dlqName);
+            _queueActions.Add(new DeadLetterAction(this, dlqName, updatedMessage));
+            return;
+        }
+        _queueActions.Add(new ReceiveLaterTimeSpanAction(this, updatedMessage, timeSpan));
     }
 
     public void ReceiveLater(DateTimeOffset time)
@@ -78,7 +86,15 @@ internal class QueueContext : IQueueContext
         if (_messageDisposed)
             throw new InvalidOperationException("Cannot call ReceiveLater after SuccessfullyReceived or MoveTo has been called on this message.");
         _messageDisposed = true;
-        _queueActions.Add(new ReceiveLaterDateTimeOffsetAction(this, time));
+        var updatedMessage = _message.WithProcessingAttempts(_message.ProcessingAttempts + 1);
+        if (_message.MaxAttempts.HasValue && updatedMessage.ProcessingAttempts >= _message.MaxAttempts.Value)
+        {
+            var dlqName = DeadLetterConstants.GetDeadLetterQueueName(_message.QueueString ?? "unknown");
+            _queue.Store.CreateQueue(dlqName);
+            _queueActions.Add(new DeadLetterAction(this, dlqName, updatedMessage));
+            return;
+        }
+        _queueActions.Add(new ReceiveLaterDateTimeOffsetAction(this, updatedMessage, time));
     }
 
     public void SuccessfullyReceived()
@@ -95,6 +111,16 @@ internal class QueueContext : IQueueContext
             throw new InvalidOperationException("Cannot call MoveTo after SuccessfullyReceived or ReceiveLater has been called on this message.");
         _messageDisposed = true;
         _queueActions.Add(new MoveAction(this, queueName));
+    }
+
+    public void MoveToDeadLetter()
+    {
+        if (_messageDisposed)
+            throw new InvalidOperationException("Cannot call MoveToDeadLetter after SuccessfullyReceived, ReceiveLater, or MoveTo has been called on this message.");
+        _messageDisposed = true;
+        var dlqName = DeadLetterConstants.GetDeadLetterQueueName(_message.QueueString ?? "unknown");
+        _queue.Store.CreateQueue(dlqName);
+        _queueActions.Add(new DeadLetterAction(this, dlqName, _message));
     }
 
     public void Enqueue(Message message)
