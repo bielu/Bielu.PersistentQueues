@@ -19,15 +19,15 @@ public class DeadLetterQueueTests : TestBase
     // ─── DeadLetterConstants ───────────────────────────────────────────────
 
     [Fact]
-    public void GetDeadLetterQueueName_AppendsSuffix()
+    public void QueueName_IsDeadLetter()
     {
-        DeadLetterConstants.GetDeadLetterQueueName("orders").ShouldBe("orders:dead-letter");
+        DeadLetterConstants.QueueName.ShouldBe("dead-letter");
     }
 
     [Fact]
     public void IsDeadLetterQueue_ReturnsTrueForDlq()
     {
-        DeadLetterConstants.IsDeadLetterQueue("orders:dead-letter").ShouldBeTrue();
+        DeadLetterConstants.IsDeadLetterQueue("dead-letter").ShouldBeTrue();
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public class DeadLetterQueueTests : TestBase
             ctx.QueueContext.MoveToDeadLetter();
             ctx.QueueContext.CommitChanges();
 
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").ShouldBeEmpty();
             store.PersistedIncoming(dlqName).Count().ShouldBe(1);
@@ -93,7 +93,7 @@ public class DeadLetterQueueTests : TestBase
             ctx.QueueContext.MoveToDeadLetter();
             ctx.QueueContext.CommitChanges();
 
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             queue.Queues.ShouldContain(dlqName);
         }, TimeSpan.FromSeconds(3));
     }
@@ -109,7 +109,7 @@ public class DeadLetterQueueTests : TestBase
             ctx.QueueContext.MoveToDeadLetter();
             ctx.QueueContext.CommitChanges();
 
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             var store = (LmdbMessageStore)queue.Store;
             var dlqMessage = store.PersistedIncoming(dlqName).Single();
             dlqMessage.OriginalQueue.ShouldBe("test");
@@ -148,7 +148,7 @@ public class DeadLetterQueueTests : TestBase
             ctx.QueueContext.ReceiveLater(TimeSpan.FromHours(1));
             ctx.QueueContext.CommitChanges();
 
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").ShouldBeEmpty();
             store.PersistedIncoming(dlqName).Count().ShouldBe(1);
@@ -170,7 +170,7 @@ public class DeadLetterQueueTests : TestBase
             ctx.QueueContext.ReceiveLater(TimeSpan.FromHours(1));
             ctx.QueueContext.CommitChanges();
 
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             var store = (LmdbMessageStore)queue.Store;
             var dlqMessage = store.PersistedIncoming(dlqName).Single();
             dlqMessage.OriginalQueue.ShouldBe("test");
@@ -192,7 +192,7 @@ public class DeadLetterQueueTests : TestBase
             ctx.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(1));
             ctx.QueueContext.CommitChanges();
 
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             // DLQ exists (auto-created) but should be empty
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming(dlqName).ShouldBeEmpty();
@@ -214,7 +214,7 @@ public class DeadLetterQueueTests : TestBase
             ctx.QueueContext.ReceiveLater(TimeSpan.FromHours(1));
             ctx.QueueContext.CommitChanges();
 
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             var store = (LmdbMessageStore)queue.Store;
             var dlqMessage = store.PersistedIncoming(dlqName).Single();
             dlqMessage.ProcessingAttempts.ShouldBe(1);
@@ -235,7 +235,7 @@ public class DeadLetterQueueTests : TestBase
             ctx.MoveToDeadLetter();
             ctx.CommitChanges();
 
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").ShouldBeEmpty();
             store.PersistedIncoming(dlqName).Count().ShouldBe(2);
@@ -258,7 +258,7 @@ public class DeadLetterQueueTests : TestBase
             ctx.SuccessfullyReceived(toSuccess);
             ctx.CommitChanges();
 
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").ShouldBeEmpty();
             store.PersistedIncoming(dlqName).Count().ShouldBe(1);
@@ -279,7 +279,7 @@ public class DeadLetterQueueTests : TestBase
             ctx.ReceiveLater(TimeSpan.FromHours(1));
             ctx.CommitChanges();
 
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             var store = (LmdbMessageStore)queue.Store;
             // m1 (maxAttempts=1) should be dead-lettered; m2 (maxAttempts=5) should be retried
             store.PersistedIncoming(dlqName).Count().ShouldBe(1);
@@ -298,7 +298,7 @@ public class DeadLetterQueueTests : TestBase
             ctx.MoveToDeadLetter();
             ctx.CommitChanges();
 
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming(dlqName)
                 .All(m => m.OriginalQueue == "test")
@@ -323,7 +323,7 @@ public class DeadLetterQueueTests : TestBase
     {
         await QueueScenario(async (queue, token) =>
         {
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             queue.Queues.ShouldContain(dlqName);
             await Task.CompletedTask;
         }, TimeSpan.FromSeconds(3));
@@ -336,7 +336,7 @@ public class DeadLetterQueueTests : TestBase
             config => config.DisableDeadLetterQueue(),
             async (queue, token) =>
             {
-                var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+                var dlqName = DeadLetterConstants.QueueName;
                 queue.Queues.ShouldNotContain(dlqName);
                 await Task.CompletedTask;
             }, TimeSpan.FromSeconds(3));
@@ -347,10 +347,9 @@ public class DeadLetterQueueTests : TestBase
     {
         await QueueScenario(async (queue, token) =>
         {
-            // Creating the DLQ explicitly should not create "test:dead-letter:dead-letter"
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
-            queue.CreateQueue(dlqName); // no-op since it already exists
-            queue.Queues.ShouldNotContain(dlqName + DeadLetterConstants.DeadLetterSuffix);
+            // Creating the DLQ explicitly should not create a duplicate
+            queue.CreateQueue(DeadLetterConstants.QueueName); // no-op since it already exists
+            queue.Queues.Count(q => q == DeadLetterConstants.QueueName).ShouldBe(1);
             await Task.CompletedTask;
         }, TimeSpan.FromSeconds(3));
     }
@@ -390,7 +389,7 @@ public class DeadLetterQueueTests : TestBase
                 ctx.QueueContext.CommitChanges();
 
                 // The DLQ should not exist (was never created since DLQ is disabled)
-                queue.Queues.ShouldNotContain(DeadLetterConstants.GetDeadLetterQueueName("test"));
+                queue.Queues.ShouldNotContain(DeadLetterConstants.QueueName);
             }, TimeSpan.FromSeconds(3));
     }
 
@@ -409,7 +408,7 @@ public class DeadLetterQueueTests : TestBase
             ctx.MoveToDeadLetter();
             ctx.CommitChanges();
 
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming(dlqName).Count().ShouldBe(2);
             store.PersistedIncoming("test").ShouldBeEmpty();
@@ -439,7 +438,7 @@ public class DeadLetterQueueTests : TestBase
             ctx.QueueContext.ReceiveLater(TimeSpan.FromHours(1));
             ctx.QueueContext.CommitChanges();
 
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming(dlqName).Single().ProcessingAttempts.ShouldBe(1);
 
@@ -469,7 +468,7 @@ public class DeadLetterQueueTests : TestBase
     {
         await QueueScenario(async (queue, token) =>
         {
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName("test");
+            var dlqName = DeadLetterConstants.QueueName;
             var count = queue.RequeueDeadLetterMessages(dlqName);
             count.ShouldBe(0);
             await Task.CompletedTask;

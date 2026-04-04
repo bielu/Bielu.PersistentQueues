@@ -146,20 +146,17 @@ public interface IQueue : IDisposable, IAsyncDisposable
         string? partitionKey = null);
 
     /// <summary>
-    /// Moves all messages from a dead letter queue back to their original source queues.
+    /// Moves all messages from the dead letter queue back to their original source queues.
     /// </summary>
     /// <param name="deadLetterQueueName">
-    /// The name of the dead letter queue to drain (e.g., <c>orders:dead-letter</c>).
+    /// The name of the dead letter queue (must be <see cref="DeadLetterConstants.QueueName"/>).
     /// </param>
     /// <returns>The number of messages that were requeued.</returns>
     /// <exception cref="ArgumentException">
-    /// Thrown when <paramref name="deadLetterQueueName"/> is not a valid dead letter queue name
-    /// (i.e., does not end with <c>:dead-letter</c>).
+    /// Thrown when <paramref name="deadLetterQueueName"/> does not match the shared dead letter queue name.
     /// </exception>
     /// <remarks>
     /// Each message is moved back to the queue recorded in its <c>original-queue</c> header.
-    /// If a message has no <c>original-queue</c> header, it is moved to the source queue
-    /// inferred from the DLQ name (the part before <c>:dead-letter</c>).
     /// The processing attempt counter is reset to zero so the message can be retried.
     /// All moves happen in a single atomic transaction.
     /// </remarks>

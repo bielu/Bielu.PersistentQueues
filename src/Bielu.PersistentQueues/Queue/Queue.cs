@@ -81,7 +81,7 @@ public class Queue : IQueue
         Store.CreateQueue(queueName);
         if (_deadLetterOptions.Enabled && !DeadLetterConstants.IsDeadLetterQueue(queueName))
         {
-            Store.CreateQueue(DeadLetterConstants.GetDeadLetterQueueName(queueName));
+            Store.CreateQueue(DeadLetterConstants.QueueName);
         }
     }
 
@@ -507,10 +507,8 @@ public class Queue : IQueue
     {
         if (!DeadLetterConstants.IsDeadLetterQueue(deadLetterQueueName))
             throw new ArgumentException(
-                $"'{deadLetterQueueName}' is not a dead letter queue. Dead letter queue names must end with '{DeadLetterConstants.DeadLetterSuffix}'.",
+                $"'{deadLetterQueueName}' is not the dead letter queue. The dead letter queue name is '{DeadLetterConstants.QueueName}'.",
                 nameof(deadLetterQueueName));
-
-        var sourceQueue = deadLetterQueueName[..^DeadLetterConstants.DeadLetterSuffix.Length];
 
         var messages = Store.PersistedIncoming(deadLetterQueueName).ToList();
         if (messages.Count == 0)
@@ -519,8 +517,7 @@ public class Queue : IQueue
         using var transaction = Store.BeginTransaction();
         foreach (var message in messages)
         {
-            // Use the original-queue header if present, otherwise fall back to inferred source queue
-            var targetQueue = message.OriginalQueue ?? sourceQueue;
+            var targetQueue = message.OriginalQueue ?? throw new InvalidOperationException($"Message {message.Id} in DLQ has no original-queue header and cannot be requeued.");
 
             // Reset processing attempts and move back to the source queue
             var requeuedMessage = message.WithProcessingAttempts(0);

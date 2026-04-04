@@ -73,7 +73,7 @@ internal class QueueContext : IQueueContext
         var updatedMessage = _message.WithProcessingAttempts(_message.ProcessingAttempts + 1);
         if (_queue._deadLetterOptions.Enabled && _message.MaxAttempts.HasValue && updatedMessage.ProcessingAttempts >= _message.MaxAttempts.Value)
         {
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName(_message.QueueString ?? "unknown");
+            var dlqName = DeadLetterConstants.QueueName;
             _queue.Store.CreateQueue(dlqName);
             _queueActions.Add(new DeadLetterAction(this, dlqName, updatedMessage, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
             return;
@@ -89,7 +89,7 @@ internal class QueueContext : IQueueContext
         var updatedMessage = _message.WithProcessingAttempts(_message.ProcessingAttempts + 1);
         if (_queue._deadLetterOptions.Enabled && _message.MaxAttempts.HasValue && updatedMessage.ProcessingAttempts >= _message.MaxAttempts.Value)
         {
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName(_message.QueueString ?? "unknown");
+            var dlqName = DeadLetterConstants.QueueName;
             _queue.Store.CreateQueue(dlqName);
             _queueActions.Add(new DeadLetterAction(this, dlqName, updatedMessage, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
             return;
@@ -120,7 +120,7 @@ internal class QueueContext : IQueueContext
         if (_messageDisposed)
             throw new InvalidOperationException("Cannot call MoveToDeadLetter after SuccessfullyReceived, ReceiveLater, or MoveTo has been called on this message.");
         _messageDisposed = true;
-        var dlqName = DeadLetterConstants.GetDeadLetterQueueName(_message.QueueString ?? "unknown");
+        var dlqName = DeadLetterConstants.QueueName;
         _queue.Store.CreateQueue(dlqName);
         _queueActions.Add(new DeadLetterAction(this, dlqName, _message, DeadLetterDiagnostics.Reasons.Manual));
     }

@@ -92,7 +92,7 @@ public class SendingErrorPolicy
     private void MoveToDeadLetter(Message message)
     {
         var sourceQueue = message.QueueString ?? "unknown";
-        var dlqName = DeadLetterConstants.GetDeadLetterQueueName(sourceQueue);
+        var dlqName = DeadLetterConstants.QueueName;
         try
         {
             _store.CreateQueue(dlqName);

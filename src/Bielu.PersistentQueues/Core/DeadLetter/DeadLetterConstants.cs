@@ -1,35 +1,26 @@
 namespace Bielu.PersistentQueues;
 
 /// <summary>
-/// Contains constants and helpers for dead letter queue naming.
+/// Contains constants and helpers for the dead letter queue.
 /// </summary>
 /// <remarks>
-/// A dead letter queue (DLQ) is a special queue that receives messages which
-/// could not be processed or delivered successfully after all retry attempts
-/// have been exhausted, or which were explicitly moved there by a consumer.
-/// Each source queue has a corresponding DLQ named with the
-/// <see cref="DeadLetterSuffix"/> suffix (e.g., <c>orders:dead-letter</c>).
+/// There is a single, shared dead letter queue named <see cref="QueueName"/>.
+/// Every message that is dead-lettered — regardless of its source queue — is
+/// placed into this queue. The <c>original-queue</c> header on each message
+/// records which queue the message originally belonged to.
 /// </remarks>
 public static class DeadLetterConstants
 {
     /// <summary>
-    /// The suffix appended to a source queue name to form its dead letter queue name.
+    /// The name of the shared dead letter queue.
     /// </summary>
-    public const string DeadLetterSuffix = ":dead-letter";
+    public const string QueueName = "dead-letter";
 
     /// <summary>
-    /// Returns the dead letter queue name for the given source queue name.
-    /// </summary>
-    /// <param name="queueName">The source queue name.</param>
-    /// <returns>The corresponding dead letter queue name.</returns>
-    public static string GetDeadLetterQueueName(string queueName)
-        => queueName + DeadLetterSuffix;
-
-    /// <summary>
-    /// Determines whether the given queue name is a dead letter queue.
+    /// Determines whether the given queue name is the dead letter queue.
     /// </summary>
     /// <param name="queueName">The queue name to check.</param>
-    /// <returns><c>true</c> if the queue is a dead letter queue; otherwise, <c>false</c>.</returns>
+    /// <returns><c>true</c> if the queue is the dead letter queue; otherwise, <c>false</c>.</returns>
     public static bool IsDeadLetterQueue(string queueName)
-        => queueName.EndsWith(DeadLetterSuffix, System.StringComparison.Ordinal);
+        => string.Equals(queueName, QueueName, System.StringComparison.Ordinal);
 }

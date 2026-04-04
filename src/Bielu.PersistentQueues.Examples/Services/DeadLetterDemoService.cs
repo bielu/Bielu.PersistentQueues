@@ -105,7 +105,7 @@ public class DeadLetterDemoService : BackgroundService
         Console.WriteLine();
 
         // ── 4. Inspect the DLQ ───────────────────────────────────────────────
-        var dlqName = DeadLetterConstants.GetDeadLetterQueueName(QueueName);
+        var dlqName = DeadLetterConstants.QueueName;
         var dlqMessages = _queue.Store.PersistedIncoming(dlqName).ToList();
 
         Console.WriteLine($"[4] Dead letter queue '{dlqName}' contains {dlqMessages.Count} message(s):");

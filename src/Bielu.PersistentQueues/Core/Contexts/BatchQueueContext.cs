@@ -291,11 +291,7 @@ public class BatchQueueContext : IBatchQueueContext
 
     private void EnsureDeadLetterQueues(Message[] messages)
     {
-        foreach (var message in messages)
-        {
-            var dlqName = DeadLetterConstants.GetDeadLetterQueueName(message.QueueString ?? "unknown");
-            _queue.Store.CreateQueue(dlqName);
-        }
+        _queue.Store.CreateQueue(DeadLetterConstants.QueueName);
     }
 
     private interface IBatchAction
@@ -446,9 +442,8 @@ public class BatchQueueContext : IBatchQueueContext
             foreach (var message in _messages)
             {
                 var sourceQueue = message.QueueString ?? "unknown";
-                var dlqName = DeadLetterConstants.GetDeadLetterQueueName(sourceQueue);
                 var messageWithOrigin = message.WithOriginalQueue(sourceQueue);
-                _queue.Store.MoveToQueue(transaction, dlqName, messageWithOrigin);
+                _queue.Store.MoveToQueue(transaction, DeadLetterConstants.QueueName, messageWithOrigin);
             }
         }
 
