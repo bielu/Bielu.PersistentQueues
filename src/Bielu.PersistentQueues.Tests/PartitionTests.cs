@@ -200,8 +200,8 @@ public class PartitionedQueueTests : TestBase
             var msg1 = Message.Create(data: Encoding.UTF8.GetBytes("order-a"), queue: "orders", partitionKey: "customer-1");
             var msg2 = Message.Create(data: Encoding.UTF8.GetBytes("order-b"), queue: "orders", partitionKey: "customer-1");
 
-            var p1 = partitioned.ResolvePartition(msg1, "orders");
-            var p2 = partitioned.ResolvePartition(msg2, "orders");
+            var p1 = partitioned.ResolvePartition(msg1);
+            var p2 = partitioned.ResolvePartition(msg2);
             p1.ShouldBe(p2);
 
             partitioned.Enqueue(msg1);
@@ -232,7 +232,7 @@ public class PartitionedQueueTests : TestBase
             partitioned.CreatePartitionedQueue("events", 3);
 
             var msg = Message.Create(data: Encoding.UTF8.GetBytes("event-data"), queue: "events");
-            partitioned.EnqueueToPartition(msg, "events", 2);
+            partitioned.EnqueueToPartition(msg, 2);
 
             // Should be retrievable from partition 2
             var received = await partitioned.ReceiveFromPartition("events", 2, 50, token).FirstAsync(token);
@@ -254,7 +254,7 @@ public class PartitionedQueueTests : TestBase
             for (int i = 0; i < 5; i++)
             {
                 var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "batch-q");
-                partitioned.EnqueueToPartition(msg, "batch-q", 0);
+                partitioned.EnqueueToPartition(msg, 0);
             }
 
             await foreach (var batch in partitioned.ReceiveBatchFromPartition("batch-q", 0,
@@ -304,8 +304,8 @@ public class PartitionedQueueTests : TestBase
             partitioned.CreatePartitionedQueue("test", 4);
 
             var msg = Message.Create(data: Encoding.UTF8.GetBytes("data"), queue: "test", partitionKey: "key-1");
-            var p1 = partitioned.ResolvePartition(msg, "test");
-            var p2 = partitioned.ResolvePartition(msg, "test");
+            var p1 = partitioned.ResolvePartition(msg);
+            var p2 = partitioned.ResolvePartition(msg);
 
             p1.ShouldBe(p2);
             p1.ShouldBeGreaterThanOrEqualTo(0);
@@ -327,8 +327,8 @@ public class PartitionedQueueTests : TestBase
 
             var msg = Message.Create(data: Encoding.UTF8.GetBytes("data"), queue: "test");
 
-            Should.Throw<ArgumentOutOfRangeException>(() => partitioned.EnqueueToPartition(msg, "test", 5));
-            Should.Throw<ArgumentOutOfRangeException>(() => partitioned.EnqueueToPartition(msg, "test", -1));
+            Should.Throw<ArgumentOutOfRangeException>(() => partitioned.EnqueueToPartition(msg, 5));
+            Should.Throw<ArgumentOutOfRangeException>(() => partitioned.EnqueueToPartition(msg, -1));
         });
     }
 
@@ -344,7 +344,7 @@ public class PartitionedQueueTests : TestBase
             for (int i = 0; i < 5; i++)
             {
                 var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "orders");
-                partitioned.EnqueueToPartition(msg, "orders", 0);
+                partitioned.EnqueueToPartition(msg, 0);
             }
 
             var allReceived = new ConcurrentBag<string>();

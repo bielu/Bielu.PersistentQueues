@@ -113,7 +113,7 @@ public class PartitionedQueue : IPartitionedQueue
             if (partitionCount > 0)
             {
                 var partition = PartitionStrategy.GetPartition(message, partitionCount);
-                EnqueueToPartition(message, queueName, partition);
+                EnqueueToPartition(message, partition);
                 return;
             }
         }
@@ -318,8 +318,10 @@ public class PartitionedQueue : IPartitionedQueue
         }
     }
     /// <inheritdoc />
-    public void EnqueueToPartition(Message message, string queueName, int partition)
+    public void EnqueueToPartition(Message message, int partition)
     {
+        var queueName = message.QueueString
+            ?? throw new InvalidOperationException("Message must have a queue name set.");
         ValidatePartition(queueName, partition);
         var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
 
@@ -340,8 +342,10 @@ public class PartitionedQueue : IPartitionedQueue
     }
 
     /// <inheritdoc />
-    public int ResolvePartition(Message message, string queueName)
+    public int ResolvePartition(Message message)
     {
+        var queueName = message.QueueString
+            ?? throw new InvalidOperationException("Message must have a queue name set.");
         var partitionCount = GetPartitionCount(queueName);
         if (partitionCount == 0)
             throw new InvalidOperationException($"No partitions found for queue '{queueName}'. Call CreatePartitionedQueue first.");
