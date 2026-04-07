@@ -9,6 +9,8 @@ using Bielu.PersistentQueues.Partitioning;
 using Bielu.PersistentQueues.Serialization;
 using Bielu.PersistentQueues.Storage.LMDB;
 using LightningDB;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Shouldly;
 using Xunit;
 using Xunit.Abstractions;
@@ -456,5 +458,101 @@ public class PartitionedQueueTests : TestBase
         using var queue = queueConfiguration.BuildAndStartQueue(queueName);
         await scenario(queue, cancellation.Token);
         await cancellation.CancelAsync();
+    }
+}
+
+public class CreatePartitionedQueuesBuilderTests : TestBase
+{
+    public CreatePartitionedQueuesBuilderTests(ITestOutputHelper output)
+    {
+        Output = output;
+    }
+
+    [Fact]
+    public void create_partitioned_queues_via_builder_registers_partitions()
+    {
+        var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
+        var tempPath = TempPath();
+        services.AddLogging();
+        services.AddPersistentQueues(builder =>
+        {
+            builder
+                .AutomaticEndpoint()
+                .UseStorage(sp =>
+                {
+                    var env = new LightningEnvironment(tempPath, new EnvironmentConfiguration { MaxDatabases = 20, MapSize = 1024 * 1024 * 100 });
+                    return new LmdbMessageStore(env, new MessageSerializer());
+                })
+                .UsePartitioning()
+                .CreatePartitionedQueues(("orders", 4), ("events", 2));
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var partitionedQueue = provider.GetRequiredService<IPartitionedQueue>();
+
+        partitionedQueue.GetPartitionCount("orders").ShouldBe(4);
+        partitionedQueue.GetPartitionCount("events").ShouldBe(2);
+
+        var queues = partitionedQueue.Queues;
+        queues.ShouldContain("orders:partition-0");
+        queues.ShouldContain("orders:partition-3");
+        queues.ShouldContain("events:partition-0");
+        queues.ShouldContain("events:partition-1");
+    }
+
+    [Fact]
+    public void create_partitioned_queues_before_use_partitioning_works()
+    {
+        var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
+        var tempPath = TempPath();
+        services.AddLogging();
+        services.AddPersistentQueues(builder =>
+        {
+            builder
+                .AutomaticEndpoint()
+                .UseStorage(sp =>
+                {
+                    var env = new LightningEnvironment(tempPath, new EnvironmentConfiguration { MaxDatabases = 20, MapSize = 1024 * 1024 * 100 });
+                    return new LmdbMessageStore(env, new MessageSerializer());
+                })
+                .CreatePartitionedQueues(("tasks", 3))
+                .UsePartitioning();
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var partitionedQueue = provider.GetRequiredService<IPartitionedQueue>();
+
+        partitionedQueue.GetPartitionCount("tasks").ShouldBe(3);
+
+        var queues = partitionedQueue.Queues;
+        queues.ShouldContain("tasks:partition-0");
+        queues.ShouldContain("tasks:partition-1");
+        queues.ShouldContain("tasks:partition-2");
+    }
+
+    [Fact]
+    public void use_partitioning_with_inline_queues_still_works()
+    {
+        var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
+        var tempPath = TempPath();
+        services.AddLogging();
+        services.AddPersistentQueues(builder =>
+        {
+            builder
+                .AutomaticEndpoint()
+                .UseStorage(sp =>
+                {
+                    var env = new LightningEnvironment(tempPath, new EnvironmentConfiguration { MaxDatabases = 20, MapSize = 1024 * 1024 * 100 });
+                    return new LmdbMessageStore(env, new MessageSerializer());
+                })
+                .UsePartitioning(new HashPartitionStrategy(), ("orders", 4));
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var partitionedQueue = provider.GetRequiredService<IPartitionedQueue>();
+
+        partitionedQueue.GetPartitionCount("orders").ShouldBe(4);
+        partitionedQueue.Queues.ShouldContain("orders:partition-0");
+        partitionedQueue.Queues.ShouldContain("orders:partition-3");
     }
 }
