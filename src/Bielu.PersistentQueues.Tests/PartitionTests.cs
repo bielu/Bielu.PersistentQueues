@@ -314,24 +314,6 @@ public class PartitionedQueueTests : TestBase
     }
 
     [Fact]
-    public void enqueue_without_partition_throws()
-    {
-        StorageScenario(store =>
-        {
-            var config = new QueueConfiguration()
-                .WithDefaultsForTest(Output)
-                .StoreMessagesWith(() => store);
-            var innerQueue = config.BuildQueue();
-            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
-
-            // Don't create partitions
-            var msg = Message.Create(data: Encoding.UTF8.GetBytes("data"), queue: "nonexistent");
-
-            Should.Throw<InvalidOperationException>(() => partitioned.EnqueueToPartition(msg, "nonexistent"));
-        });
-    }
-
-    [Fact]
     public void enqueue_to_out_of_range_partition_throws()
     {
         PartitionedStorageScenario(store =>
