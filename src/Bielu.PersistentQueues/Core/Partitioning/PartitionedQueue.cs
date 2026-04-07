@@ -286,14 +286,15 @@ public class PartitionedQueue : IPartitionedQueue
             }
         }
     }
-
+    //todo merge with enqueue instead
     /// <inheritdoc />
     public void EnqueueToPartition(Message message, string queueName)
     {
         var partitionCount = GetPartitionCount(queueName);
         if (partitionCount == 0)
-            throw new InvalidOperationException($"No partitions found for queue '{queueName}'. Call CreatePartitionedQueue first.");
-
+        {
+            Enqueue(message);
+        }
         var partition = PartitionStrategy.GetPartition(message, partitionCount);
         EnqueueToPartition(message, queueName, partition);
     }
