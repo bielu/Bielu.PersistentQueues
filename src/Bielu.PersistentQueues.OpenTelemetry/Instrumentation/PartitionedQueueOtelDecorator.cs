@@ -140,39 +140,9 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
     }
 
     /// <inheritdoc />
-    public void EnqueueToPartition(Message message, string queueName)
+    public void EnqueueToPartition(Message message, int partition)
     {
-        using var activity = _activitySource.StartActivity(ActivityNames.EnqueueToPartition, ActivityKind.Producer);
-        QueueActivitySource.SetQueueTags(activity, queueName);
-        QueueActivitySource.SetMessageTags(activity, message.Id.MessageIdentifier, queueName);
-
-        try
-        {
-            var startTime = Stopwatch.GetTimestamp();
-            var partition = _partitionedQueue.ResolvePartition(message, queueName);
-
-            QueueActivitySource.SetPartitionTags(activity, queueName, partition, message.PartitionKeyString);
-
-            _metrics.RecordPartitionProducerStarted(queueName);
-            _partitionedQueue.EnqueueToPartition(message, queueName);
-            _metrics.RecordPartitionProducerStopped(queueName);
-
-            var elapsed = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
-            _metrics.RecordPartitionEnqueued(queueName, partition, message.PartitionKeyString);
-            _metrics.RecordPartitionEnqueueDuration(elapsed, queueName, partition);
-        }
-        catch (Exception ex)
-        {
-            _metrics.RecordPartitionProducerStopped(queueName);
-            _metrics.RecordOperationError("EnqueueToPartition", queueName);
-            _activitySource.RecordException(activity, ex);
-            throw;
-        }
-    }
-
-    /// <inheritdoc />
-    public void EnqueueToPartition(Message message, string queueName, int partition)
-    {
+        var queueName = message.QueueString ?? string.Empty;
         using var activity = _activitySource.StartActivity(ActivityNames.EnqueueToPartition, ActivityKind.Producer);
         QueueActivitySource.SetPartitionTags(activity, queueName, partition, message.PartitionKeyString);
         QueueActivitySource.SetMessageTags(activity, message.Id.MessageIdentifier, queueName);
@@ -182,7 +152,7 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
             var startTime = Stopwatch.GetTimestamp();
 
             _metrics.RecordPartitionProducerStarted(queueName);
-            _partitionedQueue.EnqueueToPartition(message, queueName, partition);
+            _partitionedQueue.EnqueueToPartition(message, partition);
             _metrics.RecordPartitionProducerStopped(queueName);
 
             var elapsed = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
@@ -199,14 +169,15 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
     }
 
     /// <inheritdoc />
-    public int ResolvePartition(Message message, string queueName)
+    public int ResolvePartition(Message message)
     {
+        var queueName = message.QueueString ?? string.Empty;
         using var activity = _activitySource.StartActivity(ActivityNames.ResolvePartition, ActivityKind.Internal);
         QueueActivitySource.SetQueueTags(activity, queueName);
 
         try
         {
-            var partition = _partitionedQueue.ResolvePartition(message, queueName);
+            var partition = _partitionedQueue.ResolvePartition(message);
             QueueActivitySource.SetPartitionTags(activity, queueName, partition, message.PartitionKeyString);
             return partition;
         }

@@ -99,8 +99,26 @@ public class PartitionedQueue : IPartitionedQueue
         => _innerQueue.Send(message);
 
     /// <inheritdoc />
+    /// <remarks>
+    /// If the message's queue has partitions, the message is automatically routed to the
+    /// appropriate partition based on the configured <see cref="IPartitionStrategy"/>.
+    /// Otherwise, the message is enqueued to the inner queue as-is.
+    /// </remarks>
     public void Enqueue(Message message)
-        => _innerQueue.Enqueue(message);
+    {
+        var queueName = message.QueueString;
+        if (queueName != null)
+        {
+            var partitionCount = GetPartitionCount(queueName);
+            if (partitionCount > 0)
+            {
+                var partition = PartitionStrategy.GetPartition(message, partitionCount);
+                EnqueueToPartition(message, partition);
+                return;
+            }
+        }
+        _innerQueue.Enqueue(message);
+    }
 
     /// <inheritdoc />
     public void Send<T>(
@@ -114,12 +132,25 @@ public class PartitionedQueue : IPartitionedQueue
         => _innerQueue.Send(content, destinationUri, queueName, headers, deliverBy, maxAttempts, partitionKey);
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The content is serialized using the inner queue's content serializer and then
+    /// routed through the partition-aware <see cref="Enqueue(Message)"/> overload.
+    /// </remarks>
     public void Enqueue<T>(
         T content,
         string? queueName = null,
         Dictionary<string, string>? headers = null,
         string? partitionKey = null)
-        => _innerQueue.Enqueue(content, queueName, headers, partitionKey);
+    {
+        var serializer = (_innerQueue as Queue)?._contentSerializer ?? Serialization.JsonContentSerializer.Default;
+        var message = Message.Create(
+            content,
+            contentSerializer: serializer,
+            queue: queueName,
+            headers: headers,
+            partitionKey: partitionKey);
+        Enqueue(message);
+    }
 
     /// <inheritdoc />
     public int RequeueDeadLetterMessages()
@@ -286,22 +317,11 @@ public class PartitionedQueue : IPartitionedQueue
             }
         }
     }
-    //todo merge with enqueue instead
     /// <inheritdoc />
-    public void EnqueueToPartition(Message message, string queueName)
+    public void EnqueueToPartition(Message message, int partition)
     {
-        var partitionCount = GetPartitionCount(queueName);
-        if (partitionCount == 0)
-        {
-            Enqueue(message);
-        }
-        var partition = PartitionStrategy.GetPartition(message, partitionCount);
-        EnqueueToPartition(message, queueName, partition);
-    }
-
-    /// <inheritdoc />
-    public void EnqueueToPartition(Message message, string queueName, int partition)
-    {
+        var queueName = message.QueueString
+            ?? throw new InvalidOperationException("Message must have a queue name set.");
         ValidatePartition(queueName, partition);
         var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
 
@@ -322,8 +342,10 @@ public class PartitionedQueue : IPartitionedQueue
     }
 
     /// <inheritdoc />
-    public int ResolvePartition(Message message, string queueName)
+    public int ResolvePartition(Message message)
     {
+        var queueName = message.QueueString
+            ?? throw new InvalidOperationException("Message must have a queue name set.");
         var partitionCount = GetPartitionCount(queueName);
         if (partitionCount == 0)
             throw new InvalidOperationException($"No partitions found for queue '{queueName}'. Call CreatePartitionedQueue first.");
