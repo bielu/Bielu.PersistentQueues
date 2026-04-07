@@ -34,7 +34,7 @@ internal sealed class OrderProducerService(
                     data: Encoding.UTF8.GetBytes($"{{\"customerId\":\"{customerId}\",\"orderId\":{++orderNo}}}"),
                     queue: OrdersQueue,
                     partitionKey: customerId);
-                queue.EnqueueToPartition(msg, OrdersQueue);
+                queue.Enqueue(msg);
                 stats.IncrementOrdersSent();
             }
 

@@ -72,18 +72,6 @@ public interface IPartitionedQueue : IQueue
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Enqueues a message to the appropriate partition based on the configured partition strategy.
-    /// </summary>
-    /// <param name="message">The message to enqueue.</param>
-    /// <param name="queueName">The base queue name.</param>
-    /// <remarks>
-    /// The partition is determined by the <see cref="IPartitionStrategy"/> based on the message's
-    /// <see cref="Message.PartitionKey"/>. If no partition key is set, the strategy determines
-    /// the default behavior (e.g., round-robin or message-ID-based hashing).
-    /// </remarks>
-    void EnqueueToPartition(Message message, string queueName);
-
-    /// <summary>
     /// Enqueues a message to a specific partition, bypassing the partition strategy.
     /// </summary>
     /// <param name="message">The message to enqueue.</param>

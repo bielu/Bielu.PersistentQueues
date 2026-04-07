@@ -204,8 +204,8 @@ public class PartitionedQueueTests : TestBase
             var p2 = partitioned.ResolvePartition(msg2, "orders");
             p1.ShouldBe(p2);
 
-            partitioned.EnqueueToPartition(msg1, "orders");
-            partitioned.EnqueueToPartition(msg2, "orders");
+            partitioned.Enqueue(msg1);
+            partitioned.Enqueue(msg2);
 
             // Receive from the resolved partition
             var received = new List<Message>();
