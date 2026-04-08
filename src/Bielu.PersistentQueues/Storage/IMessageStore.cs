@@ -279,9 +279,9 @@ public interface IMessageStore : IDisposable
     /// <returns>The number of messages in the queue.</returns>
     /// <remarks>
     /// This method provides a lightweight way to check how many messages are in a queue
-    /// without enumerating them. Implementations should use efficient O(1) mechanisms
-    /// (e.g., LMDB database statistics) when available.
-    /// The default implementation falls back to enumerating <see cref="PersistedIncoming"/>.
+    /// without enumerating them. Implementations should override this with efficient O(1)
+    /// mechanisms (e.g., LMDB database statistics) when available.
+    /// The default implementation enumerates <see cref="PersistedIncoming"/>.
     /// </remarks>
     long GetMessageCount(string queueName)
     {

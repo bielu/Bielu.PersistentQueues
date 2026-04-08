@@ -65,15 +65,15 @@ public class PartitionedQueue : IPartitionedQueue
         get
         {
             var rawQueues = _innerQueue.Queues;
-            var result = new HashSet<string>();
+            var logicalQueues = new HashSet<string>();
             foreach (var q in rawQueues)
             {
                 if (PartitionConstants.TryParsePartitionQueueName(q, out var baseName, out _))
-                    result.Add(baseName);
+                    logicalQueues.Add(baseName);
                 else
-                    result.Add(q);
+                    logicalQueues.Add(q);
             }
-            return result.ToArray();
+            return logicalQueues.ToArray();
         }
     }
 
