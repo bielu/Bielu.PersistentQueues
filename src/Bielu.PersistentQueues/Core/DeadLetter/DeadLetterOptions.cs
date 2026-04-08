@@ -28,4 +28,6 @@ public sealed class DeadLetterOptions
     /// When <c>false</c>, all of the above operations are no-ops or throw.
     /// </remarks>
     public bool Enabled { get; set; }
+
+    public int GlobalMaxAttemptsForMessage { get; set; } = 3;
 }

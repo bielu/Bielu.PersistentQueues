@@ -280,12 +280,13 @@ public class BatchQueueContext : IBatchQueueContext
         return updated;
     }
 
-    private static (Message[] dlq, Message[] retry) SplitByMaxAttempts(Message[] updatedMessages, bool dlqEnabled)
+    private (Message[] dlq, Message[] retry) SplitByMaxAttempts(Message[] updatedMessages, bool dlqEnabled)
     {
         if (!dlqEnabled)
             return ([], updatedMessages);
-        var dlq = updatedMessages.Where(m => m.MaxAttempts.HasValue && m.ProcessingAttempts >= m.MaxAttempts.Value).ToArray();
-        var retry = updatedMessages.Where(m => !m.MaxAttempts.HasValue || m.ProcessingAttempts < m.MaxAttempts.Value).ToArray();
+        
+        var dlq = updatedMessages.Where(m =>( m.MaxAttempts.HasValue && m.ProcessingAttempts >= m.MaxAttempts.Value)|| _queue._deadLetterOptions.GlobalMaxAttemptsForMessage >=m.ProcessingAttempts).ToArray();
+        var retry = updatedMessages.Where(m => (!m.MaxAttempts.HasValue || m.ProcessingAttempts < m.MaxAttempts.Value)||  _queue._deadLetterOptions.GlobalMaxAttemptsForMessage <m.ProcessingAttempts).ToArray();
         return (dlq, retry);
     }
 
