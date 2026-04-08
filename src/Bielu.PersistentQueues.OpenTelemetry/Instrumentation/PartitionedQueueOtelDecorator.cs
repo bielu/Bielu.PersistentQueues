@@ -188,4 +188,10 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
             throw;
         }
     }
+
+    /// <inheritdoc />
+    public long GetPartitionMessageCount(string queueName, int partition)
+    {
+        return _partitionedQueue.GetPartitionMessageCount(queueName, partition);
+    }
 }

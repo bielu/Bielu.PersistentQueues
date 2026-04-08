@@ -84,4 +84,17 @@ public interface IPartitionedQueue : IQueue
     /// <param name="message">The message to check. The queue name is read from <see cref="Message.QueueString"/>.</param>
     /// <returns>The zero-based partition index.</returns>
     int ResolvePartition(Message message);
+
+    /// <summary>
+    /// Gets the number of persisted messages in a specific partition of a queue.
+    /// </summary>
+    /// <param name="queueName">The base queue name.</param>
+    /// <param name="partition">The zero-based partition index.</param>
+    /// <returns>The number of messages in the specified partition.</returns>
+    /// <remarks>
+    /// This method provides a lightweight way to check whether a partition has messages
+    /// without starting a full receive operation. It is useful for workers that need to
+    /// skip empty partitions to avoid blocking on partitions with no data.
+    /// </remarks>
+    long GetPartitionMessageCount(string queueName, int partition);
 }

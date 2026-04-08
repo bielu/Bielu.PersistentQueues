@@ -422,6 +422,110 @@ public class PartitionedQueueTests : TestBase
         msg.PartitionKeyString.ShouldBeNull();
     }
 
+    [Fact]
+    public void get_message_count_returns_zero_for_empty_queue()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            store.GetMessageCount("test").ShouldBe(0);
+        });
+    }
+
+    [Fact]
+    public void get_message_count_returns_correct_count_after_enqueue()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var messages = Enumerable.Range(0, 5)
+                .Select(i => Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "test"))
+                .ToList();
+            store.StoreIncoming(messages);
+
+            store.GetMessageCount("test").ShouldBe(5);
+        });
+    }
+
+    [Fact]
+    public void get_message_count_updates_after_removal()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var messages = Enumerable.Range(0, 3)
+                .Select(i => Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "test"))
+                .ToList();
+            store.StoreIncoming(messages);
+            store.GetMessageCount("test").ShouldBe(3);
+
+            using var tx = store.BeginTransaction();
+            store.SuccessfullyReceived(tx, messages[0]);
+            tx.Commit();
+
+            store.GetMessageCount("test").ShouldBe(2);
+        });
+    }
+
+    [Fact]
+    public void get_partition_message_count_returns_zero_for_empty_partition()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+            partitioned.CreatePartitionedQueue("orders", 4);
+
+            partitioned.GetPartitionMessageCount("orders", 0).ShouldBe(0);
+            partitioned.GetPartitionMessageCount("orders", 1).ShouldBe(0);
+            partitioned.GetPartitionMessageCount("orders", 2).ShouldBe(0);
+            partitioned.GetPartitionMessageCount("orders", 3).ShouldBe(0);
+        });
+    }
+
+    [Fact]
+    public void get_partition_message_count_returns_correct_count()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+            partitioned.CreatePartitionedQueue("orders", 4);
+
+            // Enqueue 3 messages to partition 1
+            for (int i = 0; i < 3; i++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "orders");
+                partitioned.EnqueueToPartition(msg, 1);
+            }
+
+            partitioned.GetPartitionMessageCount("orders", 0).ShouldBe(0);
+            partitioned.GetPartitionMessageCount("orders", 1).ShouldBe(3);
+            partitioned.GetPartitionMessageCount("orders", 2).ShouldBe(0);
+            partitioned.GetPartitionMessageCount("orders", 3).ShouldBe(0);
+        });
+    }
+
+    [Fact]
+    public void get_partition_message_count_out_of_range_throws()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+            partitioned.CreatePartitionedQueue("orders", 4);
+
+            Should.Throw<ArgumentOutOfRangeException>(() => partitioned.GetPartitionMessageCount("orders", 5));
+            Should.Throw<ArgumentOutOfRangeException>(() => partitioned.GetPartitionMessageCount("orders", -1));
+        });
+    }
+
     /// <summary>
     /// QueueScenario variant with higher MaxDatabases to support partitioned queues.
     /// </summary>

@@ -353,6 +353,14 @@ public class PartitionedQueue : IPartitionedQueue
         return PartitionStrategy.GetPartition(message, partitionCount);
     }
 
+    /// <inheritdoc />
+    public long GetPartitionMessageCount(string queueName, int partition)
+    {
+        ValidatePartition(queueName, partition);
+        var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
+        return Store.GetMessageCount(partitionQueueName);
+    }
+
     private void ValidatePartition(string queueName, int partition)
     {
         if (partition < 0)

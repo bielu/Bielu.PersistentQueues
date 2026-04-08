@@ -144,6 +144,11 @@ internal sealed class PartitionCoordinatorService(
             int partition = partitions[cursor % partitions.Length];
             cursor++;
 
+            // Skip empty partitions to avoid blocking on ReceiveBatchFromPartition,
+            // which never yields for partitions with no messages.
+            if (queue.GetPartitionMessageCount(OrdersQueue, partition) == 0)
+                continue;
+
             bool lockAcquired = false;
             try
             {

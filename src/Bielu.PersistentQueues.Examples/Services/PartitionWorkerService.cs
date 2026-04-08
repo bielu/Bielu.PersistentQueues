@@ -26,6 +26,14 @@ internal sealed class PartitionWorkerService(
         {
             int partition = partitions[cursor % partitions.Length];
 
+            // Skip empty partitions to avoid blocking on ReceiveBatchFromPartition,
+            // which never yields for partitions with no messages.
+            if (queue.GetPartitionMessageCount(OrdersQueue, partition) == 0)
+            {
+                cursor++;
+                continue;
+            }
+
             await foreach (var batch in queue.ReceiveBatchFromPartition(
                 OrdersQueue,
                 partition,
