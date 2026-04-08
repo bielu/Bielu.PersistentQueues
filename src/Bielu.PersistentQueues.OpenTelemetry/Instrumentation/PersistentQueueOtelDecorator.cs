@@ -323,4 +323,8 @@ public class PersistentQueueOtelDecorator : IQueue
     /// <inheritdoc />
     public int RequeueDeadLetterMessages()
         => _queue.RequeueDeadLetterMessages();
+
+    /// <inheritdoc />
+    public int ClearDeadLetterQueue()
+        => _queue.ClearDeadLetterQueue();
 }

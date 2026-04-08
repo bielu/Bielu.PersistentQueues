@@ -522,6 +522,23 @@ public class Queue : IQueue
         return messages.Count;
     }
 
+    /// <inheritdoc />
+    public int ClearDeadLetterQueue()
+    {
+        var messages = Store.PersistedIncoming(DeadLetterConstants.QueueName).ToList();
+        if (messages.Count == 0)
+            return 0;
+
+        using var transaction = Store.BeginTransaction();
+        foreach (var message in messages)
+        {
+            Store.SuccessfullyReceived(transaction, message);
+        }
+        transaction.Commit();
+
+        return messages.Count;
+    }
+
     /// <summary>
     /// Releases all resources used by the queue.
     /// </summary>

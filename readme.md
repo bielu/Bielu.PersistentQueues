@@ -281,6 +281,17 @@ int count = queue.RequeueDeadLetterMessages();
 Console.WriteLine($"Requeued {count} messages back to their original queues");
 ```
 
+### Clearing DLQ Messages
+
+If you want to permanently remove all messages from the DLQ without requeuing them:
+
+```csharp
+int count = queue.ClearDeadLetterQueue();
+Console.WriteLine($"Permanently deleted {count} messages from the dead letter queue");
+```
+
+**Warning:** This operation permanently deletes all messages in the DLQ and cannot be undone. Use with caution.
+
 ### Enabling the DLQ
 
 The DLQ is **disabled by default**. Enable it via the builder API:
@@ -292,7 +303,7 @@ services.AddPersistentQueues(builder =>
 {
     builder
         .AddLmdbStorage("./queue_data")
-        .WithDeadLetterQueue()   // ← enable dead letter queue
+        .WithDeadLetterQueue()   // ← enable dead letter queue with default settings
         .CreateQueues("my-queue");
 });
 ```
@@ -311,6 +322,29 @@ When the DLQ is not enabled:
 - `ReceiveLater` never auto-moves messages to the DLQ, even when `MaxAttempts` is exceeded — the message is retried indefinitely.
 - Outgoing messages that fail all send retries are silently discarded.
 - Calling `MoveToDeadLetter()` throws `InvalidOperationException`.
+
+### Global Max Attempts
+
+In addition to per-message `maxAttempts`, you can configure a **global maximum** that applies to all messages:
+
+```csharp
+services.AddPersistentQueues(builder =>
+{
+    builder
+        .AddLmdbStorage("./queue_data")
+        .WithDeadLetterQueue(options =>
+        {
+            options.GlobalMaxAttemptsForMessage = 5;  // Default is 3
+        })
+        .CreateQueues("my-queue");
+});
+```
+
+**How it works:**
+- If a message has `maxAttempts` set, the **lower** of the two values takes precedence.
+- Example: `GlobalMaxAttemptsForMessage = 5`, message has `maxAttempts: 10` → DLQ after 5 attempts.
+- Example: `GlobalMaxAttemptsForMessage = 5`, message has `maxAttempts: 3` → DLQ after 3 attempts.
+- Messages without `maxAttempts` are dead-lettered after reaching the global max.
 
 ### DLQ Metrics (OpenTelemetry)
 

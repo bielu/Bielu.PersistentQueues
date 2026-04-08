@@ -155,4 +155,15 @@ public interface IQueue : IDisposable, IAsyncDisposable
     /// All moves happen in a single atomic transaction.
     /// </remarks>
     int RequeueDeadLetterMessages();
+
+    /// <summary>
+    /// Permanently removes all messages from the dead letter queue.
+    /// </summary>
+    /// <returns>The number of messages that were deleted.</returns>
+    /// <remarks>
+    /// This operation permanently deletes all messages in the dead letter queue.
+    /// Use with caution as this action cannot be undone.
+    /// All deletions happen in a single atomic transaction.
+    /// </remarks>
+    int ClearDeadLetterQueue();
 }

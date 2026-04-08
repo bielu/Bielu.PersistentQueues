@@ -488,4 +488,65 @@ public class DeadLetterQueueTests : TestBase
             await Task.CompletedTask;
         }, TimeSpan.FromSeconds(3));
     }
+
+    // ─── ClearDeadLetterQueue ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ClearDeadLetterQueue_RemovesAllMessages()
+    {
+        await QueueScenario(
+            config => config.WithDeadLetterQueue(),
+            async (queue, token) =>
+        {
+            // Add 3 messages to DLQ
+            var message1 = Message.Create(data: Encoding.UTF8.GetBytes("msg1"), queue: "test", maxAttempts: 1);
+            var message2 = Message.Create(data: Encoding.UTF8.GetBytes("msg2"), queue: "test", maxAttempts: 1);
+            var message3 = Message.Create(data: Encoding.UTF8.GetBytes("msg3"), queue: "test", maxAttempts: 1);
+
+            queue.Enqueue(message1);
+            queue.Enqueue(message2);
+            queue.Enqueue(message3);
+
+            // Process and move to DLQ
+            var ctx1 = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            ctx1.QueueContext.ReceiveLater(TimeSpan.FromHours(1));
+            ctx1.QueueContext.CommitChanges();
+
+            var ctx2 = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            ctx2.QueueContext.ReceiveLater(TimeSpan.FromHours(1));
+            ctx2.QueueContext.CommitChanges();
+
+            var ctx3 = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            ctx3.QueueContext.ReceiveLater(TimeSpan.FromHours(1));
+            ctx3.QueueContext.CommitChanges();
+
+            // Verify DLQ has 3 messages
+            var store = (LmdbMessageStore)queue.Store;
+            var dlqName = DeadLetterConstants.QueueName;
+            store.PersistedIncoming(dlqName).Count().ShouldBe(3);
+
+            // Clear DLQ
+            var count = queue.ClearDeadLetterQueue();
+            count.ShouldBe(3);
+
+            // Verify DLQ is empty
+            store.PersistedIncoming(dlqName).ShouldBeEmpty();
+
+            // Verify original queue is still empty (messages not requeued)
+            store.PersistedIncoming("test").ShouldBeEmpty();
+        }, TimeSpan.FromSeconds(3));
+    }
+
+    [Fact]
+    public async Task ClearDeadLetterQueue_ReturnsZeroForEmptyDlq()
+    {
+        await QueueScenario(
+            config => config.WithDeadLetterQueue(),
+            async (queue, token) =>
+        {
+            var count = queue.ClearDeadLetterQueue();
+            count.ShouldBe(0);
+            await Task.CompletedTask;
+        }, TimeSpan.FromSeconds(3));
+    }
 }

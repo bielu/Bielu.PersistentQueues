@@ -71,7 +71,7 @@ internal class QueueContext : IQueueContext
             throw new InvalidOperationException("Cannot call ReceiveLater after SuccessfullyReceived or MoveTo has been called on this message.");
         _messageDisposed = true;
         var updatedMessage = _message.WithProcessingAttempts(_message.ProcessingAttempts + 1);
-        if (_queue._deadLetterOptions.Enabled && (_message.MaxAttempts.HasValue && updatedMessage.ProcessingAttempts >= _message.MaxAttempts.Value) || _queue._deadLetterOptions.GlobalMaxAttemptsForMessage >= updatedMessage.ProcessingAttempts)
+        if (_queue._deadLetterOptions.Enabled && ((_message.MaxAttempts.HasValue && updatedMessage.ProcessingAttempts >= _message.MaxAttempts.Value) || _queue._deadLetterOptions.GlobalMaxAttemptsForMessage <= updatedMessage.ProcessingAttempts))
         {
             var dlqName = DeadLetterConstants.QueueName;
             _queue.Store.CreateQueue(dlqName);
@@ -87,7 +87,7 @@ internal class QueueContext : IQueueContext
             throw new InvalidOperationException("Cannot call ReceiveLater after SuccessfullyReceived or MoveTo has been called on this message.");
         _messageDisposed = true;
         var updatedMessage = _message.WithProcessingAttempts(_message.ProcessingAttempts + 1);
-        if (_queue._deadLetterOptions.Enabled && (_message.MaxAttempts.HasValue && updatedMessage.ProcessingAttempts >= _message.MaxAttempts.Value) || _queue._deadLetterOptions.GlobalMaxAttemptsForMessage >= updatedMessage.ProcessingAttempts)
+        if (_queue._deadLetterOptions.Enabled && ((_message.MaxAttempts.HasValue && updatedMessage.ProcessingAttempts >= _message.MaxAttempts.Value) || _queue._deadLetterOptions.GlobalMaxAttemptsForMessage <= updatedMessage.ProcessingAttempts))
         {
             var dlqName = DeadLetterConstants.QueueName;
             _queue.Store.CreateQueue(dlqName);

@@ -285,8 +285,8 @@ public class BatchQueueContext : IBatchQueueContext
         if (!dlqEnabled)
             return ([], updatedMessages);
         
-        var dlq = updatedMessages.Where(m =>( m.MaxAttempts.HasValue && m.ProcessingAttempts >= m.MaxAttempts.Value)|| _queue._deadLetterOptions.GlobalMaxAttemptsForMessage >=m.ProcessingAttempts).ToArray();
-        var retry = updatedMessages.Where(m => (!m.MaxAttempts.HasValue || m.ProcessingAttempts < m.MaxAttempts.Value)||  _queue._deadLetterOptions.GlobalMaxAttemptsForMessage <m.ProcessingAttempts).ToArray();
+        var dlq = updatedMessages.Where(m =>( m.MaxAttempts.HasValue && m.ProcessingAttempts >= m.MaxAttempts.Value)|| _queue._deadLetterOptions.GlobalMaxAttemptsForMessage <=m.ProcessingAttempts).ToArray();
+        var retry = updatedMessages.Where(m => (!m.MaxAttempts.HasValue || m.ProcessingAttempts < m.MaxAttempts.Value)&&  _queue._deadLetterOptions.GlobalMaxAttemptsForMessage >m.ProcessingAttempts).ToArray();
         return (dlq, retry);
     }
 

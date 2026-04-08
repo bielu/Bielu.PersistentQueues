@@ -176,6 +176,10 @@ public class PartitionedQueue : IPartitionedQueue
         => _innerQueue.RequeueDeadLetterMessages();
 
     /// <inheritdoc />
+    public int ClearDeadLetterQueue()
+        => _innerQueue.ClearDeadLetterQueue();
+
+    /// <inheritdoc />
     public void Dispose()
     {
         foreach (var semaphore in _partitionLocks.Values)
