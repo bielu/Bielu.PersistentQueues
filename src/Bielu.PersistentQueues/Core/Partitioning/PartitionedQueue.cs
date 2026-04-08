@@ -55,8 +55,27 @@ public class PartitionedQueue : IPartitionedQueue
     /// <inheritdoc />
     public IMessageStore Store => _innerQueue.Store;
 
-    /// <inheritdoc />
-    public string[] Queues => _innerQueue.Queues;
+    /// <summary>
+    /// Gets the logical queue names, collapsing partitioned sub-queues (e.g.
+    /// <c>orders:partition-0</c> … <c>orders:partition-3</c>) into their base
+    /// queue name (<c>orders</c>). Non-partitioned queues are returned as-is.
+    /// </summary>
+    public string[] Queues
+    {
+        get
+        {
+            var rawQueues = _innerQueue.Queues;
+            var logicalQueues = new HashSet<string>();
+            foreach (var q in rawQueues)
+            {
+                if (PartitionConstants.TryParsePartitionQueueName(q, out var baseName, out _))
+                    logicalQueues.Add(baseName);
+                else
+                    logicalQueues.Add(q);
+            }
+            return logicalQueues.ToArray();
+        }
+    }
 
     /// <inheritdoc />
     public IPEndPoint Endpoint => _innerQueue.Endpoint;
@@ -351,6 +370,54 @@ public class PartitionedQueue : IPartitionedQueue
             throw new InvalidOperationException($"No partitions found for queue '{queueName}'. Call CreatePartitionedQueue first.");
 
         return PartitionStrategy.GetPartition(message, partitionCount);
+    }
+
+    /// <inheritdoc />
+    public long GetPartitionMessageCount(string queueName, int partition)
+    {
+        ValidatePartition(queueName, partition);
+        var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
+        return Store.GetMessageCount(partitionQueueName);
+    }
+
+    /// <inheritdoc />
+    public int[] GetActivePartitions(string queueName)
+    {
+        var partitionCount = GetPartitionCount(queueName);
+        if (partitionCount == 0)
+            return [];
+
+        var active = new List<int>();
+        for (var i = 0; i < partitionCount; i++)
+        {
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, i);
+            if (Store.GetMessageCount(partitionQueueName) > 0)
+                active.Add(i);
+        }
+        return active.ToArray();
+    }
+
+    /// <inheritdoc />
+    public int[] GetAvailablePartitions(string queueName)
+    {
+        var partitionCount = GetPartitionCount(queueName);
+        if (partitionCount == 0)
+            return [];
+
+        var available = new List<int>();
+        for (var i = 0; i < partitionCount; i++)
+        {
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, i);
+
+            // Check lock state first (cheap) before checking message count (slightly more expensive)
+            var partitionLock = GetPartitionLock(partitionQueueName);
+            if (partitionLock.CurrentCount == 0)
+                continue; // locked by another consumer
+
+            if (Store.GetMessageCount(partitionQueueName) > 0)
+                available.Add(i);
+        }
+        return available.ToArray();
     }
 
     private void ValidatePartition(string queueName, int partition)

@@ -137,39 +137,53 @@ internal sealed class PartitionCoordinatorService(
 
     private async Task RunWorkerAsync(int[] partitions, CancellationToken ct)
     {
-        int cursor = 0;
-
         while (!ct.IsCancellationRequested)
         {
-            int partition = partitions[cursor % partitions.Length];
-            cursor++;
+            // Ask the queue which of our assigned partitions are available
+            // (have messages AND are not locked by another consumer).
+            var available = queue.GetAvailablePartitions(OrdersQueue)
+                .Where(p => partitions.Contains(p))
+                .ToArray();
 
-            bool lockAcquired = false;
-            try
+            if (available.Length == 0)
             {
-                await batchLock.WaitAsync(ct);
-                lockAcquired = true;
-
-                await foreach (var batch in queue.ReceiveBatchFromPartition(
-                    OrdersQueue,
-                    partition,
-                    maxMessages: 50,
-                    batchTimeoutInMilliseconds: 10,
-                    pollIntervalInMilliseconds: 5,
-                    cancellationToken: ct))
-                {
-                    if (batch.Messages.Length > 0)
-                    {
-                        stats.AddOrdersProcessed(batch.Messages.Length);
-                        batch.SuccessfullyReceived();
-                    }
-                    break; // one batch per rotation
-                }
+                // No work right now — sleep briefly and re-check.
+                try { await Task.Delay(10, ct); }
+                catch (OperationCanceledException) { break; }
+                continue;
             }
-            catch (OperationCanceledException) { break; }
-            finally
+
+            foreach (var partition in available)
             {
-                if (lockAcquired) batchLock.Release();
+                if (ct.IsCancellationRequested) break;
+
+                bool lockAcquired = false;
+                try
+                {
+                    await batchLock.WaitAsync(ct);
+                    lockAcquired = true;
+
+                    await foreach (var batch in queue.ReceiveBatchFromPartition(
+                        OrdersQueue,
+                        partition,
+                        maxMessages: 50,
+                        batchTimeoutInMilliseconds: 10,
+                        pollIntervalInMilliseconds: 5,
+                        cancellationToken: ct))
+                    {
+                        if (batch.Messages.Length > 0)
+                        {
+                            stats.AddOrdersProcessed(batch.Messages.Length);
+                            batch.SuccessfullyReceived();
+                        }
+                        break; // one batch per partition per rotation
+                    }
+                }
+                catch (OperationCanceledException) { break; }
+                finally
+                {
+                    if (lockAcquired) batchLock.Release();
+                }
             }
         }
     }

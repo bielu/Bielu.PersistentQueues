@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Bielu.PersistentQueues.Serialization;
 
 namespace Bielu.PersistentQueues.Storage;
@@ -270,6 +271,22 @@ public interface IMessageStore : IDisposable
     /// all messages and queue definitions from the store.
     /// </remarks>
     void ClearAllStorage();
+
+    /// <summary>
+    /// Gets the number of persisted incoming messages for a specified queue.
+    /// </summary>
+    /// <param name="queueName">The name of the queue to count messages in.</param>
+    /// <returns>The number of messages in the queue.</returns>
+    /// <remarks>
+    /// This method provides a lightweight way to check how many messages are in a queue
+    /// without enumerating them. Implementations should override this with efficient O(1)
+    /// mechanisms (e.g., LMDB database statistics) when available.
+    /// The default implementation enumerates <see cref="PersistedIncoming"/>.
+    /// </remarks>
+    long GetMessageCount(string queueName)
+    {
+        return PersistedIncoming(queueName).Count();
+    }
 
     /// <summary>
     /// Gets storage usage information including used bytes, total bytes, and usage percentage.

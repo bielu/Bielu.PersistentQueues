@@ -84,4 +84,43 @@ public interface IPartitionedQueue : IQueue
     /// <param name="message">The message to check. The queue name is read from <see cref="Message.QueueString"/>.</param>
     /// <returns>The zero-based partition index.</returns>
     int ResolvePartition(Message message);
+
+    /// <summary>
+    /// Gets the number of persisted messages in a specific partition of a queue.
+    /// </summary>
+    /// <param name="queueName">The base queue name.</param>
+    /// <param name="partition">The zero-based partition index.</param>
+    /// <returns>The number of messages in the specified partition.</returns>
+    /// <remarks>
+    /// This method provides a lightweight way to check whether a partition has messages
+    /// without starting a full receive operation. It is useful for workers that need to
+    /// skip empty partitions to avoid blocking on partitions with no data.
+    /// </remarks>
+    long GetPartitionMessageCount(string queueName, int partition);
+
+    /// <summary>
+    /// Gets the partition indices that have at least one persisted message (non-empty partitions).
+    /// </summary>
+    /// <param name="queueName">The base queue name.</param>
+    /// <returns>An array of zero-based partition indices that contain messages.</returns>
+    /// <remarks>
+    /// This method checks every partition of the specified queue and returns only those
+    /// that currently have messages. It does not consider lock state — a partition may
+    /// be active but currently held by another consumer.
+    /// </remarks>
+    int[] GetActivePartitions(string queueName);
+
+    /// <summary>
+    /// Gets the partition indices that have at least one persisted message and are not
+    /// currently locked by another consumer.
+    /// </summary>
+    /// <param name="queueName">The base queue name.</param>
+    /// <returns>An array of zero-based partition indices that contain messages and are not locked.</returns>
+    /// <remarks>
+    /// This is the recommended method for workers that need to pick a partition to consume from.
+    /// It combines the message-count check with the internal partition lock state, so callers
+    /// do not need to guess which partitions are available. A partition is considered available
+    /// when it has messages <b>and</b> no other consumer currently holds its exclusive lock.
+    /// </remarks>
+    int[] GetAvailablePartitions(string queueName);
 }

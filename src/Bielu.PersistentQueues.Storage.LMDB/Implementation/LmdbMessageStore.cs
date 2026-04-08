@@ -979,6 +979,29 @@ public class LmdbMessageStore : IMessageStore
         return new StorageUsageInfo(usedBytes, totalBytes);
     }
 
+    /// <summary>
+    /// Gets the number of persisted incoming messages for a specified queue using
+    /// LMDB's O(1) database statistics instead of enumerating all messages.
+    /// </summary>
+    /// <param name="queueName">The name of the queue to count messages in.</param>
+    /// <returns>The number of messages in the queue.</returns>
+    public long GetMessageCount(string queueName)
+    {
+        CheckDisposed();
+
+        _lock.EnterReadLock();
+        try
+        {
+            var db = GetCachedDatabase(queueName);
+            using var tx = _environment.BeginTransaction(TransactionBeginFlags.ReadOnly);
+            return tx.GetEntriesCount(db);
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+    }
+
 
 
     public void Dispose()

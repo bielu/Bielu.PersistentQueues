@@ -26,6 +26,8 @@ internal static class MetricNames
     public const string PartitionCreated = "bielupersistentqueues.partition.created";
     public const string PartitionEnqueueDuration = "bielupersistentqueues.partition.enqueue.duration";
     public const string PartitionsActive = "bielupersistentqueues.partitions.active";
+    public const string PartitionsPerQueue = "bielupersistentqueues.partitions.per_queue";
+    public const string PartitionsActivePerQueue = "bielupersistentqueues.partitions.active_per_queue";
     public const string PartitionConsumersActive = "bielupersistentqueues.partition.consumers.active";
     public const string PartitionProducersActive = "bielupersistentqueues.partition.producers.active";
 

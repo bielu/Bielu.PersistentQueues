@@ -292,6 +292,53 @@ public class PartitionedQueueTests : TestBase
     }
 
     [Fact]
+    public void queues_collapses_partitions_into_single_logical_queue()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            partitioned.CreatePartitionedQueue("orders", 4);
+
+            // The logical view should show "test" (from PartitionedStorageScenario) and "orders"
+            // but NOT the individual partition sub-queues
+            var queues = partitioned.Queues;
+            queues.ShouldContain("test");
+            queues.ShouldContain("orders");
+            queues.ShouldNotContain("orders:partition-0");
+            queues.ShouldNotContain("orders:partition-1");
+            queues.ShouldNotContain("orders:partition-2");
+            queues.ShouldNotContain("orders:partition-3");
+        });
+    }
+
+    [Fact]
+    public void queues_includes_non_partitioned_queues()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            innerQueue.CreateQueue("plain-queue");
+            partitioned.CreatePartitionedQueue("orders", 2);
+
+            var queues = partitioned.Queues;
+            queues.ShouldContain("test"); // from scenario
+            queues.ShouldContain("plain-queue");
+            queues.ShouldContain("orders"); // collapsed from partition sub-queues
+            queues.Length.ShouldBe(3);
+        });
+    }
+
+    [Fact]
     public void resolve_partition_is_consistent_for_same_key()
     {
         PartitionedStorageScenario(store =>
@@ -420,6 +467,238 @@ public class PartitionedQueueTests : TestBase
         var msg = Message.Create(data: Encoding.UTF8.GetBytes("data"), queue: "test");
         msg.PartitionKey.IsEmpty.ShouldBeTrue();
         msg.PartitionKeyString.ShouldBeNull();
+    }
+
+    [Fact]
+    public void get_message_count_returns_zero_for_empty_queue()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            store.GetMessageCount("test").ShouldBe(0);
+        });
+    }
+
+    [Fact]
+    public void get_message_count_returns_correct_count_after_enqueue()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var messages = Enumerable.Range(0, 5)
+                .Select(i => Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "test"))
+                .ToList();
+            store.StoreIncoming(messages);
+
+            store.GetMessageCount("test").ShouldBe(5);
+        });
+    }
+
+    [Fact]
+    public void get_message_count_updates_after_removal()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var messages = Enumerable.Range(0, 3)
+                .Select(i => Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "test"))
+                .ToList();
+            store.StoreIncoming(messages);
+            store.GetMessageCount("test").ShouldBe(3);
+
+            using var tx = store.BeginTransaction();
+            store.SuccessfullyReceived(tx, messages[0]);
+            tx.Commit();
+
+            store.GetMessageCount("test").ShouldBe(2);
+        });
+    }
+
+    [Fact]
+    public void get_partition_message_count_returns_zero_for_empty_partition()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+            partitioned.CreatePartitionedQueue("orders", 4);
+
+            partitioned.GetPartitionMessageCount("orders", 0).ShouldBe(0);
+            partitioned.GetPartitionMessageCount("orders", 1).ShouldBe(0);
+            partitioned.GetPartitionMessageCount("orders", 2).ShouldBe(0);
+            partitioned.GetPartitionMessageCount("orders", 3).ShouldBe(0);
+        });
+    }
+
+    [Fact]
+    public void get_partition_message_count_returns_correct_count()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+            partitioned.CreatePartitionedQueue("orders", 4);
+
+            // Enqueue 3 messages to partition 1
+            for (int i = 0; i < 3; i++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "orders");
+                partitioned.EnqueueToPartition(msg, 1);
+            }
+
+            partitioned.GetPartitionMessageCount("orders", 0).ShouldBe(0);
+            partitioned.GetPartitionMessageCount("orders", 1).ShouldBe(3);
+            partitioned.GetPartitionMessageCount("orders", 2).ShouldBe(0);
+            partitioned.GetPartitionMessageCount("orders", 3).ShouldBe(0);
+        });
+    }
+
+    [Fact]
+    public void get_partition_message_count_out_of_range_throws()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+            partitioned.CreatePartitionedQueue("orders", 4);
+
+            Should.Throw<ArgumentOutOfRangeException>(() => partitioned.GetPartitionMessageCount("orders", 5));
+            Should.Throw<ArgumentOutOfRangeException>(() => partitioned.GetPartitionMessageCount("orders", -1));
+        });
+    }
+
+    [Fact]
+    public void get_active_partitions_returns_empty_when_no_messages()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+            partitioned.CreatePartitionedQueue("orders", 4);
+
+            partitioned.GetActivePartitions("orders").ShouldBeEmpty();
+        });
+    }
+
+    [Fact]
+    public void get_active_partitions_returns_only_non_empty_partitions()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+            partitioned.CreatePartitionedQueue("orders", 4);
+
+            // Enqueue messages to partitions 1 and 3 only
+            var msg1 = Message.Create(data: Encoding.UTF8.GetBytes("a"), queue: "orders");
+            partitioned.EnqueueToPartition(msg1, 1);
+            var msg2 = Message.Create(data: Encoding.UTF8.GetBytes("b"), queue: "orders");
+            partitioned.EnqueueToPartition(msg2, 3);
+
+            var active = partitioned.GetActivePartitions("orders");
+            active.ShouldBe(new[] { 1, 3 });
+        });
+    }
+
+    [Fact]
+    public void get_active_partitions_returns_empty_for_unknown_queue()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            // Queue "nope" was never created — should get empty array, not an exception
+            partitioned.GetActivePartitions("nope").ShouldBeEmpty();
+        });
+    }
+
+    [Fact]
+    public void get_available_partitions_returns_non_empty_unlocked_partitions()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+            partitioned.CreatePartitionedQueue("orders", 4);
+
+            // Enqueue to partitions 0, 1, 2
+            for (int p = 0; p < 3; p++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{p}"), queue: "orders");
+                partitioned.EnqueueToPartition(msg, p);
+            }
+
+            // Without any consumer, all non-empty partitions should be available
+            var available = partitioned.GetAvailablePartitions("orders");
+            available.ShouldBe(new[] { 0, 1, 2 });
+        });
+    }
+
+    [Fact]
+    public async Task get_available_partitions_excludes_locked_partitions()
+    {
+        await PartitionedQueueScenario(async (queue, token) =>
+        {
+            var partitioned = new PartitionedQueue(queue, new HashPartitionStrategy());
+            partitioned.CreatePartitionedQueue("orders", 4);
+
+            // Enqueue to partitions 0 and 1
+            for (int p = 0; p < 2; p++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{p}"), queue: "orders");
+                partitioned.EnqueueToPartition(msg, p);
+            }
+
+            // Start a consumer on partition 0 to hold the lock
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            var consumerStarted = new TaskCompletionSource();
+
+            var consumerTask = Task.Run(async () =>
+            {
+                await foreach (var ctx in partitioned.ReceiveFromPartition("orders", 0, 50, cts.Token))
+                {
+                    consumerStarted.TrySetResult();
+                    // Hold the lock while we wait — don't process
+                    try { await Task.Delay(Timeout.Infinite, cts.Token); }
+                    catch (OperationCanceledException) { }
+                    break;
+                }
+            }, cts.Token);
+
+            // Wait until the consumer has acquired the partition lock
+            await consumerStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+
+            // Partition 0 is locked, partition 1 has messages, partitions 2+3 are empty
+            var available = partitioned.GetAvailablePartitions("orders");
+            available.ShouldBe(new[] { 1 });
+
+            // Also verify GetActivePartitions still sees partition 0 (it has messages, just locked)
+            var active = partitioned.GetActivePartitions("orders");
+            active.ShouldBe(new[] { 0, 1 });
+
+            await cts.CancelAsync();
+            try { await consumerTask; }
+            catch (OperationCanceledException) { }
+        }, TimeSpan.FromSeconds(10));
     }
 
     /// <summary>
