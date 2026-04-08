@@ -976,7 +976,38 @@ public class LmdbMessageStore : IMessageStore
         // LastPageNumber is 0-based, so used pages = LastPageNumber + 1
         var usedBytes = (info.LastPageNumber + 1) * stats.PageSize;
 
-        return new StorageUsageInfo(usedBytes, totalBytes);
+        // Calculate free bytes from the environment stats
+        long freeBytes = 0;
+        try
+        {
+            // In LMDB, the free list is stored in a special database with ID 0.
+            // LightningDB EnvironmentStats mapping for free pages is ms_free_pages.
+            // We iterate all members of EnvironmentStats to find anything related to free pages.
+            var type = stats.GetType();
+            var members = type.GetMembers(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            foreach (var member in members)
+            {
+                if (member.Name.Contains("free", StringComparison.OrdinalIgnoreCase) && member.Name.Contains("page", StringComparison.OrdinalIgnoreCase))
+                {
+                    object? value = null;
+                    if (member is System.Reflection.PropertyInfo p) value = p.GetValue(stats);
+                    else if (member is System.Reflection.FieldInfo f) value = f.GetValue(stats);
+                    
+                    if (value != null)
+                    {
+                        freeBytes = Convert.ToInt64(value) * stats.PageSize;
+                        break;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Fallback to 0
+        }
+
+        return new StorageUsageInfo(usedBytes, totalBytes, freeBytes);
     }
 
     /// <summary>
