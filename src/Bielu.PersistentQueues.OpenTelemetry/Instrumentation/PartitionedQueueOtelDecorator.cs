@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Linq;
@@ -27,15 +28,60 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
         _partitionedQueue = partitionedQueue;
         _metrics = queueMetrics;
         _activitySource = activitySource;
+
+        // Total active (non-empty) partitions across all queues
         _activePartitionsGauge = _metrics.CreateActivePartitionsGauge(() =>
         {
-            // Sum up partition counts across all known queues
-            var queues = _partitionedQueue.Queues;
-            return queues.Count(q => q.Contains(Bielu.PersistentQueues.Partitioning.PartitionConstants.PartitionSeparator));
+            int total = 0;
+            foreach (var queueName in GetPartitionedQueueNames())
+                total += _partitionedQueue.GetActivePartitions(queueName).Length;
+            return total;
+        });
+
+        // Per-queue: total partition count
+        _partitionsPerQueueGauge = _metrics.CreatePartitionsPerQueueGauge(() =>
+        {
+            var measurements = new List<Measurement<int>>();
+            foreach (var queueName in GetPartitionedQueueNames())
+            {
+                var count = _partitionedQueue.GetPartitionCount(queueName);
+                measurements.Add(new Measurement<int>(count,
+                    new KeyValuePair<string, object?>("queue.name", queueName)));
+            }
+            return measurements;
+        });
+
+        // Per-queue: active (non-empty) partition count
+        _activePartitionsPerQueueGauge = _metrics.CreateActivePartitionsPerQueueGauge(() =>
+        {
+            var measurements = new List<Measurement<int>>();
+            foreach (var queueName in GetPartitionedQueueNames())
+            {
+                var active = _partitionedQueue.GetActivePartitions(queueName).Length;
+                measurements.Add(new Measurement<int>(active,
+                    new KeyValuePair<string, object?>("queue.name", queueName)));
+            }
+            return measurements;
         });
     }
 
     private readonly ObservableGauge<int> _activePartitionsGauge;
+    private readonly ObservableGauge<int> _partitionsPerQueueGauge;
+    private readonly ObservableGauge<int> _activePartitionsPerQueueGauge;
+
+    /// <summary>
+    /// Returns the base names of all partitioned queues currently known to the system.
+    /// Uses the logical <see cref="IQueue.Queues"/> view (which already collapses
+    /// partition sub-queues) and filters to those that have partitions.
+    /// </summary>
+    private IEnumerable<string> GetPartitionedQueueNames()
+    {
+        foreach (var queueName in _partitionedQueue.Queues)
+        {
+            if (_partitionedQueue.GetPartitionCount(queueName) > 0)
+                yield return queueName;
+        }
+    }
 
     /// <inheritdoc />
     public int GetPartitionCount(string queueName)

@@ -292,6 +292,53 @@ public class PartitionedQueueTests : TestBase
     }
 
     [Fact]
+    public void queues_collapses_partitions_into_single_logical_queue()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            partitioned.CreatePartitionedQueue("orders", 4);
+
+            // The logical view should show "test" (from PartitionedStorageScenario) and "orders"
+            // but NOT the individual partition sub-queues
+            var queues = partitioned.Queues;
+            queues.ShouldContain("test");
+            queues.ShouldContain("orders");
+            queues.ShouldNotContain("orders:partition-0");
+            queues.ShouldNotContain("orders:partition-1");
+            queues.ShouldNotContain("orders:partition-2");
+            queues.ShouldNotContain("orders:partition-3");
+        });
+    }
+
+    [Fact]
+    public void queues_includes_non_partitioned_queues()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            innerQueue.CreateQueue("plain-queue");
+            partitioned.CreatePartitionedQueue("orders", 2);
+
+            var queues = partitioned.Queues;
+            queues.ShouldContain("test"); // from scenario
+            queues.ShouldContain("plain-queue");
+            queues.ShouldContain("orders"); // collapsed from partition sub-queues
+            queues.Length.ShouldBe(3);
+        });
+    }
+
+    [Fact]
     public void resolve_partition_is_consistent_for_same_key()
     {
         PartitionedStorageScenario(store =>

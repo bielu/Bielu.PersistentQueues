@@ -55,8 +55,27 @@ public class PartitionedQueue : IPartitionedQueue
     /// <inheritdoc />
     public IMessageStore Store => _innerQueue.Store;
 
-    /// <inheritdoc />
-    public string[] Queues => _innerQueue.Queues;
+    /// <summary>
+    /// Gets the logical queue names, collapsing partitioned sub-queues (e.g.
+    /// <c>orders:partition-0</c> … <c>orders:partition-3</c>) into their base
+    /// queue name (<c>orders</c>). Non-partitioned queues are returned as-is.
+    /// </summary>
+    public string[] Queues
+    {
+        get
+        {
+            var rawQueues = _innerQueue.Queues;
+            var result = new HashSet<string>();
+            foreach (var q in rawQueues)
+            {
+                if (PartitionConstants.TryParsePartitionQueueName(q, out var baseName, out _))
+                    result.Add(baseName);
+                else
+                    result.Add(q);
+            }
+            return result.ToArray();
+        }
+    }
 
     /// <inheritdoc />
     public IPEndPoint Endpoint => _innerQueue.Endpoint;

@@ -306,7 +306,23 @@ public sealed class QueueMetrics
         return _meter.CreateObservableGauge(
             MetricNames.PartitionsActive,
             () => new Measurement<int>(observeValue()),
-            description: "Number of active partitions across all queues");
+            description: "Total number of active (non-empty) partitions across all queues");
+    }
+
+    public ObservableGauge<int> CreatePartitionsPerQueueGauge(Func<IEnumerable<Measurement<int>>> observeValues)
+    {
+        return _meter.CreateObservableGauge(
+            MetricNames.PartitionsPerQueue,
+            observeValues,
+            description: "Number of partitions per queue");
+    }
+
+    public ObservableGauge<int> CreateActivePartitionsPerQueueGauge(Func<IEnumerable<Measurement<int>>> observeValues)
+    {
+        return _meter.CreateObservableGauge(
+            MetricNames.PartitionsActivePerQueue,
+            observeValues,
+            description: "Number of active (non-empty) partitions per queue");
     }
 
     /// <summary>
