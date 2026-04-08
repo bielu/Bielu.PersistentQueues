@@ -361,6 +361,46 @@ public class PartitionedQueue : IPartitionedQueue
         return Store.GetMessageCount(partitionQueueName);
     }
 
+    /// <inheritdoc />
+    public int[] GetActivePartitions(string queueName)
+    {
+        var partitionCount = GetPartitionCount(queueName);
+        if (partitionCount == 0)
+            return [];
+
+        var active = new List<int>();
+        for (var i = 0; i < partitionCount; i++)
+        {
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, i);
+            if (Store.GetMessageCount(partitionQueueName) > 0)
+                active.Add(i);
+        }
+        return active.ToArray();
+    }
+
+    /// <inheritdoc />
+    public int[] GetAvailablePartitions(string queueName)
+    {
+        var partitionCount = GetPartitionCount(queueName);
+        if (partitionCount == 0)
+            return [];
+
+        var available = new List<int>();
+        for (var i = 0; i < partitionCount; i++)
+        {
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, i);
+
+            // Check lock state first (cheap) before checking message count (slightly more expensive)
+            var partitionLock = GetPartitionLock(partitionQueueName);
+            if (partitionLock.CurrentCount == 0)
+                continue; // locked by another consumer
+
+            if (Store.GetMessageCount(partitionQueueName) > 0)
+                available.Add(i);
+        }
+        return available.ToArray();
+    }
+
     private void ValidatePartition(string queueName, int partition)
     {
         if (partition < 0)

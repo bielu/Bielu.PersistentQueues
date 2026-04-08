@@ -194,4 +194,16 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
     {
         return _partitionedQueue.GetPartitionMessageCount(queueName, partition);
     }
+
+    /// <inheritdoc />
+    public int[] GetActivePartitions(string queueName)
+    {
+        return _partitionedQueue.GetActivePartitions(queueName);
+    }
+
+    /// <inheritdoc />
+    public int[] GetAvailablePartitions(string queueName)
+    {
+        return _partitionedQueue.GetAvailablePartitions(queueName);
+    }
 }

@@ -97,4 +97,30 @@ public interface IPartitionedQueue : IQueue
     /// skip empty partitions to avoid blocking on partitions with no data.
     /// </remarks>
     long GetPartitionMessageCount(string queueName, int partition);
+
+    /// <summary>
+    /// Gets the partition indices that have at least one persisted message (non-empty partitions).
+    /// </summary>
+    /// <param name="queueName">The base queue name.</param>
+    /// <returns>An array of zero-based partition indices that contain messages.</returns>
+    /// <remarks>
+    /// This method checks every partition of the specified queue and returns only those
+    /// that currently have messages. It does not consider lock state — a partition may
+    /// be active but currently held by another consumer.
+    /// </remarks>
+    int[] GetActivePartitions(string queueName);
+
+    /// <summary>
+    /// Gets the partition indices that have at least one persisted message and are not
+    /// currently locked by another consumer.
+    /// </summary>
+    /// <param name="queueName">The base queue name.</param>
+    /// <returns>An array of zero-based partition indices that contain messages and are not locked.</returns>
+    /// <remarks>
+    /// This is the recommended method for workers that need to pick a partition to consume from.
+    /// It combines the message-count check with the internal partition lock state, so callers
+    /// do not need to guess which partitions are available. A partition is considered available
+    /// when it has messages <b>and</b> no other consumer currently holds its exclusive lock.
+    /// </remarks>
+    int[] GetAvailablePartitions(string queueName);
 }
