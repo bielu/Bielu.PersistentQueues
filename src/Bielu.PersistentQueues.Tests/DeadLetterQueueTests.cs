@@ -549,4 +549,90 @@ public class DeadLetterQueueTests : TestBase
             await Task.CompletedTask;
         }, TimeSpan.FromSeconds(3));
     }
+
+    // ─── ID Persistence Tests ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task ReceiveLater_PreservesMessageId()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            var message = NewMessage("test");
+            var originalId = message.Id;
+            queue.Enqueue(message);
+
+            // First receive and defer
+            var ctx1 = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            ctx1.Message.Id.ShouldBe(originalId);
+            ctx1.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(100));
+            ctx1.QueueContext.CommitChanges();
+
+            await DeterministicDelay(200, token);
+
+            // Second receive - ID should still be the same
+            var ctx2 = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            ctx2.Message.Id.ShouldBe(originalId);
+            ctx2.Message.Id.SourceInstanceId.ShouldBe(originalId.SourceInstanceId);
+            ctx2.Message.Id.MessageIdentifier.ShouldBe(originalId.MessageIdentifier);
+        }, TimeSpan.FromSeconds(3));
+    }
+
+    [Fact]
+    public async Task MoveToDlq_PreservesMessageId()
+    {
+        await QueueScenario(
+            config => config.WithDeadLetterQueue(),
+            async (queue, token) =>
+        {
+            var message = Message.Create(
+                data: Encoding.UTF8.GetBytes("test"),
+                queue: "test",
+                maxAttempts: 1);
+            var originalId = message.Id;
+            queue.Enqueue(message);
+
+            var ctx = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            ctx.Message.Id.ShouldBe(originalId);
+
+            // Trigger auto-DLQ via ReceiveLater with maxAttempts exhausted
+            ctx.QueueContext.ReceiveLater(TimeSpan.FromHours(1));
+            ctx.QueueContext.CommitChanges();
+
+            // Verify message in DLQ has the same ID
+            var store = (LmdbMessageStore)queue.Store;
+            var dlqName = DeadLetterConstants.QueueName;
+            var dlqMessage = store.PersistedIncoming(dlqName).Single();
+            dlqMessage.Id.ShouldBe(originalId);
+            dlqMessage.Id.SourceInstanceId.ShouldBe(originalId.SourceInstanceId);
+            dlqMessage.Id.MessageIdentifier.ShouldBe(originalId.MessageIdentifier);
+        }, TimeSpan.FromSeconds(3));
+    }
+
+    [Fact]
+    public async Task MoveToDeadLetter_Explicit_PreservesMessageId()
+    {
+        await QueueScenario(
+            config => config.WithDeadLetterQueue(),
+            async (queue, token) =>
+        {
+            var message = NewMessage("test");
+            var originalId = message.Id;
+            queue.Enqueue(message);
+
+            var ctx = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            ctx.Message.Id.ShouldBe(originalId);
+
+            // Explicit move to DLQ
+            ctx.QueueContext.MoveToDeadLetter();
+            ctx.QueueContext.CommitChanges();
+
+            // Verify message in DLQ has the same ID
+            var store = (LmdbMessageStore)queue.Store;
+            var dlqName = DeadLetterConstants.QueueName;
+            var dlqMessage = store.PersistedIncoming(dlqName).Single();
+            dlqMessage.Id.ShouldBe(originalId);
+            dlqMessage.Id.SourceInstanceId.ShouldBe(originalId.SourceInstanceId);
+            dlqMessage.Id.MessageIdentifier.ShouldBe(originalId.MessageIdentifier);
+        }, TimeSpan.FromSeconds(3));
+    }
 }

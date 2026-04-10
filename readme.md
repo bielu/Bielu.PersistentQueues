@@ -201,6 +201,20 @@ Bielu.PersistentQueues has built-in support for a **dead letter queue**. When a 
 - Dead-lettered messages carry an `original-queue` header so you always know where they came from.
 - A **processing-attempts** counter is incremented on every `ReceiveLater` call.
 
+### Message ID Persistence
+
+**Message IDs remain constant throughout the entire message lifecycle**, including:
+- Multiple `ReceiveLater` operations (retry/defer)
+- Moving to the dead letter queue (automatic or explicit)
+- Moving between queues with `MoveTo`
+- Reading from storage multiple times
+
+Each `MessageId` consists of two components:
+- `SourceInstanceId`: Identifies the queue instance that generated the message
+- `MessageIdentifier`: A unique GUID (using COMB algorithm for performance)
+
+Both components are preserved across all operations, enabling reliable message tracking, deduplication, and correlation in distributed systems. This persistence is guaranteed by the immutable `Message` struct design.
+
 ### Automatic Dead-Lettering (MaxAttempts)
 
 Set `maxAttempts` when creating a message. When `ReceiveLater` is called and the processing attempt count reaches the limit, the message is moved to the DLQ automatically:

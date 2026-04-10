@@ -111,21 +111,69 @@ public class QueueContextTests : TestBase
     }
     
     [Fact]
+    public async Task MessageId_RemainsConstant_AcrossMultipleReads()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            // Create a message with a specific ID
+            var originalMessage = Message.Create(
+                data: Encoding.UTF8.GetBytes("test data"),
+                queue: "test");
+            var originalId = originalMessage.Id;
+
+            queue.Enqueue(originalMessage);
+
+            // First read
+            var ctx1 = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            ctx1.Message.Id.ShouldBe(originalId);
+            ctx1.Message.Id.SourceInstanceId.ShouldBe(originalId.SourceInstanceId);
+            ctx1.Message.Id.MessageIdentifier.ShouldBe(originalId.MessageIdentifier);
+
+            // Delay and re-read
+            ctx1.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(100));
+            ctx1.QueueContext.CommitChanges();
+
+            await DeterministicDelay(200, token);
+
+            // Second read - should have exact same ID
+            var ctx2 = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            ctx2.Message.Id.ShouldBe(originalId);
+            ctx2.Message.Id.SourceInstanceId.ShouldBe(originalId.SourceInstanceId);
+            ctx2.Message.Id.MessageIdentifier.ShouldBe(originalId.MessageIdentifier);
+
+            // Delay again and re-read
+            ctx2.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(100));
+            ctx2.QueueContext.CommitChanges();
+
+            await DeterministicDelay(200, token);
+
+            // Third read - should still have exact same ID
+            var ctx3 = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            ctx3.Message.Id.ShouldBe(originalId);
+            ctx3.Message.Id.SourceInstanceId.ShouldBe(originalId.SourceInstanceId);
+            ctx3.Message.Id.MessageIdentifier.ShouldBe(originalId.MessageIdentifier);
+
+            ctx3.QueueContext.SuccessfullyReceived();
+            ctx3.QueueContext.CommitChanges();
+        }, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public async Task ReceiveLater_WithDateTimeOffset_DelaysProcessing()
     {
         await QueueScenario(async (queue, token) =>
         {
             var message = NewMessage("test");
             queue.Enqueue(message);
-            
+
             var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             var messageId = receivedContext.Message.Id;
-            
+
             var futureTime = DateTimeOffset.Now.AddMilliseconds(800);
             receivedContext.QueueContext.ReceiveLater(futureTime);
             // ReceiveLater now handles message removal automatically, no need to call SuccessfullyReceived
             receivedContext.QueueContext.CommitChanges();
-            
+
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").Any().ShouldBeFalse();
             
