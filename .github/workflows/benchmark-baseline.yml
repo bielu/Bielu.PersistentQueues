@@ -1,0 +1,67 @@
+name: Update Performance Baseline
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/Bielu.PersistentQueues/**'
+      - 'src/Bielu.PersistentQueues.Storage.LMDB/**'
+      - 'src/Bielu.PersistentQueues.Benchmarks/**'
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore src/Bielu.PersistentQueues.Benchmarks/Bielu.PersistentQueues.Benchmarks.csproj
+
+    - name: Build benchmarks
+      run: dotnet build src/Bielu.PersistentQueues.Benchmarks/Bielu.PersistentQueues.Benchmarks.csproj -c Release --no-restore
+
+    - name: Run regression benchmarks
+      run: |
+        dotnet run --project src/Bielu.PersistentQueues.Benchmarks/Bielu.PersistentQueues.Benchmarks.csproj \
+          -c Release --no-build -- \
+          --filter "*RegressionBenchmark*" \
+          --exporters json \
+          --artifacts ./BenchmarkDotNet.Artifacts
+
+    - name: Store baseline
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-baseline
+        path: ./BenchmarkDotNet.Artifacts/results/
+        retention-days: 365  # Keep baseline for 1 year
+
+    - name: Generate summary report
+      run: |
+        echo "# Performance Baseline Updated" > $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "**Date:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Baseline benchmark results have been stored and will be used for PR comparisons." >> $GITHUB_STEP_SUMMARY
+
+    - name: Commit baseline to repository (optional)
+      continue-on-error: true
+      run: |
+        mkdir -p .benchmarks
+        cp -r ./BenchmarkDotNet.Artifacts/results/* .benchmarks/
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add .benchmarks/
+        git commit -m "chore: update performance baseline [skip ci]" || echo "No changes to commit"
+        git push || echo "Nothing to push"
