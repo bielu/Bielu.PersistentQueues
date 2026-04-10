@@ -28,6 +28,9 @@ public class RegressionBenchmark
     [Params(64, 512)]
     public int MessageDataSize { get; set; }
 
+    /// <summary>
+    /// Sets up a temporary LMDB-backed queue environment, creates and starts a "test" queue, pre-generates deterministic test messages, and initializes a cancellation token source.
+    /// </summary>
     [GlobalSetup]
     public void GlobalSetup()
     {
@@ -62,6 +65,12 @@ public class RegressionBenchmark
         _cts = new CancellationTokenSource();
     }
 
+    /// <summary>
+    /// Cleans up benchmark resources by cancelling and disposing the cancellation token, disposing the queue, and removing the temporary queue directory.
+    /// </summary>
+    /// <remarks>
+    /// If the temporary queue directory exists, it will be deleted recursively.
+    /// </remarks>
     [GlobalCleanup]
     public void GlobalCleanup()
     {
@@ -74,6 +83,9 @@ public class RegressionBenchmark
         }
     }
 
+    /// <summary>
+    /// Enqueues all pre-generated messages into the configured benchmark queue.
+    /// </summary>
     [Benchmark(Description = "Enqueue messages")]
     public void Enqueue()
     {
@@ -83,6 +95,9 @@ public class RegressionBenchmark
         }
     }
 
+    /// <summary>
+    /// Enqueues the pre-generated messages into the "test" queue, then receives messages and acknowledges each until the configured MessageCount has been processed.
+    /// </summary>
     [Benchmark(Description = "Receive and acknowledge messages")]
     public async Task ReceiveAndAcknowledge()
     {
@@ -103,6 +118,9 @@ public class RegressionBenchmark
         }
     }
 
+    /// <summary>
+    /// Enqueues the pre-generated messages and processes them by receiving batches (up to 10 messages), marking each batch as successfully received and committing changes until MessageCount messages have been processed.
+    /// </summary>
     [Benchmark(Description = "Batch receive and acknowledge")]
     public async Task BatchReceiveAndAcknowledge()
     {
@@ -124,6 +142,12 @@ public class RegressionBenchmark
         }
     }
 
+    /// <summary>
+    /// Enqueues the prepared messages, receives them, and schedules each message to be retried later before committing, simulating a retry pattern.
+    /// </summary>
+    /// <remarks>
+    /// Each received message is marked with ReceiveLater(100ms) and then committed. Processing stops after <see cref="MessageCount"/> messages have been handled.
+    /// </remarks>
     [Benchmark(Description = "ReceiveLater (retry pattern)")]
     public async Task ReceiveLater()
     {
@@ -144,6 +168,13 @@ public class RegressionBenchmark
         }
     }
 
+    /// <summary>
+    /// Moves a batch of pre-generated messages from the "test" queue into a newly created "target" queue.
+    /// </summary>
+    /// <remarks>
+    /// The method creates the "target" queue, enqueues the pre-generated messages into "test", then consumes messages from "test" and moves each to "target" until <see cref="MessageCount"/> messages have been moved and committed.
+    /// </remarks>
+    /// <returns>A task that completes when <see cref="MessageCount"/> messages have been moved to the "target" queue and the changes have been committed.</returns>
     [Benchmark(Description = "MoveTo (queue transfer)")]
     public async Task MoveTo()
     {
@@ -166,6 +197,12 @@ public class RegressionBenchmark
         }
     }
 
+    /// <summary>
+    /// Processes messages from the "test" queue in batches and performs mixed operations per batch:
+    /// schedules the first message for later delivery, moves the second message to the "target" queue,
+    /// marks the batch as successfully received, and commits changes until MessageCount messages are handled.
+    /// </summary>
+    /// <returns>Completion of the benchmarked batch processing.</returns>
     [Benchmark(Description = "Batch mixed operations")]
     public async Task BatchMixedOperations()
     {
