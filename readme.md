@@ -275,6 +275,22 @@ await foreach (var batch in queue.ReceiveBatch("orders", maxMessages: 10, cancel
 }
 ```
 
+You can also mix subset operations with batch-wide operations. Messages already processed by subset operations are automatically excluded from batch-wide calls:
+
+```csharp
+await foreach (var batch in queue.ReceiveBatch("orders", maxMessages: 10, cancellationToken: token))
+{
+    // Process some messages individually
+    batch.ReceiveLater(new[] { msg1.Id.MessageIdentifier }, TimeSpan.FromMinutes(5));
+    batch.MoveToDeadLetter(new[] { msg2.Id.MessageIdentifier });
+
+    // Then successfully receive the rest of the batch
+    // This will only affect messages not already processed above
+    batch.SuccessfullyReceived();
+    batch.CommitChanges();
+}
+```
+
 ### Inspecting DLQ Messages
 
 ```csharp

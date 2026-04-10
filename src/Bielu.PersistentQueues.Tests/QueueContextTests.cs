@@ -546,4 +546,92 @@ public class QueueContextTests : TestBase
             movedQueueMessages.Count.ShouldBe(2); // Only moved messages
         }, TimeSpan.FromSeconds(5));
     }
+
+    [Fact]
+    public async Task BatchContext_ReceiveLaterSubsetThenSuccessfullyReceivedBatch()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            var msg1 = NewMessage("test", "msg1");
+            var msg2 = NewMessage("test", "msg2");
+            var msg3 = NewMessage("test", "msg3");
+
+            queue.Enqueue(msg1);
+            queue.Enqueue(msg2);
+            queue.Enqueue(msg3);
+
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            batchCtx.Messages.Length.ShouldBe(3);
+
+            // Delay msg1 using subset operation
+            batchCtx.ReceiveLater(new[] { msg1.Id.MessageIdentifier }, TimeSpan.FromMilliseconds(800));
+
+            // Then call SuccessfullyReceived on entire batch - should only affect msg2 and msg3
+            batchCtx.SuccessfullyReceived();
+            batchCtx.CommitChanges();
+
+            var store = (LmdbMessageStore)queue.Store;
+
+            // Queue should be empty immediately
+            store.PersistedIncoming("test").Any().ShouldBeFalse();
+
+            // Wait for delayed message to be re-enqueued
+            await DeterministicDelay(1000, token);
+
+            // Only msg1 should reappear
+            var delayedMessages = await queue.Receive("test", cancellationToken: token)
+                .Take(1)
+                .ToListAsync(token);
+            delayedMessages.Count.ShouldBe(1);
+            delayedMessages[0].Message.Id.MessageIdentifier.ShouldBe(msg1.Id.MessageIdentifier);
+
+            // msg2 and msg3 should be gone
+            store.PersistedIncoming("test").Count().ShouldBe(1);
+            store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg2.Id.MessageIdentifier).ShouldBeFalse();
+            store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg3.Id.MessageIdentifier).ShouldBeFalse();
+        }, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task BatchContext_MoveToDeadLetterSubsetThenSuccessfullyReceivedBatch()
+    {
+        await QueueScenario(async (queue, token) =>
+        {
+            queue.WithDeadLetterQueue();
+
+            var msg1 = NewMessage("test", "msg1");
+            var msg2 = NewMessage("test", "msg2");
+            var msg3 = NewMessage("test", "msg3");
+
+            queue.Enqueue(msg1);
+            queue.Enqueue(msg2);
+            queue.Enqueue(msg3);
+
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            batchCtx.Messages.Length.ShouldBe(3);
+
+            // Move msg1 to DLQ using subset operation
+            batchCtx.MoveToDeadLetter(new[] { msg1.Id.MessageIdentifier });
+
+            // Then call SuccessfullyReceived on entire batch - should only affect msg2 and msg3
+            batchCtx.SuccessfullyReceived();
+            batchCtx.CommitChanges();
+
+            var store = (LmdbMessageStore)queue.Store;
+
+            // Original queue should be empty
+            store.PersistedIncoming("test").Any().ShouldBeFalse();
+
+            // msg1 should be in DLQ
+            var dlqMessages = store.PersistedIncoming(DeadLetterConstants.QueueName).ToList();
+            dlqMessages.Count.ShouldBe(1);
+            dlqMessages[0].Id.MessageIdentifier.ShouldBe(msg1.Id.MessageIdentifier);
+
+            // msg2 and msg3 should be completely gone (successfully received)
+            store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg2.Id.MessageIdentifier).ShouldBeFalse();
+            store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg3.Id.MessageIdentifier).ShouldBeFalse();
+            store.PersistedIncoming(DeadLetterConstants.QueueName).Any(m => m.Id.MessageIdentifier == msg2.Id.MessageIdentifier).ShouldBeFalse();
+            store.PersistedIncoming(DeadLetterConstants.QueueName).Any(m => m.Id.MessageIdentifier == msg3.Id.MessageIdentifier).ShouldBeFalse();
+        }, TimeSpan.FromSeconds(5));
+    }
 }

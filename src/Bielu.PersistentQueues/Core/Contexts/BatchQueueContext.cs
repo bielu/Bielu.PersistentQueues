@@ -109,8 +109,9 @@ public class BatchQueueContext : IBatchQueueContext
     /// <inheritdoc />
     public void ReceiveLater(TimeSpan timeSpan)
     {
-        ValidateAndMarkMessages(Messages, "ReceiveLater");
-        var updatedMessages = UpdateProcessingAttempts(Messages);
+        var unprocessedMessages = Messages.Where(m => !_disposedMessageIds.Contains(m.Id.MessageIdentifier)).ToArray();
+        ValidateAndMarkMessages(unprocessedMessages, "ReceiveLater");
+        var updatedMessages = UpdateProcessingAttempts(unprocessedMessages);
         var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
         if (dlqMessages.Length > 0)
         {
@@ -124,8 +125,9 @@ public class BatchQueueContext : IBatchQueueContext
     /// <inheritdoc />
     public void ReceiveLater(DateTimeOffset time)
     {
-        ValidateAndMarkMessages(Messages, "ReceiveLater");
-        var updatedMessages = UpdateProcessingAttempts(Messages);
+        var unprocessedMessages = Messages.Where(m => !_disposedMessageIds.Contains(m.Id.MessageIdentifier)).ToArray();
+        ValidateAndMarkMessages(unprocessedMessages, "ReceiveLater");
+        var updatedMessages = UpdateProcessingAttempts(unprocessedMessages);
         var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
         if (dlqMessages.Length > 0)
         {
@@ -139,15 +141,17 @@ public class BatchQueueContext : IBatchQueueContext
     /// <inheritdoc />
     public void SuccessfullyReceived()
     {
-        ValidateAndMarkMessages(Messages, "SuccessfullyReceived");
-        _actions.Add(new SuccessAllAction(_queue, Messages));
+        var unprocessedMessages = Messages.Where(m => !_disposedMessageIds.Contains(m.Id.MessageIdentifier)).ToArray();
+        ValidateAndMarkMessages(unprocessedMessages, "SuccessfullyReceived");
+        _actions.Add(new SuccessAllAction(_queue, unprocessedMessages));
     }
 
     /// <inheritdoc />
     public void MoveTo(string queueName)
     {
-        ValidateAndMarkMessages(Messages, "MoveTo");
-        _actions.Add(new MoveAllAction(_queue, Messages, queueName));
+        var unprocessedMessages = Messages.Where(m => !_disposedMessageIds.Contains(m.Id.MessageIdentifier)).ToArray();
+        ValidateAndMarkMessages(unprocessedMessages, "MoveTo");
+        _actions.Add(new MoveAllAction(_queue, unprocessedMessages, queueName));
     }
 
     /// <inheritdoc />
@@ -235,9 +239,10 @@ public class BatchQueueContext : IBatchQueueContext
     {
         if (!_queue._deadLetterOptions.Enabled)
             throw new InvalidOperationException("Dead letter queue is disabled. Enable it via WithDeadLetterQueue() in the queue configuration.");
-        ValidateAndMarkMessages(Messages, "MoveToDeadLetter");
-        EnsureDeadLetterQueues(Messages);
-        _actions.Add(new DeadLetterAllAction(_queue, Messages, DeadLetterDiagnostics.Reasons.Manual));
+        var unprocessedMessages = Messages.Where(m => !_disposedMessageIds.Contains(m.Id.MessageIdentifier)).ToArray();
+        ValidateAndMarkMessages(unprocessedMessages, "MoveToDeadLetter");
+        EnsureDeadLetterQueues(unprocessedMessages);
+        _actions.Add(new DeadLetterAllAction(_queue, unprocessedMessages, DeadLetterDiagnostics.Reasons.Manual));
     }
 
     /// <inheritdoc />
