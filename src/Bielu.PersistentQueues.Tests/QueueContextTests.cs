@@ -595,9 +595,8 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task BatchContext_MoveToDeadLetterSubsetThenSuccessfullyReceivedBatch()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenario(config =>config.WithDeadLetterQueue(),async (queue, token) =>
         {
-            queue.WithDeadLetterQueue();
 
             var msg1 = NewMessage("test", "msg1");
             var msg2 = NewMessage("test", "msg2");
