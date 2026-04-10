@@ -299,4 +299,43 @@ public interface IMessageStore : IDisposable
     /// Not all storage implementations can report usage. The default implementation returns <c>null</c>.
     /// </remarks>
     StorageUsageInfo? GetStorageUsageInfo() => null;
+
+    /// <summary>
+    /// Retrieves incoming messages from a queue that were stored after a specific message ID.
+    /// Used for catch-up replication when a new replica needs to sync missed messages.
+    /// </summary>
+    /// <param name="queueName">The name of the queue to retrieve messages from.</param>
+    /// <param name="afterMessageId">
+    /// The message ID to start from (exclusive). Only messages stored after this ID are returned.
+    /// If null, all messages for the queue are returned.
+    /// </param>
+    /// <returns>Messages stored after the specified message ID, in storage order.</returns>
+    /// <remarks>
+    /// The default implementation retrieves all incoming messages and filters by ID comparison.
+    /// Storage implementations with COMB-ordered keys (like LMDB) can provide an optimized
+    /// implementation using range queries.
+    /// </remarks>
+    IEnumerable<Message> GetMessagesAfter(string queueName, MessageId? afterMessageId)
+    {
+        var messages = PersistedIncoming(queueName);
+        if (afterMessageId == null)
+            return messages;
+
+        // Default: iterate all and skip until we find the marker
+        var found = false;
+        var result = new List<Message>();
+        foreach (var msg in messages)
+        {
+            if (found)
+            {
+                result.Add(msg);
+            }
+            else if (msg.Id.MessageIdentifier == afterMessageId.MessageIdentifier &&
+                     msg.Id.SourceInstanceId == afterMessageId.SourceInstanceId)
+            {
+                found = true;
+            }
+        }
+        return result;
+    }
 }
