@@ -19,16 +19,11 @@ public abstract class MessageStoreTestBase
 
     /// <summary>
     /// Creates a new IMessageStore rooted at the given path.
-    /// <summary>
-/// Create an IMessageStore instance whose storage is rooted at the specified filesystem path.
-/// </summary>
-/// <param name="path">The root directory path where the store will persist its data.</param>
-/// <returns>An IMessageStore instance rooted at <paramref name="path"/>.</returns>
-protected abstract IMessageStore CreateStoreForPath(string path);
+    /// </summary>
+    /// <param name="path">The root directory path where the store will persist its data.</param>
+    /// <returns>An IMessageStore instance rooted at <paramref name="path"/>.</returns>
     protected abstract IMessageStore CreateStoreForPath(string path);
 
-    /// <summary>
-    /// Creates a new IMessageStore at a fresh temp directory.
     /// <summary>
     /// Creates a fresh temporary directory and returns an IMessageStore rooted at that directory.
     /// </summary>
