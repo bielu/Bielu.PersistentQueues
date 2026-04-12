@@ -13,7 +13,8 @@ namespace Bielu.PersistentQueues.Storage.ZoneTree;
 
 /// <summary>
 /// ZoneTree-based implementation of <see cref="IMessageStore"/>.
-/// Uses a separate ZoneTree instance per queue, with Guid keys and byte[] values.
+/// Uses a separate ZoneTree instance per queue, with Guid keys and Memory&lt;byte&gt; values.
+/// Uses ZoneTree's built-in ByteArraySerializer for value serialization.
 /// </summary>
 public class ZoneTreeMessageStore : IMessageStore
 {
@@ -22,7 +23,7 @@ public class ZoneTreeMessageStore : IMessageStore
     private readonly string _dataDirectory;
     private readonly IMessageSerializer _serializer;
     private readonly ZoneTreeStorageOptions _options;
-    private readonly ConcurrentDictionary<string, IZoneTree<Guid, byte[]>> _trees;
+    private readonly ConcurrentDictionary<string, IZoneTree<Guid, Memory<byte>>> _trees;
     private readonly ConcurrentDictionary<string, IMaintainer> _maintainers;
     private bool _disposed;
 
@@ -38,7 +39,7 @@ public class ZoneTreeMessageStore : IMessageStore
         _dataDirectory = dataDirectory;
         _serializer = serializer;
         _options = options ?? new ZoneTreeStorageOptions();
-        _trees = new ConcurrentDictionary<string, IZoneTree<Guid, byte[]>>();
+        _trees = new ConcurrentDictionary<string, IZoneTree<Guid, Memory<byte>>>();
         _maintainers = new ConcurrentDictionary<string, IMaintainer>();
 
         Directory.CreateDirectory(_dataDirectory);
@@ -110,7 +111,7 @@ public class ZoneTreeMessageStore : IMessageStore
                 foreach (var message in group)
                 {
                     var key = message.Id.MessageIdentifier;
-                    var value = _serializer.AsSpan(message).ToArray();
+                    Memory<byte> value = _serializer.AsSpan(message).ToArray();
                     tree.Upsert(key, value);
                 }
             }
@@ -136,7 +137,7 @@ public class ZoneTreeMessageStore : IMessageStore
                 {
                     var tree = GetTree(capturedQueue);
                     var key = capturedMessage.Id.MessageIdentifier;
-                    var value = _serializer.AsSpan(capturedMessage).ToArray();
+                    Memory<byte> value = _serializer.AsSpan(capturedMessage).ToArray();
                     tree.Upsert(key, value);
                 });
             }
@@ -202,7 +203,7 @@ public class ZoneTreeMessageStore : IMessageStore
                 capturedMessage.MaxAttempts,
                 capturedMessage.Headers
             );
-            var value = _serializer.AsSpan(updatedMessage).ToArray();
+            Memory<byte> value = _serializer.AsSpan(updatedMessage).ToArray();
             targetTree.Upsert(key, value);
         });
     }
@@ -246,7 +247,7 @@ public class ZoneTreeMessageStore : IMessageStore
         {
             var tree = GetTree(OutgoingQueue);
             var key = capturedMessage.Id.MessageIdentifier;
-            var value = _serializer.AsSpan(capturedMessage).ToArray();
+            Memory<byte> value = _serializer.AsSpan(capturedMessage).ToArray();
             tree.Upsert(key, value);
         });
     }
@@ -260,7 +261,7 @@ public class ZoneTreeMessageStore : IMessageStore
         {
             var tree = GetTree(OutgoingQueue);
             var key = message.Id.MessageIdentifier;
-            var value = _serializer.AsSpan(message).ToArray();
+            Memory<byte> value = _serializer.AsSpan(message).ToArray();
             tree.Upsert(key, value);
         }
         finally
@@ -280,7 +281,7 @@ public class ZoneTreeMessageStore : IMessageStore
             foreach (var message in messages)
             {
                 var key = message.Id.MessageIdentifier;
-                var value = _serializer.AsSpan(message).ToArray();
+                Memory<byte> value = _serializer.AsSpan(message).ToArray();
                 tree.Upsert(key, value);
             }
         }
@@ -301,7 +302,7 @@ public class ZoneTreeMessageStore : IMessageStore
             foreach (var message in messages)
             {
                 var key = message.Id.MessageIdentifier;
-                var value = _serializer.AsSpan(message).ToArray();
+                Memory<byte> value = _serializer.AsSpan(message).ToArray();
                 tree.Upsert(key, value);
             }
         }
@@ -325,7 +326,7 @@ public class ZoneTreeMessageStore : IMessageStore
                 if (!tree.TryGet(key, out var storedValue))
                     continue;
 
-                var msg = _serializer.ToMessage(storedValue);
+                var msg = _serializer.ToMessage(storedValue.Span);
                 var attempts = message.SentAttempts;
                 if (attempts >= message.MaxAttempts)
                 {
@@ -341,7 +342,7 @@ public class ZoneTreeMessageStore : IMessageStore
                 }
                 else
                 {
-                    var value = _serializer.AsSpan(msg).ToArray();
+                    Memory<byte> value = _serializer.AsSpan(msg).ToArray();
                     tree.Upsert(key, value);
                 }
             }
@@ -381,7 +382,7 @@ public class ZoneTreeMessageStore : IMessageStore
             var tree = GetTree(queueName);
             if (tree.TryGet(messageId.MessageIdentifier, out var value))
             {
-                return _serializer.ToMessage(value);
+                return _serializer.ToMessage(value.Span);
             }
 
             return null;
@@ -409,7 +410,6 @@ public class ZoneTreeMessageStore : IMessageStore
         {
             foreach (var kvp in _trees)
             {
-                // Delete all entries by iterating
                 var tree = kvp.Value;
                 var keysToDelete = new List<Guid>();
                 using (var iterator = tree.CreateIterator())
@@ -552,7 +552,7 @@ public class ZoneTreeMessageStore : IMessageStore
                 $"Expected ZoneTreeTransaction but received {transaction.GetType().Name}",
                 nameof(transaction));
 
-    private IZoneTree<Guid, byte[]> GetTree(string queueName)
+    private IZoneTree<Guid, Memory<byte>> GetTree(string queueName)
     {
         if (_trees.TryGetValue(queueName, out var tree))
             return tree;
@@ -570,20 +570,20 @@ public class ZoneTreeMessageStore : IMessageStore
         return System.IO.Path.Combine(_dataDirectory, safeName);
     }
 
-    private IZoneTree<Guid, byte[]> CreateZoneTree(string queueName)
+    private IZoneTree<Guid, Memory<byte>> CreateZoneTree(string queueName)
     {
         var queuePath = GetQueuePath(queueName);
         Directory.CreateDirectory(queuePath);
 
-        var factory = new ZoneTreeFactory<Guid, byte[]>()
+        var factory = new ZoneTreeFactory<Guid, Memory<byte>>()
             .SetDataDirectory(queuePath)
             .SetComparer(new GuidComparerAscending())
             .SetKeySerializer(new StructSerializer<Guid>())
-            .SetValueSerializer(new ByteArrayZoneTreeSerializer())
+            .SetValueSerializer(new ByteArraySerializer())
             .SetMutableSegmentMaxItemCount(_options.MutableSegmentMaxItemCount)
             .SetDiskSegmentMaxItemCount(_options.DiskSegmentMaxItemCount)
-            .SetIsDeletedDelegate((in Guid _, in byte[] value) => value.Length == 0)
-            .SetMarkValueDeletedDelegate((ref byte[] value) => value = Array.Empty<byte>());
+            .SetIsDeletedDelegate((in Guid _, in Memory<byte> value) => value.Length == 0)
+            .SetMarkValueDeletedDelegate((ref Memory<byte> value) => value = Memory<byte>.Empty);
 
         return factory.OpenOrCreate();
     }
@@ -596,7 +596,6 @@ public class ZoneTreeMessageStore : IMessageStore
         foreach (var dir in Directory.GetDirectories(_dataDirectory))
         {
             var queueName = System.IO.Path.GetFileName(dir);
-            // Reverse the sanitization (best effort)
             if (_trees.ContainsKey(queueName))
                 continue;
 
@@ -641,7 +640,7 @@ public class ZoneTreeMessageStore : IMessageStore
     {
         private readonly ZoneTreeMessageStore _store;
         private readonly string _queueName;
-        private IZoneTreeIterator<Guid, byte[]>? _iterator;
+        private IZoneTreeIterator<Guid, Memory<byte>>? _iterator;
         private bool _disposed;
 
         public ZoneTreeMessageEnumerator(ZoneTreeMessageStore store, string queueName)
@@ -682,7 +681,7 @@ public class ZoneTreeMessageStore : IMessageStore
                     var value = _iterator.CurrentValue;
                     if (value.Length == 0) // Skip deleted entries
                         return MoveNext();
-                    Current = _store._serializer.ToMessage(value);
+                    Current = _store._serializer.ToMessage(value.Span);
                     return true;
                 }
             }
