@@ -477,7 +477,14 @@ public class PartitionedQueue : IPartitionedQueue
         }
         tx.Commit();
 
-        // Mark the queue as non-partitioned in cache (prevents rediscovery from existing sub-queues)
+        // Delete partition sub-queues from storage so discovery won't re-enable partitioning
+        for (var i = 0; i < partitionCount; i++)
+        {
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, i);
+            Store.DeleteQueue(partitionQueueName);
+        }
+
+        // Mark the queue as non-partitioned in cache
         _partitionCounts[queueName] = 0;
 
         // Clean up partition locks
@@ -527,6 +534,13 @@ public class PartitionedQueue : IPartitionedQueue
             Store.MoveToQueue(tx, newPartitionQueueName, message);
         }
         tx.Commit();
+
+        // Delete old partition sub-queues that are no longer needed (when shrinking)
+        for (var i = newPartitionCount; i < oldPartitionCount; i++)
+        {
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, i);
+            Store.DeleteQueue(partitionQueueName);
+        }
 
         // Update partition count
         _partitionCounts[queueName] = newPartitionCount;

@@ -1022,6 +1022,82 @@ public class PartitionedQueueTests : TestBase
         });
     }
 
+    [Fact]
+    public void disable_partitioning_survives_restart()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            // First instance: create partitioned queue, add messages, then disable
+            var config1 = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue1 = config1.BuildQueue();
+            var partitioned1 = new PartitionedQueue(innerQueue1, new HashPartitionStrategy());
+
+            partitioned1.CreatePartitionedQueue("test", 3);
+            for (int i = 0; i < 6; i++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "test");
+                partitioned1.EnqueueToPartition(msg, i % 3);
+            }
+
+            partitioned1.DisablePartitioning("test");
+
+            // Simulate restart: create a new PartitionedQueue instance over the same store
+            var config2 = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue2 = config2.BuildQueue();
+            var partitioned2 = new PartitionedQueue(innerQueue2, new HashPartitionStrategy());
+
+            // The new instance should discover 0 partitions (sub-queues were deleted)
+            partitioned2.GetPartitionCount("test").ShouldBe(0);
+
+            // All messages should be in the base queue
+            store.GetMessageCount("test").ShouldBe(6);
+        });
+    }
+
+    [Fact]
+    public void repartition_shrink_survives_restart()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            // First instance: create 4 partitions, add messages, then shrink to 2
+            var config1 = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue1 = config1.BuildQueue();
+            var partitioned1 = new PartitionedQueue(innerQueue1, new HashPartitionStrategy());
+
+            partitioned1.CreatePartitionedQueue("test", 4);
+            for (int i = 0; i < 8; i++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "test",
+                    partitionKey: $"key-{i}");
+                partitioned1.EnqueueToPartition(msg, i % 4);
+            }
+
+            partitioned1.Repartition("test", 2);
+
+            // Simulate restart: create a new PartitionedQueue instance over the same store
+            var config2 = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue2 = config2.BuildQueue();
+            var partitioned2 = new PartitionedQueue(innerQueue2, new HashPartitionStrategy());
+
+            // The new instance should discover exactly 2 partitions (old sub-queues 2,3 were deleted)
+            partitioned2.GetPartitionCount("test").ShouldBe(2);
+
+            // All 8 messages should still be present across the 2 partitions
+            long total = 0;
+            for (int i = 0; i < 2; i++)
+                total += partitioned2.GetPartitionMessageCount("test", i);
+            total.ShouldBe(8);
+        });
+    }
+
     /// <summary>
     /// QueueScenario variant with higher MaxDatabases to support partitioned queues.
     /// </summary>

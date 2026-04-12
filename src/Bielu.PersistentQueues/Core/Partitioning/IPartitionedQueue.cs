@@ -134,10 +134,15 @@ public interface IPartitionedQueue : IQueue
     /// <exception cref="InvalidOperationException">Thrown when the queue is already partitioned. Use <see cref="Repartition"/> instead.</exception>
     /// <remarks>
     /// <para>
-    /// This method creates the partition sub-queues and atomically moves all messages from the
+    /// This method creates the partition sub-queues and moves all messages from the
     /// original queue into the appropriate partitions. The partition assignment is determined by
     /// the configured <see cref="IPartitionStrategy"/> using each message's partition key (or
     /// message ID if no key is set).
+    /// </para>
+    /// <para>
+    /// <b>Important:</b> The queue must be quiesced before calling this method — no concurrent
+    /// producers or consumers should be active on this queue. Messages enqueued or received
+    /// concurrently during this operation may be lost or routed incorrectly.
     /// </para>
     /// <para>
     /// After this operation completes, the original queue name becomes a logical partitioned queue
@@ -154,9 +159,16 @@ public interface IPartitionedQueue : IQueue
     /// <exception cref="InvalidOperationException">Thrown when the queue is not partitioned.</exception>
     /// <remarks>
     /// <para>
-    /// This method atomically moves all messages from every partition sub-queue back into
-    /// the base queue. After this operation, the queue behaves as a standard non-partitioned
-    /// queue and messages are no longer routed to partitions.
+    /// This method moves all messages from every partition sub-queue back into
+    /// the base queue, then deletes the partition sub-queues from storage. After this
+    /// operation, the queue behaves as a standard non-partitioned queue and messages are
+    /// no longer routed to partitions. A new <see cref="PartitionedQueue"/> instance over
+    /// the same store will correctly see the queue as non-partitioned.
+    /// </para>
+    /// <para>
+    /// <b>Important:</b> The queue must be quiesced before calling this method — no concurrent
+    /// producers or consumers should be active on this queue. Messages enqueued or received
+    /// concurrently during this operation may be lost or routed incorrectly.
     /// </para>
     /// <para>
     /// Partition locks are released and cleaned up as part of this operation.
@@ -176,7 +188,13 @@ public interface IPartitionedQueue : IQueue
     /// <para>
     /// This method collects all messages from the existing partitions, creates the new partition
     /// layout, and redistributes messages using the configured <see cref="IPartitionStrategy"/>.
-    /// The operation is atomic — all message moves happen within a single transaction.
+    /// When shrinking, old partition sub-queues are deleted from storage so a new instance
+    /// over the same store will discover the correct partition count.
+    /// </para>
+    /// <para>
+    /// <b>Important:</b> The queue must be quiesced before calling this method — no concurrent
+    /// producers or consumers should be active on this queue. Messages enqueued or received
+    /// concurrently during this operation may be lost or routed incorrectly.
     /// </para>
     /// <para>
     /// If <paramref name="newPartitionCount"/> equals the current partition count, this method

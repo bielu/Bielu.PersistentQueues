@@ -300,8 +300,15 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
 
         try
         {
+            var oldPartitionCount = _partitionedQueue.GetPartitionCount(queueName);
             _partitionedQueue.Repartition(queueName, newPartitionCount);
-            _metrics.RecordPartitionCreated(queueName, newPartitionCount);
+
+            // Only record newly created partitions (expanding); no metric for shrinking or no-op
+            var delta = newPartitionCount - oldPartitionCount;
+            if (delta > 0)
+            {
+                _metrics.RecordPartitionCreated(queueName, delta);
+            }
         }
         catch (Exception ex)
         {
