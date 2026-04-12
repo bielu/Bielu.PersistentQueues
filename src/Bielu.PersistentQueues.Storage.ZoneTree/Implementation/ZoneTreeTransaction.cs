@@ -32,8 +32,6 @@ public class ZoneTreeTransaction : IStoreTransaction
     }
 
     /// <summary>
-    /// Adds a pending operation to be executed on commit.
-    /// <summary>
     /// Buffers an operation to be executed when the transaction is committed.
     /// </summary>
     /// <param name="operation">The action to enqueue for execution during Commit.</param>
@@ -49,17 +47,12 @@ public class ZoneTreeTransaction : IStoreTransaction
     }
 
     /// <summary>
-    /// Applies all buffered operations sequentially.
+    /// Executes all buffered operations for the transaction and marks the transaction as committed.
     /// </summary>
     /// <remarks>
     /// ZoneTree does not support native multi-tree transactions. Operations are applied
     /// in order; if one fails, earlier operations remain applied. Cross-tree moves use
     /// a write-first-then-delete strategy so the worst case is a duplicate, not data loss.
-    /// <summary>
-    /// Executes all buffered operations for the transaction and marks the transaction as committed.
-    /// </summary>
-    /// <remarks>
-    /// Operations are invoked sequentially in the order they were added. If the transaction has already been committed, this method does nothing. After successful execution all pending operations are considered applied and the transaction is marked committed.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the transaction has been disposed.</exception>
     public void Commit()

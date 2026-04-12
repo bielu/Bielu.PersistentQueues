@@ -232,9 +232,6 @@ public class ZoneTreeMessageStore : IMessageStore
     }
 
     /// <summary>
-    /// Returns outgoing messages as raw wire-format bytes with routing information extracted.
-    /// This enables zero-copy sending via the TCP Sender.
-    /// <summary>
     /// Enumerates raw persisted entries from the store's dedicated outgoing queue.
     /// </summary>
     /// <returns>An enumerable of non-deleted outgoing entries where each <see cref="RawOutgoingMessage"/> contains the 16-byte message identifier, the destination URI bytes, the queue name bytes, and the complete serialized message payload.</returns>
@@ -276,8 +273,6 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
-    /// <summary>
-    /// Deletes outgoing messages by their raw 16-byte MessageId keys.
     /// <summary>
     /// Deletes the persisted outgoing messages whose identifiers are provided.
     /// </summary>
@@ -808,10 +803,6 @@ public class ZoneTreeMessageStore : IMessageStore
     }
 
     /// <summary>
-    /// Encodes a queue name as a URL-safe directory name.
-    /// Characters that are not alphanumeric, hyphen, or underscore are percent-encoded.
-    /// This ensures the encoding is fully reversible for round-trip queue reopening.
-    /// <summary>
     /// Produces a filesystem-safe directory name by percent-encoding characters outside letters, digits, '-', '_', and '.' using their UTF-8 byte values.
     /// </summary>
     /// <param name="queueName">Original queue name to encode.</param>
@@ -838,8 +829,6 @@ public class ZoneTreeMessageStore : IMessageStore
         return sb.ToString();
     }
 
-    /// <summary>
-    /// Decodes a percent-encoded directory name back to the original queue name.
     /// <summary>
     /// Reconstructs an original queue name from its percent-encoded directory-safe representation.
     /// </summary>
@@ -972,16 +961,16 @@ public class ZoneTreeMessageStore : IMessageStore
         }
 
         /// <summary>
-/// Provides an enumerator that iterates persisted, non-deleted messages for the store's captured queue.
-/// </summary>
-/// <returns>An <see cref="IEnumerator{Message}"/> that enumerates persisted messages from the specified queue.</returns>
-public IEnumerator<Message> GetEnumerator() => new ZoneTreeMessageEnumerator(_store, _queueName);
+        /// Provides an enumerator that iterates persisted, non-deleted messages for the store's captured queue.
+        /// </summary>
+        /// <returns>An <see cref="IEnumerator{Message}"/> that enumerates persisted messages from the specified queue.</returns>
+        public IEnumerator<Message> GetEnumerator() => new ZoneTreeMessageEnumerator(_store, _queueName);
 
         /// <summary>
-/// Get a non-generic enumerator that iterates through the messages in the queue.
-/// </summary>
-/// <returns>An <see cref="System.Collections.IEnumerator"/> that can be used to iterate the collection.</returns>
-System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+        /// Get a non-generic enumerator that iterates through the messages in the queue.
+        /// </summary>
+        /// <returns>An <see cref="System.Collections.IEnumerator"/> that can be used to iterate the collection.</returns>
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     private class ZoneTreeMessageEnumerator : IEnumerator<Message>

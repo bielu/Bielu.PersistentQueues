@@ -26,15 +26,11 @@ public class ZoneTreeStorageOptions
     public bool EnableMaintainer { get; set; } = true;
 
     /// <summary>
-    /// Creates default options suitable for most workloads.
-    /// <summary>
-/// Create a ZoneTreeStorageOptions configured with the class defaults.
-/// </summary>
-/// <returns>A new <see cref="ZoneTreeStorageOptions"/> initialized with the default property values.</returns>
+    /// Create a ZoneTreeStorageOptions configured with the class defaults.
+    /// </summary>
+    /// <returns>A new <see cref="ZoneTreeStorageOptions"/> initialized with the default property values.</returns>
     public static ZoneTreeStorageOptions Default() => new();
 
-    /// <summary>
-    /// Creates options optimized for high write throughput with larger in-memory buffers.
     /// <summary>
     /// Create a ZoneTreeStorageOptions instance tuned for high-throughput workloads.
     /// </summary>
@@ -45,8 +41,6 @@ public class ZoneTreeStorageOptions
         DiskSegmentMaxItemCount = 50_000_000
     };
 
-    /// <summary>
-    /// Creates options optimized for low memory usage with smaller buffers.
     /// <summary>
     /// Creates a ZoneTreeStorageOptions instance preconfigured for low-memory environments.
     /// </summary>
