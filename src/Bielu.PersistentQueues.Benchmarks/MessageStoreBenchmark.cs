@@ -38,6 +38,12 @@ public class MessageStoreBenchmark
     [Params(64, 512)]
     public int MessageDataSize { get; set; }
 
+    /// <summary>
+    /// Prepares the benchmark environment by creating a unique temporary base directory, initializing LMDB and ZoneTree message stores (each with a "test" queue), and generating deterministic test messages.
+    /// </summary>
+    /// <remarks>
+    /// Initializes the fields _lmdbEnv, _lmdbStore, _zoneTreeStore, _lmdbPath, _zoneTreePath and populates _messages with MessageCount messages of MessageDataSize bytes using a fixed random seed for deterministic content.
+    /// </remarks>
     [GlobalSetup]
     public void GlobalSetup()
     {
@@ -72,6 +78,12 @@ public class MessageStoreBenchmark
         }
     }
 
+    /// <summary>
+    /// Releases allocated message-store resources and attempts to delete the temporary benchmark directory.
+    /// </summary>
+    /// <remarks>
+    /// Disposes the LMDB and ZoneTree stores and the LMDB environment. It then attempts to delete the parent directory of the LMDB path; any errors during deletion are ignored.
+    /// </remarks>
     [GlobalCleanup]
     public void GlobalCleanup()
     {
@@ -88,6 +100,12 @@ public class MessageStoreBenchmark
         catch { /* ignore cleanup errors */ }
     }
 
+    /// <summary>
+    /// Prepare a fresh benchmark iteration by clearing both message stores and regenerating the message array with new message IDs.
+    /// </summary>
+    /// <remarks>
+    /// Clears all persisted data from the LMDB and ZoneTree stores, then repopulates the <c>_messages</c> array using deterministic random content (seed 42) so each message receives a new <c>Id</c>, avoiding duplicate-key collisions during the iteration.
+    /// </remarks>
     [IterationSetup]
     public void IterationSetup()
     {
@@ -106,7 +124,9 @@ public class MessageStoreBenchmark
 
     // ========================================================================
     // STORE INCOMING — Batch insert messages
-    // ========================================================================
+    /// <summary>
+    /// Persists the benchmark's generated messages into the LMDB-backed message store.
+    /// </summary>
 
     [Benchmark(Description = "StoreIncoming_LMDB")]
     [BenchmarkCategory("StoreIncoming")]
@@ -115,6 +135,9 @@ public class MessageStoreBenchmark
         _lmdbStore!.StoreIncoming(_messages!);
     }
 
+    /// <summary>
+    /// Stores the current set of benchmark messages into the ZoneTree-backed message store.
+    /// </summary>
     [Benchmark(Description = "StoreIncoming_ZoneTree")]
     [BenchmarkCategory("StoreIncoming")]
     public void StoreIncoming_ZoneTree()
@@ -124,7 +147,10 @@ public class MessageStoreBenchmark
 
     // ========================================================================
     // GET MESSAGE — Point lookup by MessageId
-    // ========================================================================
+    /// <summary>
+    /// Looks up each generated message by ID in the LMDB-backed message store and counts how many are found.
+    /// </summary>
+    /// <returns>The number of messages that were successfully retrieved from the LMDB store.</returns>
 
     [Benchmark(Description = "GetMessage_LMDB")]
     [BenchmarkCategory("GetMessage")]
@@ -139,6 +165,10 @@ public class MessageStoreBenchmark
         return count;
     }
 
+    /// <summary>
+    /// Stores the benchmark messages into the ZoneTree store, looks up each by ID in the "test" queue, and counts how many are present.
+    /// </summary>
+    /// <returns>The number of messages successfully retrieved from the ZoneTree store.</returns>
     [Benchmark(Description = "GetMessage_ZoneTree")]
     [BenchmarkCategory("GetMessage")]
     public int GetMessage_ZoneTree()
@@ -154,7 +184,10 @@ public class MessageStoreBenchmark
 
     // ========================================================================
     // PERSISTED INCOMING — Enumerate all messages in a queue
-    // ========================================================================
+    /// <summary>
+    /// Stores the benchmark messages into the LMDB-backed store, enumerates all persisted incoming messages in the "test" queue, and returns how many were found.
+    /// </summary>
+    /// <returns>The number of persisted incoming messages in the "test" queue.</returns>
 
     [Benchmark(Description = "PersistedIncoming_LMDB")]
     [BenchmarkCategory("PersistedIncoming")]
@@ -169,6 +202,10 @@ public class MessageStoreBenchmark
         return count;
     }
 
+    /// <summary>
+    /// Stores the benchmark messages into the ZoneTree message store and counts persisted incoming messages in the "test" queue.
+    /// </summary>
+    /// <returns>The number of persisted incoming messages found in the "test" queue.</returns>
     [Benchmark(Description = "PersistedIncoming_ZoneTree")]
     [BenchmarkCategory("PersistedIncoming")]
     public int PersistedIncoming_ZoneTree()
@@ -184,7 +221,9 @@ public class MessageStoreBenchmark
 
     // ========================================================================
     // DELETE INCOMING — Remove messages
-    // ========================================================================
+    /// <summary>
+    /// Stores the benchmark messages into the LMDB-backed message store and then deletes those messages.
+    /// </summary>
 
     [Benchmark(Description = "DeleteIncoming_LMDB")]
     [BenchmarkCategory("DeleteIncoming")]
@@ -194,6 +233,9 @@ public class MessageStoreBenchmark
         _lmdbStore.DeleteIncoming(_messages!);
     }
 
+    /// <summary>
+    /// Stores the configured benchmark messages into the ZoneTree message store and then deletes them.
+    /// </summary>
     [Benchmark(Description = "DeleteIncoming_ZoneTree")]
     [BenchmarkCategory("DeleteIncoming")]
     public void DeleteIncoming_ZoneTree()
@@ -204,7 +246,10 @@ public class MessageStoreBenchmark
 
     // ========================================================================
     // QUEUE CYCLE — Full store → enumerate → delete (most realistic)
-    // ========================================================================
+    /// <summary>
+    /// Runs a full queue lifecycle on the LMDB-backed store for the "test" queue: store incoming messages, enumerate persisted incoming messages, then delete them.
+    /// </summary>
+    /// <returns>The number of persisted incoming messages observed during enumeration.</returns>
 
     [Benchmark(Description = "QueueCycle_LMDB")]
     [BenchmarkCategory("QueueCycle")]
@@ -224,6 +269,10 @@ public class MessageStoreBenchmark
         return count;
     }
 
+    /// <summary>
+    /// Performs a full queue cycle against the ZoneTree store: stores the benchmark messages, enumerates all persisted incoming messages for the "test" queue, then deletes the stored messages.
+    /// </summary>
+    /// <returns>The number of messages enumerated from the "test" queue.</returns>
     [Benchmark(Description = "QueueCycle_ZoneTree")]
     [BenchmarkCategory("QueueCycle")]
     public int QueueCycle_ZoneTree()
@@ -244,7 +293,9 @@ public class MessageStoreBenchmark
 
     // ========================================================================
     // OUTGOING LIFECYCLE — Store → SuccessfullySent
-    // ========================================================================
+    /// <summary>
+    /// Stores outgoing messages for the benchmark queue and then marks all persisted outgoing messages as successfully sent.
+    /// </summary>
 
     [Benchmark(Description = "OutgoingCycle_LMDB")]
     [BenchmarkCategory("OutgoingCycle")]
@@ -261,6 +312,12 @@ public class MessageStoreBenchmark
         }
     }
 
+    /// <summary>
+    /// Stores outgoing messages for the "test" queue with a fixed destination and then marks all persisted outgoing messages as successfully sent.
+    /// </summary>
+    /// <remarks>
+    /// Creates outgoing messages from the benchmark's message set, persists them, enumerates the persisted outgoing messages, and acknowledges each as successfully sent.
+    /// </remarks>
     [Benchmark(Description = "OutgoingCycle_ZoneTree")]
     [BenchmarkCategory("OutgoingCycle")]
     public void OutgoingCycle_ZoneTree()

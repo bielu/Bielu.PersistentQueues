@@ -22,6 +22,10 @@ public class ZoneTreeTransaction : IStoreTransaction
     private bool _committed;
     private bool _disposed;
 
+    /// <summary>
+    /// Creates a ZoneTreeTransaction that will buffer operations and coordinate write access using the provided lock.
+    /// </summary>
+    /// <param name="transactionLock">The ReaderWriterLockSlim instance used to coordinate and release write access during the transaction's lifetime.</param>
     internal ZoneTreeTransaction(ReaderWriterLockSlim transactionLock)
     {
         _lock = transactionLock;
@@ -29,7 +33,12 @@ public class ZoneTreeTransaction : IStoreTransaction
 
     /// <summary>
     /// Adds a pending operation to be executed on commit.
+    /// <summary>
+    /// Buffers an operation to be executed when the transaction is committed.
     /// </summary>
+    /// <param name="operation">The action to enqueue for execution during Commit.</param>
+    /// <exception cref="InvalidOperationException">Thrown if the transaction has already been committed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the transaction has been disposed.</exception>
     internal void AddOperation(Action operation)
     {
         if (_committed)
@@ -46,7 +55,13 @@ public class ZoneTreeTransaction : IStoreTransaction
     /// ZoneTree does not support native multi-tree transactions. Operations are applied
     /// in order; if one fails, earlier operations remain applied. Cross-tree moves use
     /// a write-first-then-delete strategy so the worst case is a duplicate, not data loss.
+    /// <summary>
+    /// Executes all buffered operations for the transaction and marks the transaction as committed.
+    /// </summary>
+    /// <remarks>
+    /// Operations are invoked sequentially in the order they were added. If the transaction has already been committed, this method does nothing. After successful execution all pending operations are considered applied and the transaction is marked committed.
     /// </remarks>
+    /// <exception cref="ObjectDisposedException">Thrown if the transaction has been disposed.</exception>
     public void Commit()
     {
         if (_disposed)
@@ -62,6 +77,12 @@ public class ZoneTreeTransaction : IStoreTransaction
         _committed = true;
     }
 
+    /// <summary>
+    /// Releases transaction resources, clears buffered operations, and releases the associated write lock if held.
+    /// </summary>
+    /// <remarks>
+    /// Suppresses finalization, marks the transaction as disposed, clears the pending operations buffer, and exits the write lock on the associated <see cref="ReaderWriterLockSlim"/> if it is currently held. Calling this method multiple times has no additional effect after the first call.
+    /// </remarks>
     public void Dispose()
     {
         GC.SuppressFinalize(this);

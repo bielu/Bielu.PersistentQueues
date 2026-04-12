@@ -27,12 +27,18 @@ public class ZoneTreeStorageOptions
 
     /// <summary>
     /// Creates default options suitable for most workloads.
-    /// </summary>
+    /// <summary>
+/// Create a ZoneTreeStorageOptions configured with the class defaults.
+/// </summary>
+/// <returns>A new <see cref="ZoneTreeStorageOptions"/> initialized with the default property values.</returns>
     public static ZoneTreeStorageOptions Default() => new();
 
     /// <summary>
     /// Creates options optimized for high write throughput with larger in-memory buffers.
+    /// <summary>
+    /// Create a ZoneTreeStorageOptions instance tuned for high-throughput workloads.
     /// </summary>
+    /// <returns>A new ZoneTreeStorageOptions with MutableSegmentMaxItemCount = 5,000,000 and DiskSegmentMaxItemCount = 50,000,000; EnableMaintainer remains at its default value.</returns>
     public static ZoneTreeStorageOptions HighThroughput() => new()
     {
         MutableSegmentMaxItemCount = 5_000_000,
@@ -41,7 +47,10 @@ public class ZoneTreeStorageOptions
 
     /// <summary>
     /// Creates options optimized for low memory usage with smaller buffers.
+    /// <summary>
+    /// Creates a ZoneTreeStorageOptions instance preconfigured for low-memory environments.
     /// </summary>
+    /// <returns>A new ZoneTreeStorageOptions with MutableSegmentMaxItemCount = 100000 and DiskSegmentMaxItemCount = 5000000.</returns>
     public static ZoneTreeStorageOptions LowMemory() => new()
     {
         MutableSegmentMaxItemCount = 100_000,
