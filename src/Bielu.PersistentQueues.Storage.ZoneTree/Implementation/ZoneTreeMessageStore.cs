@@ -920,7 +920,7 @@ public class ZoneTreeMessageStore : IMessageStore
                 if (File.Exists(metaPath))
                 {
                     queueName = File.ReadAllText(metaPath);
-                    // Only strip the trailing newline that File.WriteAllText may add
+                    // Strip trailing line-ending characters (\r\n or \n) that File.WriteAllText may append
                     queueName = queueName.TrimEnd('\r', '\n');
                 }
                 else
