@@ -34,11 +34,10 @@ public class LmdbIncomingMessageTests : Shared.IncomingMessageTests
     public void crash_before_commit()
     {
         var path = TempPath();
+        var message = NewMessage();
         using (var store = (LmdbMessageStore)CreateStoreForPath(path))
         {
             store.CreateQueue("test");
-            var message = NewMessage();
-            store.CreateQueue(message.QueueString!);
             using (var transaction = store.BeginTransaction())
             {
                 store.StoreIncoming(transaction, message);
@@ -53,7 +52,7 @@ public class LmdbIncomingMessageTests : Shared.IncomingMessageTests
         });
         using var store2 = new LmdbMessageStore(env2, new MessageSerializer());
         store2.CreateQueue("test");
-        var msg = store2.GetMessage("test", NewMessage().Id);
+        var msg = store2.GetMessage("test", message.Id);
         // After crash (dispose without commit), message should not be persisted
         msg.ShouldBeNull();
     }
