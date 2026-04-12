@@ -477,11 +477,21 @@ public class PartitionedQueue : IPartitionedQueue
         }
         tx.Commit();
 
-        // Delete partition sub-queues from storage so discovery won't re-enable partitioning
+        // Delete partition sub-queues from storage so discovery won't re-enable partitioning.
+        // Best-effort: if individual deletions fail, we still update the cache to prevent
+        // re-discovery within this instance. Remaining sub-queues will be empty.
         for (var i = 0; i < partitionCount; i++)
         {
             var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, i);
-            Store.DeleteQueue(partitionQueueName);
+            try
+            {
+                Store.DeleteQueue(partitionQueueName);
+            }
+            catch (NotSupportedException)
+            {
+                // Storage doesn't support queue deletion — fall through to cache-only approach
+                break;
+            }
         }
 
         // Mark the queue as non-partitioned in cache
@@ -535,11 +545,21 @@ public class PartitionedQueue : IPartitionedQueue
         }
         tx.Commit();
 
-        // Delete old partition sub-queues that are no longer needed (when shrinking)
+        // Delete old partition sub-queues that are no longer needed (when shrinking).
+        // Best-effort: if individual deletions fail, we still update the cache to prevent
+        // re-discovery within this instance. Remaining sub-queues will be empty.
         for (var i = newPartitionCount; i < oldPartitionCount; i++)
         {
             var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, i);
-            Store.DeleteQueue(partitionQueueName);
+            try
+            {
+                Store.DeleteQueue(partitionQueueName);
+            }
+            catch (NotSupportedException)
+            {
+                // Storage doesn't support queue deletion — fall through to cache-only approach
+                break;
+            }
         }
 
         // Update partition count
