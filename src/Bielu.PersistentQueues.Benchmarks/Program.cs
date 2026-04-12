@@ -6,7 +6,8 @@ var switcher = new BenchmarkSwitcher([
     typeof(LmdbStorageBenchmark),
     typeof(StorageProviderBenchmark),
     typeof(SlowStorageBenchmark),
-    typeof(RegressionBenchmark)
+    typeof(RegressionBenchmark),
+    typeof(MessageStoreBenchmark)
 ]);
 
 switcher.Run(args, new CustomConfig());
