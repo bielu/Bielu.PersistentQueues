@@ -107,17 +107,17 @@ See [BENCHMARK_STRATEGY.md](../../BENCHMARK_STRATEGY.md) for details.
 dotnet tool install -g BenchmarkDotNet.ResultsComparer
 
 # Run baseline
-dotnet run -c Release -- --filter "*RegressionBenchmark*" --exporters json
+dotnet run -c Release -- --filter "*RegressionBenchmark*" --exporters fulljson
 cp -r BenchmarkDotNet.Artifacts/results baseline/
 
 # Make changes and run again
 git checkout feature-branch
-dotnet run -c Release -- --filter "*RegressionBenchmark*" --exporters json
+dotnet run -c Release -- --filter "*RegressionBenchmark*" --exporters fulljson
 
-# Compare
+# Compare (ResultsComparer expects directories of *-report-full.json files)
 dotnet-results-comparer \
-  --base baseline/results.json \
-  --diff BenchmarkDotNet.Artifacts/results/results.json \
+  --base baseline/ \
+  --diff BenchmarkDotNet.Artifacts/results/ \
   --threshold 5%
 ```
 

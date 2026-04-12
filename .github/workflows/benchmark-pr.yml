@@ -19,8 +19,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Full history for comparison
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -38,7 +36,7 @@ jobs:
         dotnet run --project src/Bielu.PersistentQueues.Benchmarks/Bielu.PersistentQueues.Benchmarks.csproj \
           -c Release --no-build -- \
           --filter "*RegressionBenchmark*" \
-          --exporters json \
+          --exporters fulljson \
           --artifacts ./BenchmarkDotNet.Artifacts
 
     - name: Download baseline
@@ -58,7 +56,7 @@ jobs:
 
         # Compare current results with baseline
         dotnet-results-comparer \
-          --base ./baseline/results.json \
+          --base ./baseline \
           --diff ./BenchmarkDotNet.Artifacts/results/*.json \
           --threshold 10% \
           --output ./comparison.md || echo "No significant changes"

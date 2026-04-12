@@ -47,6 +47,7 @@ public class RegressionBenchmark
             .BuildQueue();
 
         _queue.CreateQueue("test");
+        _queue.CreateQueue("target");
         _queue.Start();
 
         // Pre-generate test messages
@@ -84,6 +85,50 @@ public class RegressionBenchmark
     }
 
     /// <summary>
+    /// Enqueues the pre-generated messages into the "test" queue before each iteration of benchmarks
+    /// that require a pre-populated queue (receive, move, and batch operations).
+    /// </summary>
+    [IterationSetup(Targets = new[] { nameof(ReceiveAndAcknowledge), nameof(BatchReceiveAndAcknowledge), nameof(ReceiveLater), nameof(MoveTo), nameof(BatchMixedOperations) })]
+    public void SetupQueueMessages()
+    {
+        foreach (var message in _messages!)
+        {
+            _queue!.Enqueue(message);
+        }
+    }
+
+    /// <summary>
+    /// Drains remaining messages from both queues after each iteration to prevent state accumulation
+    /// between benchmark runs. Waits briefly for any delayed messages (e.g., from ReceiveLater)
+    /// to become available before draining.
+    /// </summary>
+    [IterationCleanup]
+    public void CleanupQueueState()
+    {
+        // Wait for delayed messages (e.g., ReceiveLater with 100ms) to become available
+        Thread.Sleep(200);
+        DrainQueueSync("test");
+        DrainQueueSync("target");
+    }
+
+    private void DrainQueueSync(string queueName)
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
+        Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var ctx in _queue!.Receive(queueName, cancellationToken: cts.Token))
+                {
+                    ctx.QueueContext.SuccessfullyReceived();
+                    ctx.QueueContext.CommitChanges();
+                }
+            }
+            catch (OperationCanceledException) { }
+        }).Wait(200);
+    }
+
+    /// <summary>
     /// Enqueues all pre-generated messages into the configured benchmark queue.
     /// </summary>
     [Benchmark(Description = "Enqueue messages")]
@@ -96,20 +141,14 @@ public class RegressionBenchmark
     }
 
     /// <summary>
-    /// Enqueues the pre-generated messages into the "test" queue, then receives messages and acknowledges each until the configured MessageCount has been processed.
+    /// Receives messages from the "test" queue and acknowledges each until the configured MessageCount has been processed.
+    /// Messages are pre-enqueued by the iteration setup.
     /// </summary>
     [Benchmark(Description = "Receive and acknowledge messages")]
     public async Task ReceiveAndAcknowledge()
     {
-        // First enqueue all messages
-        foreach (var message in _messages!)
-        {
-            _queue!.Enqueue(message);
-        }
-
-        // Then receive and acknowledge
         var count = 0;
-        await foreach (var ctx in _queue.Receive("test", cancellationToken: _cts!.Token))
+        await foreach (var ctx in _queue!.Receive("test", cancellationToken: _cts!.Token))
         {
             ctx.QueueContext.SuccessfullyReceived();
             ctx.QueueContext.CommitChanges();
@@ -119,20 +158,15 @@ public class RegressionBenchmark
     }
 
     /// <summary>
-    /// Enqueues the pre-generated messages and processes them by receiving batches (up to 10 messages), marking each batch as successfully received and committing changes until MessageCount messages have been processed.
+    /// Receives messages from the "test" queue in batches (up to 10 messages), marking each batch as
+    /// successfully received and committing changes until MessageCount messages have been processed.
+    /// Messages are pre-enqueued by the iteration setup.
     /// </summary>
     [Benchmark(Description = "Batch receive and acknowledge")]
     public async Task BatchReceiveAndAcknowledge()
     {
-        // First enqueue all messages
-        foreach (var message in _messages!)
-        {
-            _queue!.Enqueue(message);
-        }
-
-        // Then receive in batches of 10
         var received = 0;
-        await foreach (var batch in _queue.ReceiveBatch("test", maxMessages: 10, cancellationToken: _cts!.Token))
+        await foreach (var batch in _queue!.ReceiveBatch("test", maxMessages: 10, cancellationToken: _cts!.Token))
         {
             batch.SuccessfullyReceived();
             batch.CommitChanges();
@@ -143,23 +177,14 @@ public class RegressionBenchmark
     }
 
     /// <summary>
-    /// Enqueues the prepared messages, receives them, and schedules each message to be retried later before committing, simulating a retry pattern.
+    /// Receives messages from the "test" queue and schedules each for later delivery, simulating a retry pattern.
+    /// Messages are pre-enqueued by the iteration setup; delayed messages are drained in iteration cleanup.
     /// </summary>
-    /// <remarks>
-    /// Each received message is marked with ReceiveLater(100ms) and then committed. Processing stops after <see cref="MessageCount"/> messages have been handled.
-    /// </remarks>
     [Benchmark(Description = "ReceiveLater (retry pattern)")]
     public async Task ReceiveLater()
     {
-        // Enqueue messages
-        foreach (var message in _messages!)
-        {
-            _queue!.Enqueue(message);
-        }
-
-        // Receive and delay (simulates retry)
         var count = 0;
-        await foreach (var ctx in _queue.Receive("test", cancellationToken: _cts!.Token))
+        await foreach (var ctx in _queue!.Receive("test", cancellationToken: _cts!.Token))
         {
             ctx.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(100));
             ctx.QueueContext.CommitChanges();
@@ -169,26 +194,14 @@ public class RegressionBenchmark
     }
 
     /// <summary>
-    /// Moves a batch of pre-generated messages from the "test" queue into a newly created "target" queue.
+    /// Moves pre-enqueued messages from the "test" queue to the "target" queue.
+    /// The "target" queue is created once in global setup; messages are pre-enqueued by the iteration setup.
     /// </summary>
-    /// <remarks>
-    /// The method creates the "target" queue, enqueues the pre-generated messages into "test", then consumes messages from "test" and moves each to "target" until <see cref="MessageCount"/> messages have been moved and committed.
-    /// </remarks>
-    /// <returns>A task that completes when <see cref="MessageCount"/> messages have been moved to the "target" queue and the changes have been committed.</returns>
     [Benchmark(Description = "MoveTo (queue transfer)")]
     public async Task MoveTo()
     {
-        _queue!.CreateQueue("target");
-
-        // Enqueue messages
-        foreach (var message in _messages!)
-        {
-            _queue.Enqueue(message);
-        }
-
-        // Move to another queue
         var count = 0;
-        await foreach (var ctx in _queue.Receive("test", cancellationToken: _cts!.Token))
+        await foreach (var ctx in _queue!.Receive("test", cancellationToken: _cts!.Token))
         {
             ctx.QueueContext.MoveTo("target");
             ctx.QueueContext.CommitChanges();
@@ -198,32 +211,21 @@ public class RegressionBenchmark
     }
 
     /// <summary>
-    /// Processes messages from the "test" queue in batches and performs mixed operations per batch:
+    /// Processes pre-enqueued messages from the "test" queue in batches with mixed operations:
     /// schedules the first message for later delivery, moves the second message to the "target" queue,
     /// marks the batch as successfully received, and commits changes until MessageCount messages are handled.
     /// </summary>
-    /// <returns>Completion of the benchmarked batch processing.</returns>
     [Benchmark(Description = "Batch mixed operations")]
     public async Task BatchMixedOperations()
     {
-        _queue!.CreateQueue("target");
-
-        // Enqueue messages
-        foreach (var message in _messages!)
-        {
-            _queue.Enqueue(message);
-        }
-
-        // Process with mixed operations
         var received = 0;
-        await foreach (var batch in _queue.ReceiveBatch("test", maxMessages: 10, cancellationToken: _cts!.Token))
+        await foreach (var batch in _queue!.ReceiveBatch("test", maxMessages: 10, cancellationToken: _cts!.Token))
         {
             var messages = batch.Messages;
             if (messages.Length > 0)
             {
                 // Simulate: first message -> retry, second -> move, rest -> success
-                if (messages.Length > 0)
-                    batch.ReceiveLater(new[] { messages[0].Id.MessageIdentifier }, TimeSpan.FromMilliseconds(100));
+                batch.ReceiveLater(new[] { messages[0].Id.MessageIdentifier }, TimeSpan.FromMilliseconds(100));
                 if (messages.Length > 1)
                     batch.MoveTo("target", new[] { messages[1] });
                 // Rest are automatically handled by SuccessfullyReceived

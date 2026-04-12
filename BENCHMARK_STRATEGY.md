@@ -114,16 +114,16 @@ dotnet run -c Release -- \
 dotnet tool install -g BenchmarkDotNet.ResultsComparer
 
 # Run baseline
-dotnet run -c Release -- --filter "*RegressionBenchmark*"
+dotnet run -c Release -- --filter "*RegressionBenchmark*" --exporters fulljson
 mv BenchmarkDotNet.Artifacts/results baseline-results
 
 # Make changes, then run again
-dotnet run -c Release -- --filter "*RegressionBenchmark*"
+dotnet run -c Release -- --filter "*RegressionBenchmark*" --exporters fulljson
 
-# Compare
+# Compare (ResultsComparer expects directories of *-report-full.json files)
 dotnet-results-comparer \
-  --base baseline-results/results.json \
-  --diff BenchmarkDotNet.Artifacts/results/results.json \
+  --base baseline-results/ \
+  --diff BenchmarkDotNet.Artifacts/results/ \
   --threshold 5%
 ```
 
