@@ -289,6 +289,21 @@ public interface IMessageStore : IDisposable
     }
 
     /// <summary>
+    /// Deletes a queue and all its messages from the store.
+    /// </summary>
+    /// <param name="queueName">The name of the queue to delete.</param>
+    /// <remarks>
+    /// This method permanently removes the queue and all of its messages from storage.
+    /// After this call, the queue will no longer appear in <see cref="GetAllQueues"/>.
+    /// Not all storage implementations support queue deletion. The default implementation
+    /// throws <see cref="NotSupportedException"/>.
+    /// </remarks>
+    void DeleteQueue(string queueName)
+    {
+        throw new NotSupportedException("Queue deletion is not supported by this storage implementation.");
+    }
+
+    /// <summary>
     /// Gets storage usage information including used bytes, total bytes, and usage percentage.
     /// </summary>
     /// <returns>
