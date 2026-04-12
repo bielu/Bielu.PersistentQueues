@@ -35,11 +35,22 @@ public class ZoneTreeMessageStore : IMessageStore
     private readonly ConcurrentDictionary<string, IMaintainer> _maintainers;
     private bool _disposed;
 
+    /// <summary>
+    /// Creates a ZoneTreeMessageStore that uses the given data directory and message serializer with default storage options.
+    /// </summary>
+    /// <param name="dataDirectory">Root directory where per-queue data directories will be created and persisted.</param>
+    /// <param name="serializer">Serializer used to convert Message instances to and from their persisted byte representation.</param>
     public ZoneTreeMessageStore(string dataDirectory, IMessageSerializer serializer)
         : this(dataDirectory, serializer, null)
     {
     }
 
+    /// <summary>
+    /// Initializes a ZoneTree-based message store rooted at the given data directory, restoring any previously persisted queues and ensuring the dedicated outgoing queue exists.
+    /// </summary>
+    /// <param name="dataDirectory">Filesystem path used to store per-queue data and metadata; the directory will be created if it does not exist.</param>
+    /// <param name="serializer">Serializer used to serialize and deserialize stored messages.</param>
+    /// <param name="options">Configuration for ZoneTree behavior; when null, default options are applied.</param>
     public ZoneTreeMessageStore(string dataDirectory, IMessageSerializer serializer,
         ZoneTreeStorageOptions? options)
     {
@@ -64,6 +75,10 @@ public class ZoneTreeMessageStore : IMessageStore
     /// </summary>
     public string Path => _dataDirectory;
 
+    /// <summary>
+    /// Begins a new store transaction while acquiring the store's write lock for exclusive access.
+    /// </summary>
+    /// <returns>An <see cref="IStoreTransaction"/> representing the transaction; the store's write lock is held for the transaction's lifetime.</returns>
     public IStoreTransaction BeginTransaction()
     {
         CheckDisposed();
@@ -80,6 +95,10 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Ensures a persistent queue with the given name exists; if the queue is not already present it is created along with its ZoneTree and, when enabled, a maintainer.
+    /// </summary>
+    /// <param name="queueName">Logical name of the queue to create. The method is idempotent and returns without action if the queue already exists.</param>
     public void CreateQueue(string queueName)
     {
         CheckDisposed();
@@ -105,6 +124,12 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Persists the provided incoming messages into their respective queue stores.
+    /// </summary>
+    /// <param name="messages">One or more sequences of messages; messages are grouped by each message's <c>QueueString</c> and stored into the corresponding queue.</param>
+    /// <exception cref="ObjectDisposedException">Thrown if the store has been disposed.</exception>
+    /// <exception cref="QueueDoesNotExistException">Thrown if a message references a queue that does not exist.</exception>
     public void StoreIncoming(params IEnumerable<Message> messages)
     {
         CheckDisposed();
@@ -130,6 +155,11 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Schedules per-message upsert operations into the given transaction for each provided message, grouping messages by their QueueString.
+    /// </summary>
+    /// <param name="transaction">The transaction to which per-message upsert operations will be added.</param>
+    /// <param name="messages">Messages to persist; each message is serialized and scheduled to be stored under its MessageId.MessageIdentifier in the queue identified by the message's QueueString.</param>
     public void StoreIncoming(IStoreTransaction transaction, params IEnumerable<Message> messages)
     {
         CheckDisposed();
@@ -152,6 +182,10 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Deletes the persisted entries for the specified incoming messages from their respective queue trees.
+    /// </summary>
+    /// <param name="messages">One or more collections of messages; messages are grouped by their <c>QueueString</c> and each message is removed by its <c>MessageId.MessageIdentifier</c>.</param>
     public void DeleteIncoming(params IEnumerable<Message> messages)
     {
         CheckDisposed();
@@ -175,12 +209,22 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Provides an enumerable that streams all persisted messages for the specified queue.
+    /// </summary>
+    /// <param name="queueName">The logical queue name whose persisted messages will be enumerated.</param>
+    /// <returns>An <see cref="IEnumerable{Message}"/> that yields persisted messages from the queue, deserializing entries on demand and skipping deleted entries.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the store has been disposed.</exception>
     public IEnumerable<Message> PersistedIncoming(string queueName)
     {
         CheckDisposed();
         return new ZoneTreeMessageEnumerable(this, queueName);
     }
 
+    /// <summary>
+    /// Enumerates messages currently persisted in the store's dedicated outgoing queue.
+    /// </summary>
+    /// <returns>An <see cref="IEnumerable{Message}"/> that yields each persisted outgoing message; deleted entries are excluded.</returns>
     public IEnumerable<Message> PersistedOutgoing()
     {
         CheckDisposed();
@@ -190,7 +234,10 @@ public class ZoneTreeMessageStore : IMessageStore
     /// <summary>
     /// Returns outgoing messages as raw wire-format bytes with routing information extracted.
     /// This enables zero-copy sending via the TCP Sender.
+    /// <summary>
+    /// Enumerates raw persisted entries from the store's dedicated outgoing queue.
     /// </summary>
+    /// <returns>An enumerable of non-deleted outgoing entries where each <see cref="RawOutgoingMessage"/> contains the 16-byte message identifier, the destination URI bytes, the queue name bytes, and the complete serialized message payload.</returns>
     public IEnumerable<RawOutgoingMessage> PersistedOutgoingRaw()
     {
         CheckDisposed();
@@ -231,7 +278,10 @@ public class ZoneTreeMessageStore : IMessageStore
 
     /// <summary>
     /// Deletes outgoing messages by their raw 16-byte MessageId keys.
+    /// <summary>
+    /// Deletes the persisted outgoing messages whose identifiers are provided.
     /// </summary>
+    /// <param name="messageIds">A sequence of 16-byte GUID values (as ReadOnlyMemory&lt;byte&gt;) identifying persisted messages in the outgoing queue; entries matching these IDs will be removed if present.</param>
     public void SuccessfullySentByIds(IEnumerable<ReadOnlyMemory<byte>> messageIds)
     {
         CheckDisposed();
@@ -252,6 +302,14 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Schedules moving the specified persisted message into another queue as part of the given transaction.
+    /// </summary>
+    /// <param name="transaction">The transaction that will execute the move; must be a ZoneTree-backed transaction from this store.</param>
+    /// <param name="queueName">The destination queue name to assign to the message.</param>
+    /// <param name="message">The message to move; the stored entry identified by the message's Id will be moved and its QueueString replaced with <paramref name="queueName"/>.</param>
+    /// <exception cref="ObjectDisposedException">Thrown if the store has been disposed.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="transaction"/> is not a ZoneTreeTransaction produced by this store.</exception>
     public void MoveToQueue(IStoreTransaction transaction, string queueName, Message message)
     {
         CheckDisposed();
@@ -283,6 +341,12 @@ public class ZoneTreeMessageStore : IMessageStore
         });
     }
 
+    /// <summary>
+    /// Schedules operations on the provided transaction to move each specified message into the named queue when the transaction is executed.
+    /// </summary>
+    /// <param name="transaction">The transaction to which move operations will be added.</param>
+    /// <param name="queueName">Destination queue name.</param>
+    /// <param name="messages">Messages to move into the destination queue.</param>
     public void MoveToQueue(IStoreTransaction transaction, string queueName, IEnumerable<Message> messages)
     {
         CheckDisposed();
@@ -292,6 +356,11 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Schedules removal of the specified message from its originating queue as part of the provided transaction.
+    /// </summary>
+    /// <param name="transaction">The transaction to which the delete operation will be added.</param>
+    /// <param name="message">The message to remove; its queue name and message identifier are used to locate the stored entry.</param>
     public void SuccessfullyReceived(IStoreTransaction transaction, Message message)
     {
         CheckDisposed();
@@ -304,6 +373,11 @@ public class ZoneTreeMessageStore : IMessageStore
         });
     }
 
+    /// <summary>
+    /// Records removal of the specified messages from their queues in the provided transaction.
+    /// </summary>
+    /// <param name="transaction">The transaction to which removal operations will be added.</param>
+    /// <param name="messages">The messages to remove from storage when the transaction is executed.</param>
     public void SuccessfullyReceived(IStoreTransaction transaction, IEnumerable<Message> messages)
     {
         CheckDisposed();
@@ -313,6 +387,13 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Schedules an upsert of the specified message into the store's dedicated outgoing queue as part of the provided transaction.
+    /// </summary>
+    /// <param name="transaction">The transaction to which the upsert operation will be added; must be a ZoneTree-backed transaction.</param>
+    /// <param name="message">The message to store in the outgoing queue; its serialized form is written using the message's MessageIdentifier as the key.</param>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="transaction"/> is not a ZoneTreeTransaction.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the store has been disposed.</exception>
     public void StoreOutgoing(IStoreTransaction transaction, Message message)
     {
         CheckDisposed();
@@ -327,6 +408,10 @@ public class ZoneTreeMessageStore : IMessageStore
         });
     }
 
+    /// <summary>
+    /// Persists the given message into the store's dedicated outgoing queue, keyed by the message identifier.
+    /// </summary>
+    /// <param name="message">The message to serialize and store in the outgoing queue; an existing entry with the same message identifier will be replaced.</param>
     public void StoreOutgoing(Message message)
     {
         CheckDisposed();
@@ -345,6 +430,10 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Stores the given messages in the store's dedicated outgoing queue as persisted entries.
+    /// </summary>
+    /// <param name="messages">Messages to persist into the outgoing queue; each message is serialized and upserted by its MessageId.</param>
     public void StoreOutgoing(params IEnumerable<Message> messages)
     {
         CheckDisposed();
@@ -366,6 +455,10 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Stores the provided messages into the dedicated outgoing queue.
+    /// </summary>
+    /// <param name="messages">Messages to persist; each message is serialized and stored under its MessageId.MessageIdentifier, replacing any existing entry with the same identifier.</param>
     public void StoreOutgoing(ReadOnlySpan<Message> messages)
     {
         CheckDisposed();
@@ -387,6 +480,18 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Processes persisted outgoing messages after a failed send and either removes or updates their stored entries according to retry and expiration rules.
+    /// </summary>
+    /// <remarks>
+    /// For each provided message the store locates the persisted outgoing entry by the message's MessageId and:
+    /// - removes the entry immediately if <paramref name="shouldRemove"/> is true;
+    /// - removes the entry if the message's SentAttempts is greater than or equal to MaxAttempts;
+    /// - removes the entry if the stored message has a DeliverBy timestamp that is not DateTime.MinValue and that timestamp has passed;
+    /// - otherwise re-serializes and updates (re-enqueues) the stored message entry.
+    /// </remarks>
+    /// <param name="shouldRemove">When true, delete matching persisted outgoing entries immediately regardless of attempts or expiration.</param>
+    /// <param name="messages">One or more sequences of messages whose corresponding persisted outgoing entries should be evaluated and acted upon.</param>
     public void FailedToSend(bool shouldRemove = false, params IEnumerable<Message> messages)
     {
         CheckDisposed();
@@ -437,6 +542,10 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Deletes the persisted entries for the given outgoing messages from the outgoing queue.
+    /// </summary>
+    /// <param name="messages">One or more collections of outgoing messages whose stored entries should be removed.</param>
     public void SuccessfullySent(params IEnumerable<Message> messages)
     {
         CheckDisposed();
@@ -456,6 +565,14 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Retrieve the persisted message with the specified message identifier from the given queue.
+    /// </summary>
+    /// <param name="queueName">The name of the queue to search.</param>
+    /// <param name="messageId">The identifier of the message to retrieve.</param>
+    /// <returns>The deserialized <see cref="Message"/> if found; otherwise <c>null</c>.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the store has been disposed.</exception>
+    /// <exception cref="QueueDoesNotExistException">Thrown if the specified queue does not exist.</exception>
     public Message? GetMessage(string queueName, MessageId messageId)
     {
         CheckDisposed();
@@ -477,6 +594,10 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Enumerates all existing persistent queue names, excluding the dedicated outgoing queue.
+    /// </summary>
+    /// <returns>An array of queue names present in the store, excluding the "outgoing" queue.</returns>
     public string[] GetAllQueues()
     {
         CheckDisposed();
@@ -485,6 +606,9 @@ public class ZoneTreeMessageStore : IMessageStore
             .ToArray();
     }
 
+    /// <summary>
+    /// Deletes all persisted messages from every queue managed by this store.
+    /// </summary>
     public void ClearAllStorage()
     {
         CheckDisposed();
@@ -516,6 +640,11 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Returns the number of persisted messages currently stored in the specified queue.
+    /// </summary>
+    /// <param name="queueName">The logical queue name whose stored message count to retrieve.</param>
+    /// <returns>The number of messages in the queue.</returns>
     public long GetMessageCount(string queueName)
     {
         CheckDisposed();
@@ -532,6 +661,15 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Removes a persisted queue and its associated resources from the store.
+    /// </summary>
+    /// <param name="queueName">The logical queue name to delete.</param>
+    /// <remarks>
+    /// If present, disposes and removes the queue's maintainer and ZoneTree, and deletes the queue's data directory.
+    /// If the queue does not exist, the method returns without error.
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">Thrown if the store has been disposed.</exception>
     public void DeleteQueue(string queueName)
     {
         CheckDisposed();
@@ -562,12 +700,26 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Releases managed and unmanaged resources used by the ZoneTreeMessageStore and suppresses finalization.
+    /// </summary>
+    /// <remarks>
+    /// Calls Dispose(true) and prevents the object's finalizer from running.
+    /// </remarks>
     public void Dispose()
     {
         GC.SuppressFinalize(this);
         Dispose(true);
     }
 
+    /// <summary>
+    /// Releases managed resources and persists per-queue metadata when the store is disposed.
+    /// </summary>
+    /// <remarks>
+    /// If <paramref name="disposing"/> is true, the method sets the disposed flag, acquires the store's write lock,
+    /// disposes and clears any maintainers, calls SaveMetaData and disposes each ZoneTree, clears the tree map,
+    /// and finally releases and disposes the lock. Disposal of individual maintainers or trees ignores exceptions.
+    /// </remarks>
     private void Dispose(bool disposing)
     {
         if (_disposed)
@@ -617,6 +769,10 @@ public class ZoneTreeMessageStore : IMessageStore
         }
     }
 
+    /// <summary>
+    /// Validates that the message store has not been disposed.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown when the store has already been disposed.</exception>
     private void CheckDisposed()
     {
         if (_disposed)
@@ -624,13 +780,25 @@ public class ZoneTreeMessageStore : IMessageStore
                 "Cannot perform operation on a disposed message store");
     }
 
-    private static ZoneTreeTransaction GetZoneTreeTransaction(IStoreTransaction transaction) =>
+    /// <summary>
+                /// Verify that an IStoreTransaction is a ZoneTreeTransaction and return it.
+                /// </summary>
+                /// <param name="transaction">The transaction to validate and cast.</param>
+                /// <returns>The given transaction cast to <see cref="ZoneTreeTransaction"/>.</returns>
+                /// <exception cref="ArgumentException">Thrown when <paramref name="transaction"/> is not a <see cref="ZoneTreeTransaction"/>.</exception>
+                private static ZoneTreeTransaction GetZoneTreeTransaction(IStoreTransaction transaction) =>
         transaction is ZoneTreeTransaction zt
             ? zt
             : throw new ArgumentException(
                 $"Expected ZoneTreeTransaction but received {transaction.GetType().Name}",
                 nameof(transaction));
 
+    /// <summary>
+    /// Retrieve the ZoneTree instance backing the specified queue.
+    /// </summary>
+    /// <param name="queueName">The logical name of the queue.</param>
+    /// <returns>The <see cref="IZoneTree{Guid,Memory{byte}}"/> instance for the given queue.</returns>
+    /// <exception cref="QueueDoesNotExistException">Thrown when no tree exists for <paramref name="queueName"/>.</exception>
     private IZoneTree<Guid, Memory<byte>> GetTree(string queueName)
     {
         if (_trees.TryGetValue(queueName, out var tree))
@@ -643,7 +811,11 @@ public class ZoneTreeMessageStore : IMessageStore
     /// Encodes a queue name as a URL-safe directory name.
     /// Characters that are not alphanumeric, hyphen, or underscore are percent-encoded.
     /// This ensures the encoding is fully reversible for round-trip queue reopening.
+    /// <summary>
+    /// Produces a filesystem-safe directory name by percent-encoding characters outside letters, digits, '-', '_', and '.' using their UTF-8 byte values.
     /// </summary>
+    /// <param name="queueName">Original queue name to encode.</param>
+    /// <returns>The encoded queue name where each unsafe character is replaced by one or more `%XX` sequences representing its UTF-8 bytes.</returns>
     private static string EncodeQueueName(string queueName)
     {
         var sb = new StringBuilder(queueName.Length);
@@ -668,7 +840,11 @@ public class ZoneTreeMessageStore : IMessageStore
 
     /// <summary>
     /// Decodes a percent-encoded directory name back to the original queue name.
+    /// <summary>
+    /// Reconstructs an original queue name from its percent-encoded directory-safe representation.
     /// </summary>
+    /// <param name="encoded">The percent-encoded queue name where non-safe characters are encoded as `%HH` sequences.</param>
+    /// <returns>The decoded queue name as a UTF-8 string, with `%HH` sequences converted to the corresponding bytes and all other characters preserved.</returns>
     private static string DecodeQueueName(string encoded)
     {
         var bytes = new List<byte>();
@@ -690,12 +866,22 @@ public class ZoneTreeMessageStore : IMessageStore
         return Encoding.UTF8.GetString(bytes.ToArray());
     }
 
+    /// <summary>
+    /// Produces the filesystem path for the given queue by encoding the queue name into a filesystem-safe directory name and combining it with the store's data directory.
+    /// </summary>
+    /// <param name="queueName">Original queue name to encode into a safe directory name.</param>
+    /// <returns>Full directory path under the store's data directory where the queue's files are stored.</returns>
     private string GetQueuePath(string queueName)
     {
         var safeName = EncodeQueueName(queueName);
         return System.IO.Path.Combine(_dataDirectory, safeName);
     }
 
+    /// <summary>
+    /// Creates or opens a ZoneTree for the specified queue and ensures the queue directory and metadata file exist.
+    /// </summary>
+    /// <param name="queueName">The logical queue name to create or reopen; persisted to a metadata file so the queue can be recovered on restart.</param>
+    /// <returns>An opened <c>IZoneTree&lt;Guid, Memory&lt;byte&gt;&gt;</c> configured for Guid keys, byte-array values, deleted-value semantics, and segment size limits from options.</returns>
     private IZoneTree<Guid, Memory<byte>> CreateZoneTree(string queueName)
     {
         var queuePath = GetQueuePath(queueName);
@@ -721,6 +907,12 @@ public class ZoneTreeMessageStore : IMessageStore
         return factory.OpenOrCreate();
     }
 
+    /// <summary>
+    /// Reopens previously persisted queue stores found under the configured data directory and registers their trees and optional maintainers.
+    /// </summary>
+    /// <remarks>
+    /// If the data directory does not exist this method returns immediately. For each subdirectory it attempts to recover the original queue name from the queue metadata file, falling back to decoding the directory name; invalid or non-ZoneTree directories are skipped.
+    /// </remarks>
     private void ReopenExistingQueues()
     {
         if (!Directory.Exists(_dataDirectory))
@@ -769,15 +961,27 @@ public class ZoneTreeMessageStore : IMessageStore
         private readonly ZoneTreeMessageStore _store;
         private readonly string _queueName;
 
+        /// <summary>
+        /// Initializes a new instance of <see cref="ZoneTreeMessageEnumerable"/> for the specified queue.
+        /// </summary>
+        /// <param name="queueName">The name of the queue whose persisted messages will be enumerated.</param>
         public ZoneTreeMessageEnumerable(ZoneTreeMessageStore store, string queueName)
         {
             _store = store;
             _queueName = queueName;
         }
 
-        public IEnumerator<Message> GetEnumerator() => new ZoneTreeMessageEnumerator(_store, _queueName);
+        /// <summary>
+/// Provides an enumerator that iterates persisted, non-deleted messages for the store's captured queue.
+/// </summary>
+/// <returns>An <see cref="IEnumerator{Message}"/> that enumerates persisted messages from the specified queue.</returns>
+public IEnumerator<Message> GetEnumerator() => new ZoneTreeMessageEnumerator(_store, _queueName);
 
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+        /// <summary>
+/// Get a non-generic enumerator that iterates through the messages in the queue.
+/// </summary>
+/// <returns>An <see cref="System.Collections.IEnumerator"/> that can be used to iterate the collection.</returns>
+System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     private class ZoneTreeMessageEnumerator : IEnumerator<Message>
@@ -787,6 +991,11 @@ public class ZoneTreeMessageStore : IMessageStore
         private IZoneTreeIterator<Guid, Memory<byte>>? _iterator;
         private bool _disposed;
 
+        /// <summary>
+        /// Initializes a new <see cref="ZoneTreeMessageEnumerator"/> for the specified message store and queue and prepares it for enumeration.
+        /// </summary>
+        /// <param name="store">The owning <see cref="ZoneTreeMessageStore"/> that provides access to the queue.</param>
+        /// <param name="queueName">The name of the queue whose messages will be enumerated.</param>
         public ZoneTreeMessageEnumerator(ZoneTreeMessageStore store, string queueName)
         {
             _store = store;
@@ -794,6 +1003,13 @@ public class ZoneTreeMessageStore : IMessageStore
             Initialize();
         }
 
+        /// <summary>
+        /// Acquires the store read lock and initializes the zone-tree iterator for the enumerator's queue.
+        /// </summary>
+        /// <remarks>
+        /// On failure the method will clean up any partial state and rethrow the original exception.
+        /// </remarks>
+        /// <exception cref="Exception">Propagates any exception thrown while retrieving the tree or creating the iterator.</exception>
         private void Initialize()
         {
             _store._lock.EnterReadLock();
@@ -813,6 +1029,10 @@ public class ZoneTreeMessageStore : IMessageStore
 
         object System.Collections.IEnumerator.Current => Current;
 
+        /// <summary>
+        /// Advances the enumerator to the next persisted message in the queue, skipping entries marked as deleted.
+        /// </summary>
+        /// <returns>`true` if the enumerator advanced and <see cref="Current"/> contains the next message; `false` if the enumerator is disposed, exhausted, an error occurred, or no next message is available.</returns>
         public bool MoveNext()
         {
             if (_disposed || _iterator == null)
@@ -839,12 +1059,21 @@ public class ZoneTreeMessageStore : IMessageStore
             return false;
         }
 
+        /// <summary>
+        /// Resets the enumerator to the beginning of the underlying queue so iteration will start from the first message.
+        /// </summary>
         public void Reset()
         {
             Cleanup();
             Initialize();
         }
 
+        /// <summary>
+        /// Disposes the current zone-tree iterator, releases the store's read lock if held, and clears the iterator reference.
+        /// </summary>
+        /// <remarks>
+        /// Any <see cref="SynchronizationLockException"/> raised when releasing the lock is ignored.
+        /// </remarks>
         private void Cleanup()
         {
             try
@@ -869,6 +1098,12 @@ public class ZoneTreeMessageStore : IMessageStore
             }
         }
 
+        /// <summary>
+        /// Releases resources held by the ZoneTreeMessageStore and marks the instance as disposed.
+        /// </summary>
+        /// <remarks>
+        /// Safe to call multiple times; after disposal, operations on the store will throw <see cref="ObjectDisposedException"/>.
+        /// </remarks>
         public void Dispose()
         {
             if (!_disposed)

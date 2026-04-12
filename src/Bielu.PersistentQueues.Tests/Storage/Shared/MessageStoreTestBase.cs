@@ -19,18 +19,30 @@ public abstract class MessageStoreTestBase
 
     /// <summary>
     /// Creates a new IMessageStore rooted at the given path.
-    /// </summary>
+    /// <summary>
+/// Create an IMessageStore instance whose storage is rooted at the specified filesystem path.
+/// </summary>
+/// <param name="path">The root directory path where the store will persist its data.</param>
+/// <returns>An IMessageStore instance rooted at <paramref name="path"/>.</returns>
+protected abstract IMessageStore CreateStoreForPath(string path);
     protected abstract IMessageStore CreateStoreForPath(string path);
 
     /// <summary>
     /// Creates a new IMessageStore at a fresh temp directory.
+    /// <summary>
+    /// Creates a fresh temporary directory and returns an IMessageStore rooted at that directory.
     /// </summary>
+    /// <returns>An IMessageStore instance whose storage root is a newly created temporary directory.</returns>
     protected IMessageStore CreateStore()
     {
         var path = TempPath();
         return CreateStoreForPath(path);
     }
 
+    /// <summary>
+    /// Creates a temporary IMessageStore with a "test" queue, invokes the provided action with that store, and disposes the store when the action completes.
+    /// </summary>
+    /// <param name="action">Action to execute using the initialized IMessageStore; the store will be disposed after the action returns.</param>
     protected void StorageScenario(Action<IMessageStore> action)
     {
         using var store = CreateStore();
@@ -38,6 +50,10 @@ public abstract class MessageStoreTestBase
         action(store);
     }
 
+    /// <summary>
+    /// Creates a new unique subdirectory under the test temporary root and returns its path.
+    /// </summary>
+    /// <returns>The full path of the created temporary directory.</returns>
     protected static string TempPath()
     {
         var path = Path.Combine(TempBasePath, Guid.NewGuid().ToString());
@@ -45,6 +61,12 @@ public abstract class MessageStoreTestBase
         return path;
     }
 
+    /// <summary>
+    /// Creates a Message for the specified queue with the given payload encoded as UTF-8 bytes.
+    /// </summary>
+    /// <param name="queueName">Target queue name for the message.</param>
+    /// <param name="payload">String payload to encode into the message body.</param>
+    /// <returns>A Message whose data is the UTF-8 bytes of <paramref name="payload"/> and whose queue is <paramref name="queueName"/>.</returns>
     protected static Message NewMessage(string queueName = "test", string payload = "hello")
     {
         return Message.Create(

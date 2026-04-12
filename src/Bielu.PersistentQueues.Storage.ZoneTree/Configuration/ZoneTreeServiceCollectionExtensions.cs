@@ -15,6 +15,12 @@ public static class ZoneTreeServiceCollectionExtensions
     /// <param name="builder">The persistent queues builder.</param>
     /// <param name="path">The file system path for the ZoneTree data directory.</param>
     /// <param name="configure">Optional delegate to configure ZoneTree storage options.</param>
+    /// <summary>
+    /// Registers ZoneTree-based persistent queue storage using the specified file system path and optional configuration.
+    /// </summary>
+    /// <param name="builder">The persistent queues builder to configure.</param>
+    /// <param name="path">File system path where ZoneTree will store its data files.</param>
+    /// <param name="configure">Optional action to customize <see cref="ZoneTreeStorageOptions"/> before registration.</param>
     /// <returns>The builder for chaining.</returns>
     public static PersistentQueuesBuilder AddZoneTreeStorage(
         this PersistentQueuesBuilder builder,
@@ -39,7 +45,13 @@ public static class ZoneTreeServiceCollectionExtensions
     /// <param name="builder">The persistent queues builder.</param>
     /// <param name="path">The file system path for the ZoneTree data directory.</param>
     /// <param name="storageOptions">ZoneTree storage options.</param>
-    /// <returns>The builder for chaining.</returns>
+    /// <summary>
+    /// Registers ZoneTree-based persistent queue storage using the provided file path and storage options.
+    /// </summary>
+    /// <param name="builder">The persistent queues builder to configure.</param>
+    /// <param name="path">The filesystem path where ZoneTree will store message data.</param>
+    /// <param name="storageOptions">Configuration options for ZoneTree storage.</param>
+    /// <returns>The original <see cref="PersistentQueuesBuilder"/> instance for chaining.</returns>
     public static PersistentQueuesBuilder AddZoneTreeStorage(
         this PersistentQueuesBuilder builder,
         string path,
