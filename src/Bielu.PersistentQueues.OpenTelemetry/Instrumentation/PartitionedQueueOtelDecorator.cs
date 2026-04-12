@@ -252,4 +252,62 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
     {
         return _partitionedQueue.GetAvailablePartitions(queueName);
     }
+
+    /// <inheritdoc />
+    public void EnablePartitioning(string queueName, int partitionCount)
+    {
+        using var activity = _activitySource.StartActivity(ActivityNames.EnablePartitioning, ActivityKind.Internal);
+        QueueActivitySource.SetQueueTags(activity, queueName);
+        QueueActivitySource.SetPartitionCountTag(activity, partitionCount);
+
+        try
+        {
+            _partitionedQueue.EnablePartitioning(queueName, partitionCount);
+            _metrics.RecordPartitionCreated(queueName, partitionCount);
+        }
+        catch (Exception ex)
+        {
+            _metrics.RecordOperationError("EnablePartitioning", queueName);
+            _activitySource.RecordException(activity, ex);
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
+    public void DisablePartitioning(string queueName)
+    {
+        using var activity = _activitySource.StartActivity(ActivityNames.DisablePartitioning, ActivityKind.Internal);
+        QueueActivitySource.SetQueueTags(activity, queueName);
+
+        try
+        {
+            _partitionedQueue.DisablePartitioning(queueName);
+        }
+        catch (Exception ex)
+        {
+            _metrics.RecordOperationError("DisablePartitioning", queueName);
+            _activitySource.RecordException(activity, ex);
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
+    public void Repartition(string queueName, int newPartitionCount)
+    {
+        using var activity = _activitySource.StartActivity(ActivityNames.Repartition, ActivityKind.Internal);
+        QueueActivitySource.SetQueueTags(activity, queueName);
+        QueueActivitySource.SetPartitionCountTag(activity, newPartitionCount);
+
+        try
+        {
+            _partitionedQueue.Repartition(queueName, newPartitionCount);
+            _metrics.RecordPartitionCreated(queueName, newPartitionCount);
+        }
+        catch (Exception ex)
+        {
+            _metrics.RecordOperationError("Repartition", queueName);
+            _activitySource.RecordException(activity, ex);
+            throw;
+        }
+    }
 }

@@ -23,6 +23,9 @@ internal static class ActivityNames
     public const string ReceiveBatchFromPartition = "ReceiveBatchFromPartition";
     public const string ReceiveFromPartitions = "ReceiveFromPartitions";
     public const string ResolvePartition = "ResolvePartition";
+    public const string EnablePartitioning = "EnablePartitioning";
+    public const string DisablePartitioning = "DisablePartitioning";
+    public const string Repartition = "Repartition";
 
     // Dead letter queue operations
     public const string MoveToDeadLetter = "MoveToDeadLetter";
