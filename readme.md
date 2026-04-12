@@ -447,9 +447,10 @@ Times are in microseconds (μs). Lower is better.
 - **ZoneTree excels** at small-batch operations (100 messages) where it is consistently faster across all operations, particularly for store and delete.
 - **LMDB excels** at larger batches (1,000+ messages) where its transactional batch commit model amortizes overhead and its B+ tree provides excellent read locality.
 - **LMDB has lower memory allocations** due to zero-copy reads from memory-mapped files.
-- **ZoneTree dramatically outperforms LMDB** in the outgoing message cycle at all scales (30x faster at 1K messages) due to its LSM-tree write optimization.
+- In the benchmarked outgoing message workflow using `PersistedOutgoing()` with per-message `SuccessfullySent()`, **ZoneTree dramatically outperforms LMDB** at all scales measured (30x faster at 1K messages).
+- These outgoing-cycle results do **not** measure the production raw/bulk send path (`PersistedOutgoingRaw` + `SuccessfullySentByIds`), so they should not be treated as a universal conclusion for all send scenarios.
 - Choose **LMDB** for read-heavy, large-batch, low-latency workloads with available native dependencies.
-- Choose **ZoneTree** for write-heavy, small-batch workloads or when native dependencies are not available.
+- Choose **ZoneTree** for write-heavy, small-batch workloads or when native dependencies are not available, especially when your usage matches the benchmarked API pattern above.
 
 ### Custom Storage Providers
 
