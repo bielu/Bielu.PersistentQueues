@@ -701,6 +701,403 @@ public class PartitionedQueueTests : TestBase
         }, TimeSpan.FromSeconds(10));
     }
 
+    [Fact]
+    public void enable_partitioning_converts_non_partitioned_queue()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            // Enqueue messages to the non-partitioned "test" queue
+            for (int i = 0; i < 5; i++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "test",
+                    partitionKey: $"key-{i}");
+                innerQueue.Enqueue(msg);
+            }
+
+            store.GetMessageCount("test").ShouldBe(5);
+
+            // Enable partitioning with 3 partitions
+            partitioned.EnablePartitioning("test", 3);
+
+            // Base queue should now be empty — messages moved to partitions
+            store.GetMessageCount("test").ShouldBe(0);
+
+            // All 5 messages should be distributed across partitions
+            long total = 0;
+            for (int i = 0; i < 3; i++)
+                total += partitioned.GetPartitionMessageCount("test", i);
+            total.ShouldBe(5);
+
+            // Partition count should reflect the new layout
+            partitioned.GetPartitionCount("test").ShouldBe(3);
+        });
+    }
+
+    [Fact]
+    public void enable_partitioning_on_empty_queue()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            // Enable partitioning on an empty queue
+            partitioned.EnablePartitioning("test", 4);
+
+            partitioned.GetPartitionCount("test").ShouldBe(4);
+
+            // All partitions should be empty
+            for (int i = 0; i < 4; i++)
+                partitioned.GetPartitionMessageCount("test", i).ShouldBe(0);
+        });
+    }
+
+    [Fact]
+    public void enable_partitioning_throws_if_already_partitioned()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            partitioned.CreatePartitionedQueue("test", 4);
+
+            Should.Throw<InvalidOperationException>(() =>
+                partitioned.EnablePartitioning("test", 2));
+        });
+    }
+
+    [Fact]
+    public void enable_partitioning_throws_for_invalid_count()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            Should.Throw<ArgumentOutOfRangeException>(() =>
+                partitioned.EnablePartitioning("test", 0));
+            Should.Throw<ArgumentOutOfRangeException>(() =>
+                partitioned.EnablePartitioning("test", -1));
+        });
+    }
+
+    [Fact]
+    public void disable_partitioning_converts_partitioned_to_non_partitioned()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            partitioned.CreatePartitionedQueue("test", 3);
+
+            // Enqueue messages to various partitions
+            for (int i = 0; i < 6; i++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "test");
+                partitioned.EnqueueToPartition(msg, i % 3);
+            }
+
+            // Verify messages are distributed
+            long totalBefore = 0;
+            for (int i = 0; i < 3; i++)
+                totalBefore += partitioned.GetPartitionMessageCount("test", i);
+            totalBefore.ShouldBe(6);
+
+            // Disable partitioning
+            partitioned.DisablePartitioning("test");
+
+            // Base queue should now have all messages
+            store.GetMessageCount("test").ShouldBe(6);
+
+            // Queue is no longer partitioned
+            partitioned.GetPartitionCount("test").ShouldBe(0);
+        });
+    }
+
+    [Fact]
+    public void disable_partitioning_throws_if_not_partitioned()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            Should.Throw<InvalidOperationException>(() =>
+                partitioned.DisablePartitioning("test"));
+        });
+    }
+
+    [Fact]
+    public void repartition_changes_partition_count()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            partitioned.CreatePartitionedQueue("test", 2);
+
+            // Enqueue messages to both partitions
+            for (int i = 0; i < 10; i++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "test",
+                    partitionKey: $"key-{i}");
+                partitioned.EnqueueToPartition(msg, i % 2);
+            }
+
+            // Verify all 10 messages exist
+            long totalBefore = 0;
+            for (int i = 0; i < 2; i++)
+                totalBefore += partitioned.GetPartitionMessageCount("test", i);
+            totalBefore.ShouldBe(10);
+
+            // Repartition from 2 to 4
+            partitioned.Repartition("test", 4);
+
+            // Partition count should be updated
+            partitioned.GetPartitionCount("test").ShouldBe(4);
+
+            // All 10 messages should still exist across the new partitions
+            long totalAfter = 0;
+            for (int i = 0; i < 4; i++)
+                totalAfter += partitioned.GetPartitionMessageCount("test", i);
+            totalAfter.ShouldBe(10);
+        });
+    }
+
+    [Fact]
+    public void repartition_same_count_is_noop()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            partitioned.CreatePartitionedQueue("test", 4);
+
+            // Enqueue some messages
+            for (int i = 0; i < 4; i++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "test");
+                partitioned.EnqueueToPartition(msg, i);
+            }
+
+            // Repartition with the same count should be a no-op
+            partitioned.Repartition("test", 4);
+
+            partitioned.GetPartitionCount("test").ShouldBe(4);
+
+            // Messages should remain in their partitions unchanged
+            for (int i = 0; i < 4; i++)
+                partitioned.GetPartitionMessageCount("test", i).ShouldBe(1);
+        });
+    }
+
+    [Fact]
+    public void repartition_throws_if_not_partitioned()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            Should.Throw<InvalidOperationException>(() =>
+                partitioned.Repartition("test", 4));
+        });
+    }
+
+    [Fact]
+    public void repartition_throws_for_invalid_count()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            partitioned.CreatePartitionedQueue("test", 2);
+
+            Should.Throw<ArgumentOutOfRangeException>(() =>
+                partitioned.Repartition("test", 0));
+            Should.Throw<ArgumentOutOfRangeException>(() =>
+                partitioned.Repartition("test", -1));
+        });
+    }
+
+    [Fact]
+    public void repartition_shrink_preserves_all_messages()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            partitioned.CreatePartitionedQueue("test", 4);
+
+            // Enqueue messages to all 4 partitions
+            for (int i = 0; i < 8; i++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "test",
+                    partitionKey: $"key-{i}");
+                partitioned.EnqueueToPartition(msg, i % 4);
+            }
+
+            // Repartition from 4 to 2
+            partitioned.Repartition("test", 2);
+
+            partitioned.GetPartitionCount("test").ShouldBe(2);
+
+            // All 8 messages should still exist
+            long total = 0;
+            for (int i = 0; i < 2; i++)
+                total += partitioned.GetPartitionMessageCount("test", i);
+            total.ShouldBe(8);
+        });
+    }
+
+    [Fact]
+    public void enable_then_disable_roundtrip()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            var config = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue = config.BuildQueue();
+            var partitioned = new PartitionedQueue(innerQueue, new HashPartitionStrategy());
+
+            // Enqueue messages to non-partitioned queue
+            for (int i = 0; i < 5; i++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "test");
+                innerQueue.Enqueue(msg);
+            }
+
+            // Convert to partitioned
+            partitioned.EnablePartitioning("test", 3);
+            store.GetMessageCount("test").ShouldBe(0);
+            partitioned.GetPartitionCount("test").ShouldBe(3);
+
+            // Convert back to non-partitioned
+            partitioned.DisablePartitioning("test");
+            store.GetMessageCount("test").ShouldBe(5);
+            partitioned.GetPartitionCount("test").ShouldBe(0);
+        });
+    }
+
+    [Fact]
+    public void disable_partitioning_survives_restart()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            // First instance: create partitioned queue, add messages, then disable
+            var config1 = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue1 = config1.BuildQueue();
+            var partitioned1 = new PartitionedQueue(innerQueue1, new HashPartitionStrategy());
+
+            partitioned1.CreatePartitionedQueue("test", 3);
+            for (int i = 0; i < 6; i++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "test");
+                partitioned1.EnqueueToPartition(msg, i % 3);
+            }
+
+            partitioned1.DisablePartitioning("test");
+
+            // Simulate restart: create a new PartitionedQueue instance over the same store
+            var config2 = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue2 = config2.BuildQueue();
+            var partitioned2 = new PartitionedQueue(innerQueue2, new HashPartitionStrategy());
+
+            // The new instance should discover 0 partitions (sub-queues were deleted)
+            partitioned2.GetPartitionCount("test").ShouldBe(0);
+
+            // All messages should be in the base queue
+            store.GetMessageCount("test").ShouldBe(6);
+        });
+    }
+
+    [Fact]
+    public void repartition_shrink_survives_restart()
+    {
+        PartitionedStorageScenario(store =>
+        {
+            // First instance: create 4 partitions, add messages, then shrink to 2
+            var config1 = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue1 = config1.BuildQueue();
+            var partitioned1 = new PartitionedQueue(innerQueue1, new HashPartitionStrategy());
+
+            partitioned1.CreatePartitionedQueue("test", 4);
+            for (int i = 0; i < 8; i++)
+            {
+                var msg = Message.Create(data: Encoding.UTF8.GetBytes($"msg-{i}"), queue: "test",
+                    partitionKey: $"key-{i}");
+                partitioned1.EnqueueToPartition(msg, i % 4);
+            }
+
+            partitioned1.Repartition("test", 2);
+
+            // Simulate restart: create a new PartitionedQueue instance over the same store
+            var config2 = new QueueConfiguration()
+                .WithDefaultsForTest(Output)
+                .StoreMessagesWith(() => store);
+            var innerQueue2 = config2.BuildQueue();
+            var partitioned2 = new PartitionedQueue(innerQueue2, new HashPartitionStrategy());
+
+            // The new instance should discover exactly 2 partitions (old sub-queues 2,3 were deleted)
+            partitioned2.GetPartitionCount("test").ShouldBe(2);
+
+            // All 8 messages should still be present across the 2 partitions
+            long total = 0;
+            for (int i = 0; i < 2; i++)
+                total += partitioned2.GetPartitionMessageCount("test", i);
+            total.ShouldBe(8);
+        });
+    }
+
     /// <summary>
     /// QueueScenario variant with higher MaxDatabases to support partitioned queues.
     /// </summary>

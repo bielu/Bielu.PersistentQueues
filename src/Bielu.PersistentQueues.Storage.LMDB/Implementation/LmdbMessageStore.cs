@@ -965,6 +965,27 @@ public class LmdbMessageStore : IMessageStore
     }
 
     /// <inheritdoc />
+    public void DeleteQueue(string queueName)
+    {
+        CheckDisposed();
+
+        _lock.EnterWriteLock();
+        try
+        {
+            using var tx = _environment.BeginTransaction();
+            var db = tx.OpenDatabase(queueName);
+            ThrowIfError(tx.DropDatabase(db));
+            ThrowIfError(tx.Commit());
+
+            _cachedDatabases.TryRemove(queueName, out _);
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
+    }
+
+    /// <inheritdoc />
     public StorageUsageInfo? GetStorageUsageInfo()
     {
         CheckDisposed();

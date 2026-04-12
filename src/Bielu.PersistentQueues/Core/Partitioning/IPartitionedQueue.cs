@@ -123,4 +123,83 @@ public interface IPartitionedQueue : IQueue
     /// when it has messages <b>and</b> no other consumer currently holds its exclusive lock.
     /// </remarks>
     int[] GetAvailablePartitions(string queueName);
+
+    /// <summary>
+    /// Converts an existing non-partitioned queue to a partitioned queue, redistributing
+    /// any existing messages across the new partitions using the configured <see cref="IPartitionStrategy"/>.
+    /// </summary>
+    /// <param name="queueName">The base queue name of the existing non-partitioned queue.</param>
+    /// <param name="partitionCount">The number of partitions to create.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="partitionCount"/> is less than or equal to zero.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the queue is already partitioned. Use <see cref="Repartition"/> instead.</exception>
+    /// <remarks>
+    /// <para>
+    /// This method creates the partition sub-queues and moves all messages from the
+    /// original queue into the appropriate partitions. The partition assignment is determined by
+    /// the configured <see cref="IPartitionStrategy"/> using each message's partition key (or
+    /// message ID if no key is set).
+    /// </para>
+    /// <para>
+    /// <b>Important:</b> The queue must be quiesced before calling this method — no concurrent
+    /// producers or consumers should be active on this queue. Messages enqueued or received
+    /// concurrently during this operation may be lost or routed incorrectly.
+    /// </para>
+    /// <para>
+    /// After this operation completes, the original queue name becomes a logical partitioned queue
+    /// and messages will be routed to partitions automatically on <see cref="IQueue.Enqueue(Message)"/>.
+    /// </para>
+    /// </remarks>
+    void EnablePartitioning(string queueName, int partitionCount);
+
+    /// <summary>
+    /// Converts a partitioned queue back to a non-partitioned queue, moving all messages
+    /// from all partitions into a single queue with the base name.
+    /// </summary>
+    /// <param name="queueName">The base queue name of the partitioned queue.</param>
+    /// <exception cref="InvalidOperationException">Thrown when the queue is not partitioned.</exception>
+    /// <remarks>
+    /// <para>
+    /// This method moves all messages from every partition sub-queue back into
+    /// the base queue, then deletes the partition sub-queues from storage. After this
+    /// operation, the queue behaves as a standard non-partitioned queue and messages are
+    /// no longer routed to partitions. A new <see cref="PartitionedQueue"/> instance over
+    /// the same store will correctly see the queue as non-partitioned.
+    /// </para>
+    /// <para>
+    /// <b>Important:</b> The queue must be quiesced before calling this method — no concurrent
+    /// producers or consumers should be active on this queue. Messages enqueued or received
+    /// concurrently during this operation may be lost or routed incorrectly.
+    /// </para>
+    /// <para>
+    /// Partition locks are released and cleaned up as part of this operation.
+    /// </para>
+    /// </remarks>
+    void DisablePartitioning(string queueName);
+
+    /// <summary>
+    /// Changes the number of partitions for an already-partitioned queue, redistributing
+    /// all existing messages across the new partition count.
+    /// </summary>
+    /// <param name="queueName">The base queue name of the partitioned queue.</param>
+    /// <param name="newPartitionCount">The new number of partitions.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="newPartitionCount"/> is less than or equal to zero.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the queue is not partitioned. Use <see cref="EnablePartitioning"/> instead.</exception>
+    /// <remarks>
+    /// <para>
+    /// This method collects all messages from the existing partitions, creates the new partition
+    /// layout, and redistributes messages using the configured <see cref="IPartitionStrategy"/>.
+    /// When shrinking, old partition sub-queues are deleted from storage so a new instance
+    /// over the same store will discover the correct partition count.
+    /// </para>
+    /// <para>
+    /// <b>Important:</b> The queue must be quiesced before calling this method — no concurrent
+    /// producers or consumers should be active on this queue. Messages enqueued or received
+    /// concurrently during this operation may be lost or routed incorrectly.
+    /// </para>
+    /// <para>
+    /// If <paramref name="newPartitionCount"/> equals the current partition count, this method
+    /// is a no-op and returns immediately.
+    /// </para>
+    /// </remarks>
+    void Repartition(string queueName, int newPartitionCount);
 }
