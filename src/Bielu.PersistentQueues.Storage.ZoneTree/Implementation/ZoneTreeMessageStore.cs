@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using Tenray.ZoneTree;
 using Tenray.ZoneTree.Comparers;
@@ -19,6 +20,13 @@ namespace Bielu.PersistentQueues.Storage.ZoneTree;
 public class ZoneTreeMessageStore : IMessageStore
 {
     private const string OutgoingQueue = "outgoing";
+
+    /// <summary>
+    /// File name stored in each queue subdirectory to record the original queue name,
+    /// so that names containing path-invalid characters can survive a restart round-trip.
+    /// </summary>
+    private const string QueueNameMetadataFile = ".queue-name";
+
     private readonly ReaderWriterLockSlim _lock;
     private readonly string _dataDirectory;
     private readonly IMessageSerializer _serializer;
@@ -179,6 +187,71 @@ public class ZoneTreeMessageStore : IMessageStore
         return new ZoneTreeMessageEnumerable(this, OutgoingQueue);
     }
 
+    /// <summary>
+    /// Returns outgoing messages as raw wire-format bytes with routing information extracted.
+    /// This enables zero-copy sending via the TCP Sender.
+    /// </summary>
+    public IEnumerable<RawOutgoingMessage> PersistedOutgoingRaw()
+    {
+        CheckDisposed();
+
+        _lock.EnterReadLock();
+        try
+        {
+            var tree = GetTree(OutgoingQueue);
+            using var iterator = tree.CreateIterator();
+            while (iterator.Next())
+            {
+                var value = iterator.CurrentValue;
+                if (value.Length == 0) // Skip deleted entries
+                    continue;
+
+                // value is the full serialized message; extract routing information
+                var messageBytes = value.ToArray();
+                var raw = WireFormatReader.ReadOutgoingMessage(new ReadOnlyMemory<byte>(messageBytes));
+
+                // Override MessageId with the actual GUID key bytes
+                var keyBytes = new byte[16];
+                iterator.CurrentKey.TryWriteBytes(keyBytes);
+
+                yield return new RawOutgoingMessage
+                {
+                    MessageId = keyBytes,
+                    DestinationUriBytes = raw.DestinationUriBytes,
+                    QueueNameBytes = raw.QueueNameBytes,
+                    FullMessage = messageBytes
+                };
+            }
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+    }
+
+    /// <summary>
+    /// Deletes outgoing messages by their raw 16-byte MessageId keys.
+    /// </summary>
+    public void SuccessfullySentByIds(IEnumerable<ReadOnlyMemory<byte>> messageIds)
+    {
+        CheckDisposed();
+
+        _lock.EnterWriteLock();
+        try
+        {
+            var tree = GetTree(OutgoingQueue);
+            foreach (var messageId in messageIds)
+            {
+                var guid = new Guid(messageId.Span);
+                tree.ForceDelete(guid);
+            }
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
+    }
+
     public void MoveToQueue(IStoreTransaction transaction, string queueName, Message message)
     {
         CheckDisposed();
@@ -189,8 +262,6 @@ public class ZoneTreeMessageStore : IMessageStore
             var sourceTree = GetTree(capturedMessage.QueueString!);
             var targetTree = GetTree(queueName);
             var key = capturedMessage.Id.MessageIdentifier;
-
-            sourceTree.ForceDelete(key);
 
             var updatedMessage = new Message(
                 capturedMessage.Id,
@@ -204,7 +275,11 @@ public class ZoneTreeMessageStore : IMessageStore
                 capturedMessage.Headers
             );
             Memory<byte> value = _serializer.AsSpan(updatedMessage).ToArray();
+
+            // Write to target FIRST, then delete from source.
+            // Worst case on failure: duplicate message (safe), never lost message.
             targetTree.Upsert(key, value);
+            sourceTree.ForceDelete(key);
         });
     }
 
@@ -323,6 +398,15 @@ public class ZoneTreeMessageStore : IMessageStore
             foreach (var message in messages)
             {
                 var key = message.Id.MessageIdentifier;
+
+                // Honor shouldRemove flag: when true, remove immediately
+                // (e.g., permanently-failed messages like HostNotFound)
+                if (shouldRemove)
+                {
+                    tree.ForceDelete(key);
+                    continue;
+                }
+
                 if (!tree.TryGet(key, out var storedValue))
                     continue;
 
@@ -484,11 +568,6 @@ public class ZoneTreeMessageStore : IMessageStore
         Dispose(true);
     }
 
-    ~ZoneTreeMessageStore()
-    {
-        Dispose(false);
-    }
-
     private void Dispose(bool disposing)
     {
         if (_disposed)
@@ -560,13 +639,60 @@ public class ZoneTreeMessageStore : IMessageStore
         throw new QueueDoesNotExistException(queueName);
     }
 
+    /// <summary>
+    /// Encodes a queue name as a URL-safe directory name.
+    /// Characters that are not alphanumeric, hyphen, or underscore are percent-encoded.
+    /// This ensures the encoding is fully reversible for round-trip queue reopening.
+    /// </summary>
+    private static string EncodeQueueName(string queueName)
+    {
+        var sb = new StringBuilder(queueName.Length);
+        foreach (var c in queueName)
+        {
+            if (char.IsLetterOrDigit(c) || c == '-' || c == '_' || c == '.')
+            {
+                sb.Append(c);
+            }
+            else
+            {
+                // Percent-encode: each byte of the UTF-8 representation gets %XX
+                foreach (var b in Encoding.UTF8.GetBytes(new[] { c }))
+                {
+                    sb.Append('%');
+                    sb.Append(b.ToString("X2"));
+                }
+            }
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Decodes a percent-encoded directory name back to the original queue name.
+    /// </summary>
+    private static string DecodeQueueName(string encoded)
+    {
+        var bytes = new List<byte>();
+        for (var i = 0; i < encoded.Length; i++)
+        {
+            if (encoded[i] == '%' && i + 2 < encoded.Length)
+            {
+                var hex = encoded.Substring(i + 1, 2);
+                bytes.Add(Convert.ToByte(hex, 16));
+                i += 2;
+            }
+            else
+            {
+                // Flush accumulated percent-encoded bytes as UTF-8
+                // before appending the literal character
+                bytes.AddRange(Encoding.UTF8.GetBytes(new[] { encoded[i] }));
+            }
+        }
+        return Encoding.UTF8.GetString(bytes.ToArray());
+    }
+
     private string GetQueuePath(string queueName)
     {
-        // Sanitize queue name for use as directory name
-        var safeName = queueName
-            .Replace('/', '_')
-            .Replace('\\', '_')
-            .Replace(':', '_');
+        var safeName = EncodeQueueName(queueName);
         return System.IO.Path.Combine(_dataDirectory, safeName);
     }
 
@@ -574,6 +700,13 @@ public class ZoneTreeMessageStore : IMessageStore
     {
         var queuePath = GetQueuePath(queueName);
         Directory.CreateDirectory(queuePath);
+
+        // Persist the original queue name so ReopenExistingQueues can recover it
+        var metaPath = System.IO.Path.Combine(queuePath, QueueNameMetadataFile);
+        if (!File.Exists(metaPath))
+        {
+            File.WriteAllText(metaPath, queueName);
+        }
 
         var factory = new ZoneTreeFactory<Guid, Memory<byte>>()
             .SetDataDirectory(queuePath)
@@ -595,7 +728,18 @@ public class ZoneTreeMessageStore : IMessageStore
 
         foreach (var dir in Directory.GetDirectories(_dataDirectory))
         {
-            var queueName = System.IO.Path.GetFileName(dir);
+            // Recover the original queue name from metadata file, falling back to decoding
+            var metaPath = System.IO.Path.Combine(dir, QueueNameMetadataFile);
+            string queueName;
+            if (File.Exists(metaPath))
+            {
+                queueName = File.ReadAllText(metaPath).Trim();
+            }
+            else
+            {
+                queueName = DecodeQueueName(System.IO.Path.GetFileName(dir));
+            }
+
             if (_trees.ContainsKey(queueName))
                 continue;
 
@@ -676,11 +820,13 @@ public class ZoneTreeMessageStore : IMessageStore
 
             try
             {
-                if (_iterator.Next())
+                // Use iteration instead of recursion to skip deleted entries
+                // to avoid stack overflow with many consecutive tombstones
+                while (_iterator.Next())
                 {
                     var value = _iterator.CurrentValue;
                     if (value.Length == 0) // Skip deleted entries
-                        return MoveNext();
+                        continue;
                     Current = _store._serializer.ToMessage(value.Span);
                     return true;
                 }
@@ -709,7 +855,10 @@ public class ZoneTreeMessageStore : IMessageStore
             {
                 try
                 {
-                    _store._lock.ExitReadLock();
+                    if (_store._lock.IsReadLockHeld)
+                    {
+                        _store._lock.ExitReadLock();
+                    }
                 }
                 catch (SynchronizationLockException)
                 {

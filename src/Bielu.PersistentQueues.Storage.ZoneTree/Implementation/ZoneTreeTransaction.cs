@@ -6,8 +6,15 @@ namespace Bielu.PersistentQueues.Storage.ZoneTree;
 
 /// <summary>
 /// A transaction implementation for ZoneTree storage that buffers operations
-/// and applies them atomically on commit.
+/// and applies them on commit.
 /// </summary>
+/// <remarks>
+/// ZoneTree does not support native multi-tree transactions, so this implementation
+/// buffers operations and executes them sequentially on <see cref="Commit"/>.
+/// If an operation fails mid-commit, earlier operations will have already been applied.
+/// For most queue workloads (single-tree inserts/deletes) this is safe, but cross-tree
+/// moves are handled with a write-first-then-delete strategy to prevent data loss.
+/// </remarks>
 public class ZoneTreeTransaction : IStoreTransaction
 {
     private readonly ReaderWriterLockSlim _lock;
@@ -33,8 +40,13 @@ public class ZoneTreeTransaction : IStoreTransaction
     }
 
     /// <summary>
-    /// Commits all buffered operations atomically.
+    /// Applies all buffered operations sequentially.
     /// </summary>
+    /// <remarks>
+    /// ZoneTree does not support native multi-tree transactions. Operations are applied
+    /// in order; if one fails, earlier operations remain applied. Cross-tree moves use
+    /// a write-first-then-delete strategy so the worst case is a duplicate, not data loss.
+    /// </remarks>
     public void Commit()
     {
         if (_disposed)
@@ -59,13 +71,9 @@ public class ZoneTreeTransaction : IStoreTransaction
         _disposed = true;
         _pendingOperations.Clear();
 
-        try
+        if (_lock.IsWriteLockHeld)
         {
             _lock.ExitWriteLock();
-        }
-        catch (SynchronizationLockException)
-        {
-            // Lock was already released
         }
     }
 }

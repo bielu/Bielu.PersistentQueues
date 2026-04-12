@@ -83,7 +83,7 @@ public abstract class OutgoingMessageTests : MessageStoreTestBase
                 data: "hello"u8.ToArray(),
                 queue: "test",
                 destinationUri: "lq.tcp://localhost:5050",
-                deliverBy: DateTime.Now
+                deliverBy: DateTime.Now.AddSeconds(-5)
             );
             using (var tx = store.BeginTransaction())
             {
