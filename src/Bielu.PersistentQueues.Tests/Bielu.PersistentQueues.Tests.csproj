@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Bielu.PersistentQueues\Bielu.PersistentQueues.csproj" />
     <ProjectReference Include="..\Bielu.PersistentQueues.Storage.LMDB\Bielu.PersistentQueues.Storage.LMDB.csproj" />
+    <ProjectReference Include="..\Bielu.PersistentQueues.Storage.ZoneTree\Bielu.PersistentQueues.Storage.ZoneTree.csproj" />
   </ItemGroup>
 
   <ItemGroup>
