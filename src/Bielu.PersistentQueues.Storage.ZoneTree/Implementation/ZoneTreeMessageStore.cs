@@ -669,6 +669,10 @@ public class ZoneTreeMessageStore : IMessageStore
     {
         CheckDisposed();
 
+        if (string.Equals(queueName, OutgoingQueue, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"Cannot delete the reserved '{OutgoingQueue}' queue. It is required for outgoing message operations.");
+
         _lock.EnterWriteLock();
         try
         {
@@ -806,26 +810,29 @@ public class ZoneTreeMessageStore : IMessageStore
     }
 
     /// <summary>
-    /// Produces a filesystem-safe directory name by percent-encoding characters outside letters, digits, '-', '_', and '.' using their UTF-8 byte values.
+    /// Produces a filesystem-safe directory name by percent-encoding characters outside ASCII letters, digits, '-', '_', and '.' using their UTF-8 byte values.
+    /// Uses <see cref="System.Text.Rune"/> enumeration to correctly handle surrogate pairs (non-BMP characters).
     /// </summary>
     /// <param name="queueName">Original queue name to encode.</param>
     /// <returns>The encoded queue name where each unsafe character is replaced by one or more `%XX` sequences representing its UTF-8 bytes.</returns>
     private static string EncodeQueueName(string queueName)
     {
         var sb = new StringBuilder(queueName.Length);
-        foreach (var c in queueName)
+        Span<byte> utf8 = stackalloc byte[4];
+        foreach (var rune in queueName.EnumerateRunes())
         {
-            if (char.IsLetterOrDigit(c) || c == '-' || c == '_' || c == '.')
+            if (rune.IsAscii && (char.IsLetterOrDigit((char)rune.Value) || rune.Value == '-' || rune.Value == '_' || rune.Value == '.'))
             {
-                sb.Append(c);
+                sb.Append((char)rune.Value);
             }
             else
             {
                 // Percent-encode: each byte of the UTF-8 representation gets %XX
-                foreach (var b in Encoding.UTF8.GetBytes(new[] { c }))
+                int len = rune.EncodeToUtf8(utf8);
+                for (int i = 0; i < len; i++)
                 {
                     sb.Append('%');
-                    sb.Append(b.ToString("X2"));
+                    sb.Append(utf8[i].ToString("X2"));
                 }
             }
         }

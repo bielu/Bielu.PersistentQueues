@@ -19,6 +19,7 @@ public class ZoneTreeTransaction : IStoreTransaction
 {
     private readonly ReaderWriterLockSlim _lock;
     private readonly object _owner;
+    private readonly int _creatingThreadId;
     private readonly List<Action> _pendingOperations = new();
     private volatile bool _committed;
     private volatile bool _disposed;
@@ -32,6 +33,7 @@ public class ZoneTreeTransaction : IStoreTransaction
     {
         _lock = transactionLock;
         _owner = owner;
+        _creatingThreadId = Environment.CurrentManagedThreadId;
     }
 
     /// <summary>
@@ -87,13 +89,22 @@ public class ZoneTreeTransaction : IStoreTransaction
     /// Releases transaction resources, clears buffered operations, and releases the associated write lock if held.
     /// </summary>
     /// <remarks>
-    /// Suppresses finalization, marks the transaction as disposed, clears the pending operations buffer, and exits the write lock on the associated <see cref="ReaderWriterLockSlim"/> if it is currently held. Calling this method multiple times has no additional effect after the first call.
+    /// Suppresses finalization, marks the transaction as disposed, clears the pending operations buffer, and exits the write lock on the associated <see cref="ReaderWriterLockSlim"/> if it is currently held.
+    /// Must be called from the same thread that created the transaction, since <see cref="ReaderWriterLockSlim"/> locks are thread-affine.
+    /// Calling this method multiple times has no additional effect after the first call.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">Thrown if Dispose is called from a different thread than the one that created the transaction.</exception>
     public void Dispose()
     {
         GC.SuppressFinalize(this);
         if (_disposed)
             return;
+
+        if (Environment.CurrentManagedThreadId != _creatingThreadId)
+            throw new InvalidOperationException(
+                $"ZoneTreeTransaction must be disposed on the same thread that created it " +
+                $"(created on thread {_creatingThreadId}, disposing on thread {Environment.CurrentManagedThreadId}). " +
+                $"ReaderWriterLockSlim is thread-affine.");
 
         _disposed = true;
         _pendingOperations.Clear();

@@ -292,11 +292,13 @@ public class MessageStoreBenchmark
     }
 
     // ========================================================================
-    // OUTGOING LIFECYCLE — Store → SuccessfullySent
-    /// <summary>
-    /// Stores outgoing messages for the benchmark queue and then marks all persisted outgoing messages as successfully sent.
-    /// </summary>
+    // OUTGOING LIFECYCLE — Store → PersistedOutgoingRaw → SuccessfullySentByIds
+    // This benchmarks the production send path used by TCP Sender/SendingProtocol.
 
+    /// <summary>
+    /// Stores outgoing messages, enumerates them via the raw wire-format path, and bulk-deletes by MessageId.
+    /// This mirrors the production TCP Sender → SendingProtocol V1 flow.
+    /// </summary>
     [Benchmark(Description = "OutgoingCycle_LMDB")]
     [BenchmarkCategory("OutgoingCycle")]
     public void OutgoingCycle_Lmdb()
@@ -305,19 +307,15 @@ public class MessageStoreBenchmark
         _lmdbStore!.StoreOutgoing(_messages!.Select(m =>
             Message.Create(data: m.DataArray, queue: "test", destinationUri: "lq.tcp://localhost:5050")));
 
-        // Mark as sent
-        foreach (var msg in _lmdbStore.PersistedOutgoing().ToList())
-        {
-            _lmdbStore.SuccessfullySent(msg);
-        }
+        // Enumerate raw and bulk-delete by IDs (production path)
+        var rawMessages = _lmdbStore.PersistedOutgoingRaw().ToList();
+        _lmdbStore.SuccessfullySentByIds(rawMessages.Select(r => (ReadOnlyMemory<byte>)r.MessageId));
     }
 
     /// <summary>
-    /// Stores outgoing messages for the "test" queue with a fixed destination and then marks all persisted outgoing messages as successfully sent.
+    /// Stores outgoing messages, enumerates them via the raw wire-format path, and bulk-deletes by MessageId.
+    /// This mirrors the production TCP Sender → SendingProtocol V1 flow.
     /// </summary>
-    /// <remarks>
-    /// Creates outgoing messages from the benchmark's message set, persists them, enumerates the persisted outgoing messages, and acknowledges each as successfully sent.
-    /// </remarks>
     [Benchmark(Description = "OutgoingCycle_ZoneTree")]
     [BenchmarkCategory("OutgoingCycle")]
     public void OutgoingCycle_ZoneTree()
@@ -326,10 +324,8 @@ public class MessageStoreBenchmark
         _zoneTreeStore!.StoreOutgoing(_messages!.Select(m =>
             Message.Create(data: m.DataArray, queue: "test", destinationUri: "lq.tcp://localhost:5050")));
 
-        // Mark as sent
-        foreach (var msg in _zoneTreeStore.PersistedOutgoing().ToList())
-        {
-            _zoneTreeStore.SuccessfullySent(msg);
-        }
+        // Enumerate raw and bulk-delete by IDs (production path)
+        var rawMessages = _zoneTreeStore.PersistedOutgoingRaw().ToList();
+        _zoneTreeStore.SuccessfullySentByIds(rawMessages.Select(r => (ReadOnlyMemory<byte>)r.MessageId));
     }
 }
