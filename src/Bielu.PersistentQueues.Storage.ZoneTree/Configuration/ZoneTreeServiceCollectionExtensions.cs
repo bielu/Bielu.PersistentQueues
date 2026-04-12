@@ -10,12 +10,6 @@ namespace Bielu.PersistentQueues.Storage.ZoneTree;
 public static class ZoneTreeServiceCollectionExtensions
 {
     /// <summary>
-    /// Configures ZoneTree storage at the specified path.
-    /// </summary>
-    /// <param name="builder">The persistent queues builder.</param>
-    /// <param name="path">The file system path for the ZoneTree data directory.</param>
-    /// <param name="configure">Optional delegate to configure ZoneTree storage options.</param>
-    /// <summary>
     /// Registers ZoneTree-based persistent queue storage using the specified file system path and optional configuration.
     /// </summary>
     /// <param name="builder">The persistent queues builder to configure.</param>
@@ -39,12 +33,6 @@ public static class ZoneTreeServiceCollectionExtensions
         return builder;
     }
 
-    /// <summary>
-    /// Configures ZoneTree storage at the specified path with explicit options.
-    /// </summary>
-    /// <param name="builder">The persistent queues builder.</param>
-    /// <param name="path">The file system path for the ZoneTree data directory.</param>
-    /// <param name="storageOptions">ZoneTree storage options.</param>
     /// <summary>
     /// Registers ZoneTree-based persistent queue storage using the provided file path and storage options.
     /// </summary>

@@ -18,18 +18,26 @@ namespace Bielu.PersistentQueues.Storage.ZoneTree;
 public class ZoneTreeTransaction : IStoreTransaction
 {
     private readonly ReaderWriterLockSlim _lock;
+    private readonly object _owner;
     private readonly List<Action> _pendingOperations = new();
-    private bool _committed;
-    private bool _disposed;
+    private volatile bool _committed;
+    private volatile bool _disposed;
 
     /// <summary>
     /// Creates a ZoneTreeTransaction that will buffer operations and coordinate write access using the provided lock.
     /// </summary>
     /// <param name="transactionLock">The ReaderWriterLockSlim instance used to coordinate and release write access during the transaction's lifetime.</param>
-    internal ZoneTreeTransaction(ReaderWriterLockSlim transactionLock)
+    /// <param name="owner">The store instance that owns this transaction, used for ownership validation.</param>
+    internal ZoneTreeTransaction(ReaderWriterLockSlim transactionLock, object owner)
     {
         _lock = transactionLock;
+        _owner = owner;
     }
+
+    /// <summary>
+    /// Gets the owner store instance that created this transaction.
+    /// </summary>
+    internal object Owner => _owner;
 
     /// <summary>
     /// Buffers an operation to be executed when the transaction is committed.
@@ -53,6 +61,8 @@ public class ZoneTreeTransaction : IStoreTransaction
     /// ZoneTree does not support native multi-tree transactions. Operations are applied
     /// in order; if one fails, earlier operations remain applied. Cross-tree moves use
     /// a write-first-then-delete strategy so the worst case is a duplicate, not data loss.
+    /// On partial failure, successfully-applied operations are removed from the buffer so
+    /// a retry will not replay them.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the transaction has been disposed.</exception>
     public void Commit()
@@ -62,9 +72,12 @@ public class ZoneTreeTransaction : IStoreTransaction
         if (_committed)
             return;
 
-        foreach (var operation in _pendingOperations)
+        // Process operations one at a time, removing each after successful execution
+        // so that a retry after partial failure does not replay already-applied operations.
+        while (_pendingOperations.Count > 0)
         {
-            operation();
+            _pendingOperations[0]();
+            _pendingOperations.RemoveAt(0);
         }
 
         _committed = true;

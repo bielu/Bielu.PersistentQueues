@@ -86,7 +86,7 @@ public class ZoneTreeMessageStore : IMessageStore
         _lock.EnterWriteLock();
         try
         {
-            return new ZoneTreeTransaction(_lock);
+            return new ZoneTreeTransaction(_lock, this);
         }
         catch
         {
@@ -696,15 +696,12 @@ public class ZoneTreeMessageStore : IMessageStore
     }
 
     /// <summary>
-    /// Releases managed and unmanaged resources used by the ZoneTreeMessageStore and suppresses finalization.
+    /// Releases managed resources used by the ZoneTreeMessageStore.
     /// </summary>
-    /// <remarks>
-    /// Calls Dispose(true) and prevents the object's finalizer from running.
-    /// </remarks>
     public void Dispose()
     {
-        GC.SuppressFinalize(this);
         Dispose(true);
+        GC.SuppressFinalize(this);
     }
 
     /// <summary>
@@ -776,17 +773,23 @@ public class ZoneTreeMessageStore : IMessageStore
     }
 
     /// <summary>
-                /// Verify that an IStoreTransaction is a ZoneTreeTransaction and return it.
-                /// </summary>
-                /// <param name="transaction">The transaction to validate and cast.</param>
-                /// <returns>The given transaction cast to <see cref="ZoneTreeTransaction"/>.</returns>
-                /// <exception cref="ArgumentException">Thrown when <paramref name="transaction"/> is not a <see cref="ZoneTreeTransaction"/>.</exception>
-                private static ZoneTreeTransaction GetZoneTreeTransaction(IStoreTransaction transaction) =>
-        transaction is ZoneTreeTransaction zt
-            ? zt
-            : throw new ArgumentException(
+    /// Verify that an IStoreTransaction is a ZoneTreeTransaction owned by this store and return it.
+    /// </summary>
+    /// <param name="transaction">The transaction to validate and cast.</param>
+    /// <returns>The given transaction cast to <see cref="ZoneTreeTransaction"/>.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="transaction"/> is not a <see cref="ZoneTreeTransaction"/> or belongs to a different store.</exception>
+    private ZoneTreeTransaction GetZoneTreeTransaction(IStoreTransaction transaction)
+    {
+        if (transaction is not ZoneTreeTransaction zt)
+            throw new ArgumentException(
                 $"Expected ZoneTreeTransaction but received {transaction.GetType().Name}",
                 nameof(transaction));
+        if (!ReferenceEquals(zt.Owner, this))
+            throw new ArgumentException(
+                "Transaction belongs to a different ZoneTreeMessageStore instance.",
+                nameof(transaction));
+        return zt;
+    }
 
     /// <summary>
     /// Retrieve the ZoneTree instance backing the specified queue.
@@ -909,23 +912,25 @@ public class ZoneTreeMessageStore : IMessageStore
 
         foreach (var dir in Directory.GetDirectories(_dataDirectory))
         {
-            // Recover the original queue name from metadata file, falling back to decoding
-            var metaPath = System.IO.Path.Combine(dir, QueueNameMetadataFile);
-            string queueName;
-            if (File.Exists(metaPath))
-            {
-                queueName = File.ReadAllText(metaPath).Trim();
-            }
-            else
-            {
-                queueName = DecodeQueueName(System.IO.Path.GetFileName(dir));
-            }
-
-            if (_trees.ContainsKey(queueName))
-                continue;
-
             try
             {
+                // Recover the original queue name from metadata file, falling back to decoding
+                var metaPath = System.IO.Path.Combine(dir, QueueNameMetadataFile);
+                string queueName;
+                if (File.Exists(metaPath))
+                {
+                    queueName = File.ReadAllText(metaPath);
+                    // Only strip the trailing newline that File.WriteAllText may add
+                    queueName = queueName.TrimEnd('\r', '\n');
+                }
+                else
+                {
+                    queueName = DecodeQueueName(System.IO.Path.GetFileName(dir));
+                }
+
+                if (string.IsNullOrEmpty(queueName) || _trees.ContainsKey(queueName))
+                    continue;
+
                 var tree = CreateZoneTree(queueName);
                 _trees.TryAdd(queueName, tree);
 
@@ -937,7 +942,7 @@ public class ZoneTreeMessageStore : IMessageStore
             }
             catch
             {
-                // Skip directories that aren't valid ZoneTree stores
+                // Skip directories that aren't valid ZoneTree stores or have unreadable metadata
             }
         }
     }
