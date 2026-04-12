@@ -424,6 +424,122 @@ public class PartitionedQueue : IPartitionedQueue
         return available.ToArray();
     }
 
+    /// <inheritdoc />
+    public void EnablePartitioning(string queueName, int partitionCount)
+    {
+        if (partitionCount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(partitionCount), "Partition count must be greater than zero.");
+
+        var existingPartitions = GetPartitionCount(queueName);
+        if (existingPartitions > 0)
+            throw new InvalidOperationException(
+                $"Queue '{queueName}' is already partitioned with {existingPartitions} partitions. Use Repartition to change the partition count.");
+
+        // Create partition sub-queues
+        CreatePartitionedQueue(queueName, partitionCount);
+
+        // Move existing messages from the base queue to partitions
+        var messages = Store.PersistedIncoming(queueName).ToList();
+        if (messages.Count > 0)
+        {
+            using var tx = Store.BeginTransaction();
+            foreach (var message in messages)
+            {
+                var partition = PartitionStrategy.GetPartition(message, partitionCount);
+                var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
+                Store.MoveToQueue(tx, partitionQueueName, message);
+            }
+            tx.Commit();
+        }
+    }
+
+    /// <inheritdoc />
+    public void DisablePartitioning(string queueName)
+    {
+        var partitionCount = GetPartitionCount(queueName);
+        if (partitionCount == 0)
+            throw new InvalidOperationException(
+                $"Queue '{queueName}' is not partitioned.");
+
+        // Ensure base queue exists
+        _innerQueue.CreateQueue(queueName);
+
+        // Move all messages from partitions to the base queue
+        using var tx = Store.BeginTransaction();
+        for (var i = 0; i < partitionCount; i++)
+        {
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, i);
+            var messages = Store.PersistedIncoming(partitionQueueName).ToList();
+            if (messages.Count > 0)
+            {
+                Store.MoveToQueue(tx, queueName, messages);
+            }
+        }
+        tx.Commit();
+
+        // Mark the queue as non-partitioned in cache (prevents rediscovery from existing sub-queues)
+        _partitionCounts[queueName] = 0;
+
+        // Clean up partition locks
+        for (var i = 0; i < partitionCount; i++)
+        {
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, i);
+            if (_partitionLocks.TryRemove(partitionQueueName, out var semaphore))
+                semaphore.Dispose();
+        }
+    }
+
+    /// <inheritdoc />
+    public void Repartition(string queueName, int newPartitionCount)
+    {
+        if (newPartitionCount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(newPartitionCount), "Partition count must be greater than zero.");
+
+        var oldPartitionCount = GetPartitionCount(queueName);
+        if (oldPartitionCount == 0)
+            throw new InvalidOperationException(
+                $"Queue '{queueName}' is not partitioned. Use EnablePartitioning instead.");
+
+        if (oldPartitionCount == newPartitionCount)
+            return; // no-op
+
+        // Collect all messages from existing partitions
+        var allMessages = new List<Message>();
+        for (var i = 0; i < oldPartitionCount; i++)
+        {
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, i);
+            allMessages.AddRange(Store.PersistedIncoming(partitionQueueName));
+        }
+
+        // Create new partition sub-queues (CreateQueue is idempotent)
+        for (var i = 0; i < newPartitionCount; i++)
+        {
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, i);
+            _innerQueue.CreateQueue(partitionQueueName);
+        }
+
+        // Redistribute messages across new partition count
+        using var tx = Store.BeginTransaction();
+        foreach (var message in allMessages)
+        {
+            var partition = PartitionStrategy.GetPartition(message, newPartitionCount);
+            var newPartitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
+            Store.MoveToQueue(tx, newPartitionQueueName, message);
+        }
+        tx.Commit();
+
+        // Update partition count
+        _partitionCounts[queueName] = newPartitionCount;
+
+        // Clean up locks for removed partitions (when shrinking)
+        for (var i = newPartitionCount; i < oldPartitionCount; i++)
+        {
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, i);
+            if (_partitionLocks.TryRemove(partitionQueueName, out var semaphore))
+                semaphore.Dispose();
+        }
+    }
+
     private void ValidatePartition(string queueName, int partition)
     {
         if (partition < 0)
