@@ -5,7 +5,7 @@ on:
     branches: [ main, develop ]
     paths:
       - 'src/Bielu.PersistentQueues/**'
-      - 'src/Bielu.PersistentQueues.Storage.LMDB/**'
+      - 'src/Bielu.PersistentQueues.Storage.*/**'
       - 'src/Bielu.PersistentQueues.Benchmarks/**'
 
 permissions:
