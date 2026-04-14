@@ -345,6 +345,13 @@ public sealed class QueueMetrics
             new KeyValuePair<string, object?>("queue.name", queueName));
     }
 
+    public void RecordTimeInQueue(double durationMs, string queueName, int partition)
+    {
+        _timeInQueueHistogram.Record(durationMs,
+            new KeyValuePair<string, object?>("queue.name", queueName),
+            new KeyValuePair<string, object?>("partition", partition));
+    }
+
     /// <summary>
     /// Creates an observable gauge that reports the current number of messages in each
     /// dead letter queue as separate measurements tagged with the DLQ name.
@@ -355,6 +362,14 @@ public sealed class QueueMetrics
             MetricNames.DeadLetterQueueDepth,
             observeValues,
             description: "Number of messages currently waiting in dead letter queues");
+    }
+
+    public ObservableGauge<long> CreatePartitionDepthGauge(Func<IEnumerable<Measurement<long>>> observeValues)
+    {
+        return _meter.CreateObservableGauge(
+            MetricNames.PartitionDepth,
+            observeValues,
+            description: "Number of messages currently in each partition, tagged with queue.name and partition");
     }
 
     public void RecordPartitionConsumerStarted(string queueName, int partition)
