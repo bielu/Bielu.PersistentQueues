@@ -5,19 +5,13 @@ using Microsoft.Extensions.Logging;
 
 namespace Bielu.PersistentQueues.Logging;
 
-public class RecordingLogger : ILogger
+public class RecordingLogger(TextWriter? console = null, LogLevel logLevel = LogLevel.Debug) : ILogger
 {
-    private readonly LogLevel _level;
+    private readonly LogLevel _level = logLevel;
     private readonly TextWriter? _console;
     private readonly IList<string> _debug = new List<string>();
     private readonly IList<string> _error = new List<string>();
     private readonly IList<string> _info = new List<string>();
-
-    public RecordingLogger(TextWriter? console = null, LogLevel logLevel = LogLevel.Debug)
-    {
-        _console = console;
-        _level = logLevel;
-    }
 
     public IEnumerable<string> DebugMessages => _debug;
     public IEnumerable<string> InfoMessages => _info;

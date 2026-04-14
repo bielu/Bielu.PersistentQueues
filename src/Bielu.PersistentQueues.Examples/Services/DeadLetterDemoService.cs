@@ -15,15 +15,10 @@ namespace Bielu.PersistentQueues.Examples.Services;
 ///   4. Shows how to explicitly move a "poison" message to the DLQ.
 ///   5. Lists DLQ contents and requeues them back to the original queue.
 /// </summary>
-public class DeadLetterDemoService : BackgroundService
+public class DeadLetterDemoService(IQueue queue) : BackgroundService
 {
-    private readonly IQueue _queue;
+    private readonly IQueue _queue = queue;
     private const string QueueName = "dlq-demo";
-
-    public DeadLetterDemoService(IQueue queue)
-    {
-        _queue = queue;
-    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

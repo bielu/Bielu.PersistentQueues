@@ -6,7 +6,7 @@ namespace Bielu.PersistentQueues.Serialization;
 /// <summary>
 /// Default content serializer using System.Text.Json.
 /// </summary>
-public class JsonContentSerializer : IContentSerializer
+public class JsonContentSerializer(JsonSerializerOptions? options = null) : IContentSerializer
 {
     /// <summary>
     /// A shared default instance with default <see cref="JsonSerializerOptions"/>.
@@ -19,10 +19,6 @@ public class JsonContentSerializer : IContentSerializer
     /// Initializes a new instance of <see cref="JsonContentSerializer"/>.
     /// </summary>
     /// <param name="options">Optional JSON serializer options. If null, default options are used.</param>
-    public JsonContentSerializer(JsonSerializerOptions? options = null)
-    {
-        _options = options;
-    }
 
     /// <inheritdoc />
     public byte[] Serialize<T>(T content)

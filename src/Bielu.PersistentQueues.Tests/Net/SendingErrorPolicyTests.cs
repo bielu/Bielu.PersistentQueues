@@ -15,12 +15,8 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests.Net;
 
-public class SendingErrorPolicyTests : TestBase
+public class SendingErrorPolicyTests(ITestOutputHelper output) : TestBase
 {
-    public SendingErrorPolicyTests(ITestOutputHelper output)
-    {
-        Output = output;
-    }
 
     [Fact]
     public void max_attempts_is_reached()

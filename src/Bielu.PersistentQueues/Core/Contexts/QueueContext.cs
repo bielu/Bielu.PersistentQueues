@@ -176,16 +176,10 @@ internal class QueueContext : IQueueContext
         void Success();
     }
 
-    private class SendAction : IQueueAction
+    private class SendAction(QueueContext context, Message message) : IQueueAction
     {
-        private readonly QueueContext _context;
-        private readonly Message _message;
-
-        public SendAction(QueueContext context, Message message)
-        {
-            _context = context;
-            _message = message;
-        }
+        private readonly QueueContext _context = context;
+        private readonly Message _message = message;
 
         public void Execute(IStoreTransaction transaction)
         {
@@ -197,16 +191,10 @@ internal class QueueContext : IQueueContext
         }
     }
 
-    private class EnqueueAction : IQueueAction
+    private class EnqueueAction(QueueContext context, Message message) : IQueueAction
     {
-        private readonly QueueContext _context;
+        private readonly QueueContext _context = context;
         private readonly Message _message;
-
-        public EnqueueAction(QueueContext context, Message message)
-        {
-            _context = context;
-            _message = message;
-        }
 
         public void Execute(IStoreTransaction transaction)
         {
@@ -218,16 +206,10 @@ internal class QueueContext : IQueueContext
         }
     }
 
-    private class MoveAction : IQueueAction
+    private class MoveAction(QueueContext context, string queueName) : IQueueAction
     {
-        private readonly QueueContext _context;
-        private readonly string _queueName;
-
-        public MoveAction(QueueContext context, string queueName)
-        {
-            _context = context;
-            _queueName = queueName;
-        }
+        private readonly QueueContext _context = context;
+        private readonly string _queueName = queueName;
 
         public void Execute(IStoreTransaction transaction)
         {
@@ -239,14 +221,9 @@ internal class QueueContext : IQueueContext
         }
     }
 
-    private class SuccessAction : IQueueAction
+    private class SuccessAction(QueueContext context) : IQueueAction
     {
-        private readonly QueueContext _context;
-
-        public SuccessAction(QueueContext context)
-        {
-            _context = context;
-        }
+        private readonly QueueContext _context = context;
 
         public void Execute(IStoreTransaction transaction)
         {
@@ -258,18 +235,11 @@ internal class QueueContext : IQueueContext
         }
     }
 
-    private class ReceiveLaterTimeSpanAction : IQueueAction
+    private class ReceiveLaterTimeSpanAction(QueueContext context, Message updatedMessage, TimeSpan timeSpan) : IQueueAction
     {
-        private readonly QueueContext _context;
-        private readonly Message _updatedMessage;
-        private readonly TimeSpan _timeSpan;
-
-        public ReceiveLaterTimeSpanAction(QueueContext context, Message updatedMessage, TimeSpan timeSpan)
-        {
-            _context = context;
-            _updatedMessage = updatedMessage;
-            _timeSpan = timeSpan;
-        }
+        private readonly QueueContext _context = context;
+        private readonly Message _updatedMessage = updatedMessage;
+        private readonly TimeSpan _timeSpan = timeSpan;
 
         public void Execute(IStoreTransaction transaction)
         {
@@ -283,18 +253,11 @@ internal class QueueContext : IQueueContext
         }
     }
 
-    private class ReceiveLaterDateTimeOffsetAction : IQueueAction
+    private class ReceiveLaterDateTimeOffsetAction(QueueContext context, Message updatedMessage, DateTimeOffset time) : IQueueAction
     {
-        private readonly QueueContext _context;
-        private readonly Message _updatedMessage;
-        private readonly DateTimeOffset _time;
-
-        public ReceiveLaterDateTimeOffsetAction(QueueContext context, Message updatedMessage, DateTimeOffset time)
-        {
-            _context = context;
-            _updatedMessage = updatedMessage;
-            _time = time;
-        }
+        private readonly QueueContext _context = context;
+        private readonly Message _updatedMessage = updatedMessage;
+        private readonly DateTimeOffset _time = time;
 
         public void Execute(IStoreTransaction transaction)
         {
@@ -308,20 +271,12 @@ internal class QueueContext : IQueueContext
         }
     }
 
-    private class DeadLetterAction : IQueueAction
+    private class DeadLetterAction(QueueContext context, string dlqName, Message messageToStore, string reason) : IQueueAction
     {
-        private readonly QueueContext _context;
-        private readonly string _dlqName;
-        private readonly Message _messageToStore;
-        private readonly string _reason;
-
-        public DeadLetterAction(QueueContext context, string dlqName, Message messageToStore, string reason)
-        {
-            _context = context;
-            _dlqName = dlqName;
-            _messageToStore = messageToStore;
-            _reason = reason;
-        }
+        private readonly QueueContext _context = context;
+        private readonly string _dlqName = dlqName;
+        private readonly Message _messageToStore = messageToStore;
+        private readonly string _reason = reason;
 
         public void Execute(IStoreTransaction transaction)
         {

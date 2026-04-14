@@ -9,12 +9,8 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests;
 
-public class QueueContextTests : TestBase
+public class QueueContextTests(ITestOutputHelper output) : TestBase
 {
-    public QueueContextTests(ITestOutputHelper output)
-    {
-        Output = output;
-    }
 
     [Fact]
     public async Task SuccessfullyReceived_RemovesMessageFromQueue()

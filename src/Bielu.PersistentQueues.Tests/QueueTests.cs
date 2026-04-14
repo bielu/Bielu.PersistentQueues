@@ -12,12 +12,8 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests;
 
-public class QueueTests : TestBase
+public class QueueTests(ITestOutputHelper output) : TestBase
 {
-    public QueueTests(ITestOutputHelper output)
-    {
-        Output = output;
-    }
 
     [Fact]
     public async Task receive_at_a_later_time()

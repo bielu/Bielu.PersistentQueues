@@ -308,16 +308,10 @@ public class BatchQueueContext : IBatchQueueContext
         void Success();
     }
 
-    private class SuccessAllAction : IBatchAction
+    private class SuccessAllAction(Queue queue, Message[] messages) : IBatchAction
     {
-        private readonly Queue _queue;
-        private readonly Message[] _messages;
-
-        public SuccessAllAction(Queue queue, Message[] messages)
-        {
-            _queue = queue;
-            _messages = messages;
-        }
+        private readonly Queue _queue = queue;
+        private readonly Message[] _messages = messages;
 
         public void Execute(IStoreTransaction transaction) =>
             _queue.Store.SuccessfullyReceived(transaction, _messages);
@@ -325,18 +319,11 @@ public class BatchQueueContext : IBatchQueueContext
         public void Success() { }
     }
 
-    private class MoveAllAction : IBatchAction
+    private class MoveAllAction(Queue queue, Message[] messages, string queueName) : IBatchAction
     {
-        private readonly Queue _queue;
-        private readonly Message[] _messages;
-        private readonly string _queueName;
-
-        public MoveAllAction(Queue queue, Message[] messages, string queueName)
-        {
-            _queue = queue;
-            _messages = messages;
-            _queueName = queueName;
-        }
+        private readonly Queue _queue = queue;
+        private readonly Message[] _messages = messages;
+        private readonly string _queueName = queueName;
 
         public void Execute(IStoreTransaction transaction) =>
             _queue.Store.MoveToQueue(transaction, _queueName, _messages);
@@ -344,16 +331,10 @@ public class BatchQueueContext : IBatchQueueContext
         public void Success() { }
     }
 
-    private class SendAction : IBatchAction
+    private class SendAction(Queue queue, Message message) : IBatchAction
     {
-        private readonly Queue _queue;
-        private readonly Message _message;
-
-        public SendAction(Queue queue, Message message)
-        {
-            _queue = queue;
-            _message = message;
-        }
+        private readonly Queue _queue = queue;
+        private readonly Message _message = message;
 
         public void Execute(IStoreTransaction transaction) =>
             _queue.Store.StoreOutgoing(transaction, _message);
@@ -361,16 +342,10 @@ public class BatchQueueContext : IBatchQueueContext
         public void Success() { }
     }
 
-    private class EnqueueAction : IBatchAction
+    private class EnqueueAction(Queue queue, Message message) : IBatchAction
     {
-        private readonly Queue _queue;
-        private readonly Message _message;
-
-        public EnqueueAction(Queue queue, Message message)
-        {
-            _queue = queue;
-            _message = message;
-        }
+        private readonly Queue _queue = queue;
+        private readonly Message _message = message;
 
         public void Execute(IStoreTransaction transaction) =>
             _queue.Store.StoreIncoming(transaction, _message);
@@ -378,18 +353,11 @@ public class BatchQueueContext : IBatchQueueContext
         public void Success() { }
     }
 
-    private class ReceiveLaterTimeSpanAction : IBatchAction
+    private class ReceiveLaterTimeSpanAction(Queue queue, Message[] messages, TimeSpan timeSpan) : IBatchAction
     {
-        private readonly Queue _queue;
-        private readonly Message[] _messages;
-        private readonly TimeSpan _timeSpan;
-
-        public ReceiveLaterTimeSpanAction(Queue queue, Message[] messages, TimeSpan timeSpan)
-        {
-            _queue = queue;
-            _messages = messages;
-            _timeSpan = timeSpan;
-        }
+        private readonly Queue _queue = queue;
+        private readonly Message[] _messages = messages;
+        private readonly TimeSpan _timeSpan = timeSpan;
 
         public void Execute(IStoreTransaction transaction)
         {
@@ -405,18 +373,11 @@ public class BatchQueueContext : IBatchQueueContext
         }
     }
 
-    private class ReceiveLaterDateTimeOffsetAction : IBatchAction
+    private class ReceiveLaterDateTimeOffsetAction(Queue queue, Message[] messages, DateTimeOffset time) : IBatchAction
     {
-        private readonly Queue _queue;
-        private readonly Message[] _messages;
-        private readonly DateTimeOffset _time;
-
-        public ReceiveLaterDateTimeOffsetAction(Queue queue, Message[] messages, DateTimeOffset time)
-        {
-            _queue = queue;
-            _messages = messages;
-            _time = time;
-        }
+        private readonly Queue _queue = queue;
+        private readonly Message[] _messages = messages;
+        private readonly DateTimeOffset _time = time;
 
         public void Execute(IStoreTransaction transaction)
         {
@@ -432,18 +393,11 @@ public class BatchQueueContext : IBatchQueueContext
         }
     }
 
-    private class DeadLetterAllAction : IBatchAction
+    private class DeadLetterAllAction(Queue queue, Message[] messages, string reason) : IBatchAction
     {
         private readonly Queue _queue;
-        private readonly Message[] _messages;
-        private readonly string _reason;
-
-        public DeadLetterAllAction(Queue queue, Message[] messages, string reason)
-        {
-            _queue = queue;
-            _messages = messages;
-            _reason = reason;
-        }
+        private readonly Message[] _messages = messages;
+        private readonly string _reason = reason;
 
         public void Execute(IStoreTransaction transaction)
         {

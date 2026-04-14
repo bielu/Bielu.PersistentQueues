@@ -181,12 +181,8 @@ public class PartitionConstantsTests
     }
 }
 
-public class PartitionedQueueTests : TestBase
+public class PartitionedQueueTests(ITestOutputHelper output) : TestBase
 {
-    public PartitionedQueueTests(ITestOutputHelper output)
-    {
-        Output = output;
-    }
 
     [Fact]
     public async Task enqueue_to_partition_routes_by_key()

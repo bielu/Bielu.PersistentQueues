@@ -9,12 +9,8 @@ namespace Bielu.PersistentQueues.Tests.Storage.ZoneTree;
 /// <summary>
 /// Runs the shared OutgoingMessageTests against the ZoneTree provider.
 /// </summary>
-public class ZoneTreeOutgoingMessageTests : Shared.OutgoingMessageTests
+public class ZoneTreeOutgoingMessageTests(ITestOutputHelper output) : Shared.OutgoingMessageTests
 {
-    public ZoneTreeOutgoingMessageTests(ITestOutputHelper output)
-    {
-        Output = output;
-    }
 
     protected override IMessageStore CreateStoreForPath(string path)
     {

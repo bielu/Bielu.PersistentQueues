@@ -4,15 +4,10 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests;
 
-public class TestOutputHelperWriter : TextWriter
+public class TestOutputHelperWriter(ITestOutputHelper output) : TextWriter
 {
-    private readonly ITestOutputHelper _output;
+    private readonly ITestOutputHelper _output = output;
     private readonly StringBuilder _buffer = new();
-
-    public TestOutputHelperWriter(ITestOutputHelper output)
-    {
-        _output = output;
-    }
 
     public override Encoding Encoding => Encoding.UTF8;
 

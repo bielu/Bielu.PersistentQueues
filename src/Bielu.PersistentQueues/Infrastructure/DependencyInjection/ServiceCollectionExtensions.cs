@@ -39,7 +39,7 @@ public static class ServiceCollectionExtensions
 /// <summary>
 /// Builder for configuring Bielu.PersistentQueues services.
 /// </summary>
-public class PersistentQueuesBuilder
+public class PersistentQueuesBuilder(IServiceCollection services)
 {
     private IPEndPoint? _endpoint;
     private TimeSpan _networkBatchTimeout = TimeSpan.FromSeconds(5);
@@ -54,10 +54,6 @@ public class PersistentQueuesBuilder
     /// Initializes a new instance of <see cref="PersistentQueuesBuilder"/>.
     /// </summary>
     /// <param name="services">The service collection being configured.</param>
-    public PersistentQueuesBuilder(IServiceCollection services)
-    {
-        Services = services;
-    }
 
     /// <summary>
     /// Gets the service collection being configured.

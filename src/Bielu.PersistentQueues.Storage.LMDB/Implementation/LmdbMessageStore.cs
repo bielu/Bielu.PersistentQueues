@@ -491,16 +491,10 @@ public class LmdbMessageStore : IMessageStore
     }
 
     // Streaming enumeration that yields messages one at a time for better memory efficiency
-    private class MessageEnumerable : IEnumerable<Message>
+    private class MessageEnumerable(LmdbMessageStore store, string queueName) : IEnumerable<Message>
     {
-        private readonly LmdbMessageStore _store;
-        private readonly string _queueName;
-
-        public MessageEnumerable(LmdbMessageStore store, string queueName)
-        {
-            _store = store;
-            _queueName = queueName;
-        }
+        private readonly LmdbMessageStore _store = store;
+        private readonly string _queueName = queueName;
 
         public IEnumerator<Message> GetEnumerator()
         {
@@ -606,16 +600,10 @@ public class LmdbMessageStore : IMessageStore
         }
     }
 
-    private class RawOutgoingMessageEnumerable : IEnumerable<RawOutgoingMessage>
+    private class RawOutgoingMessageEnumerable(LmdbMessageStore store, string queueName) : IEnumerable<RawOutgoingMessage>
     {
         private readonly LmdbMessageStore _store;
         private readonly string _queueName;
-
-        public RawOutgoingMessageEnumerable(LmdbMessageStore store, string queueName)
-        {
-            _store = store;
-            _queueName = queueName;
-        }
 
         public IEnumerator<RawOutgoingMessage> GetEnumerator() => new RawOutgoingMessageEnumerator(_store, _queueName);
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
