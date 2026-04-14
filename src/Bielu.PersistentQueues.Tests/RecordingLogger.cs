@@ -7,8 +7,6 @@ namespace Bielu.PersistentQueues.Logging;
 
 public class RecordingLogger(TextWriter? console = null, LogLevel logLevel = LogLevel.Debug) : ILogger
 {
-    private readonly LogLevel _level = logLevel;
-    private readonly TextWriter? _console = console;
     private readonly IList<string> _debug = new List<string>();
     private readonly IList<string> _error = new List<string>();
     private readonly IList<string> _info = new List<string>();
@@ -35,14 +33,14 @@ public class RecordingLogger(TextWriter? console = null, LogLevel logLevel = Log
             return;
         var message = formatter(state, exception);
         list.Add(message);
-        _console?.WriteLine(message + exception);
+        console?.WriteLine(message + exception);
     }
 
-    public bool IsEnabled(LogLevel logLevel) => logLevel switch
+    public bool IsEnabled(LogLevel level) => level switch
     {
-        LogLevel.Debug when _level == LogLevel.Debug => true,
-        LogLevel.Information when _level is LogLevel.Debug or LogLevel.Information => true,
-        LogLevel.Error when _level is LogLevel.Debug 
+        LogLevel.Debug when logLevel == LogLevel.Debug => true,
+        LogLevel.Information when logLevel is LogLevel.Debug or LogLevel.Information => true,
+        LogLevel.Error when logLevel is LogLevel.Debug 
             or LogLevel.Information 
             or LogLevel.Error => true,
         _ => false

@@ -6,7 +6,6 @@ namespace Bielu.PersistentQueues.Tests;
 
 public class TestOutputHelperWriter(ITestOutputHelper output) : TextWriter
 {
-    private readonly ITestOutputHelper _output = output;
     private readonly StringBuilder _buffer = new();
 
     public override Encoding Encoding => Encoding.UTF8;
@@ -15,7 +14,7 @@ public class TestOutputHelperWriter(ITestOutputHelper output) : TextWriter
     {
         if (value == '\n')
         {
-            _output.WriteLine(_buffer.ToString());
+            output.WriteLine(_buffer.ToString());
             _buffer.Clear();
         }
         else if (value != '\r')
@@ -37,7 +36,7 @@ public class TestOutputHelperWriter(ITestOutputHelper output) : TextWriter
     public override void WriteLine(string? value)
     {
         Write(value);
-        _output.WriteLine(_buffer.ToString());
+        output.WriteLine(_buffer.ToString());
         _buffer.Clear();
     }
 
@@ -45,7 +44,7 @@ public class TestOutputHelperWriter(ITestOutputHelper output) : TextWriter
     {
         if (disposing && _buffer.Length > 0)
         {
-            _output.WriteLine(_buffer.ToString());
+            output.WriteLine(_buffer.ToString());
             _buffer.Clear();
         }
         base.Dispose(disposing);

@@ -17,7 +17,6 @@ namespace Bielu.PersistentQueues.Examples.Services;
 /// </summary>
 public class DeadLetterDemoService(IQueue queue) : BackgroundService
 {
-    private readonly IQueue _queue = queue;
     private const string QueueName = "dlq-demo";
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -36,7 +35,7 @@ public class DeadLetterDemoService(IQueue queue) : BackgroundService
                 data: Encoding.UTF8.GetBytes($"order-{i}"),
                 queue: QueueName,
                 maxAttempts: 2);
-            _queue.Enqueue(msg);
+            queue.Enqueue(msg);
         }
         Console.WriteLine("    Done.");
         Console.WriteLine();
@@ -49,7 +48,7 @@ public class DeadLetterDemoService(IQueue queue) : BackgroundService
         cts1.CancelAfter(TimeSpan.FromSeconds(2));
         try
         {
-            await foreach (var ctx in _queue.Receive(QueueName, cancellationToken: cts1.Token).ConfigureAwait(false))
+            await foreach (var ctx in queue.Receive(QueueName, cancellationToken: cts1.Token).ConfigureAwait(false))
             {
                 Console.WriteLine($"    [{ctx.Message.ProcessingAttempts + 1}/2] Processing '{Encoding.UTF8.GetString(ctx.Message.Data.Span)}' … failing.");
                 ctx.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(50));
@@ -67,7 +66,7 @@ public class DeadLetterDemoService(IQueue queue) : BackgroundService
         cts2.CancelAfter(TimeSpan.FromSeconds(2));
         try
         {
-            await foreach (var ctx in _queue.Receive(QueueName, cancellationToken: cts2.Token).ConfigureAwait(false))
+            await foreach (var ctx in queue.Receive(QueueName, cancellationToken: cts2.Token).ConfigureAwait(false))
             {
                 Console.WriteLine($"    [{ctx.Message.ProcessingAttempts + 1}/2] Processing '{Encoding.UTF8.GetString(ctx.Message.Data.Span)}' … failing → auto-DLQ.");
                 ctx.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(50));
@@ -80,7 +79,7 @@ public class DeadLetterDemoService(IQueue queue) : BackgroundService
 
         // ── 3. Explicit MoveToDeadLetter ─────────────────────────────────────
         Console.WriteLine("[3] Enqueuing a poison message and explicitly dead-lettering it …");
-        _queue.Enqueue(Message.Create(
+        queue.Enqueue(Message.Create(
             data: Encoding.UTF8.GetBytes("poison-pill"),
             queue: QueueName));
 
@@ -88,7 +87,7 @@ public class DeadLetterDemoService(IQueue queue) : BackgroundService
         cts3.CancelAfter(TimeSpan.FromSeconds(2));
         try
         {
-            await foreach (var ctx in _queue.Receive(QueueName, cancellationToken: cts3.Token).ConfigureAwait(false))
+            await foreach (var ctx in queue.Receive(QueueName, cancellationToken: cts3.Token).ConfigureAwait(false))
             {
                 Console.WriteLine($"    Received '{Encoding.UTF8.GetString(ctx.Message.Data.Span)}' → calling MoveToDeadLetter()");
                 ctx.QueueContext.MoveToDeadLetter();
@@ -101,7 +100,7 @@ public class DeadLetterDemoService(IQueue queue) : BackgroundService
 
         // ── 4. Inspect the DLQ ───────────────────────────────────────────────
         var dlqName = DeadLetterConstants.QueueName;
-        var dlqMessages = _queue.Store.PersistedIncoming(dlqName).ToList();
+        var dlqMessages = queue.Store.PersistedIncoming(dlqName).ToList();
 
         Console.WriteLine($"[4] Dead letter queue '{dlqName}' contains {dlqMessages.Count} message(s):");
         foreach (var m in dlqMessages)
@@ -114,11 +113,11 @@ public class DeadLetterDemoService(IQueue queue) : BackgroundService
 
         // ── 5. Requeue all messages from the DLQ ─────────────────────────────
         Console.WriteLine("[5] Requeuing all DLQ messages back to original queue …");
-        var requeued = _queue.RequeueDeadLetterMessages();
+        var requeued = queue.RequeueDeadLetterMessages();
         Console.WriteLine($"    Requeued {requeued} message(s).");
 
-        var remaining = _queue.Store.PersistedIncoming(dlqName).Count();
-        var backInQueue = _queue.Store.PersistedIncoming(QueueName).Count();
+        var remaining = queue.Store.PersistedIncoming(dlqName).Count();
+        var backInQueue = queue.Store.PersistedIncoming(QueueName).Count();
         Console.WriteLine($"    DLQ now has {remaining} message(s), '{QueueName}' has {backInQueue} message(s).");
         Console.WriteLine();
 

@@ -13,8 +13,6 @@ public class JsonContentSerializer(JsonSerializerOptions? options = null) : ICon
     /// </summary>
     public static readonly JsonContentSerializer Default = new();
 
-    private readonly JsonSerializerOptions? _options = options;
-
     /// <summary>
     /// Initializes a new instance of <see cref="JsonContentSerializer"/>.
     /// </summary>
@@ -23,12 +21,12 @@ public class JsonContentSerializer(JsonSerializerOptions? options = null) : ICon
     /// <inheritdoc />
     public byte[] Serialize<T>(T content)
     {
-        return JsonSerializer.SerializeToUtf8Bytes(content, _options);
+        return JsonSerializer.SerializeToUtf8Bytes(content, options);
     }
 
     /// <inheritdoc />
     public T? Deserialize<T>(ReadOnlySpan<byte> data)
     {
-        return JsonSerializer.Deserialize<T>(data, _options);
+        return JsonSerializer.Deserialize<T>(data, options);
     }
 }

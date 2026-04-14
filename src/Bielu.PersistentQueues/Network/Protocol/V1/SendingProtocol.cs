@@ -21,10 +21,6 @@ public class SendingProtocol(IMessageStore store, IStreamSecurity security, IMes
     : ProtocolBase(logger), ISendingProtocol
 #pragma warning restore BIELU004
 {
-    private readonly IMessageStore _store = store;
-    private readonly IStreamSecurity _security = security;
-    private readonly IMessageSerializer _serializer = serializer;
-
     public async ValueTask SendAsync(Uri destination, Stream stream, List<Message> batch, CancellationToken token)
     {
         using var doneCancellation = new CancellationTokenSource();
@@ -41,9 +37,9 @@ public class SendingProtocol(IMessageStore store, IStreamSecurity security, IMes
 
     private async ValueTask SendImplAsync(Uri destination, Stream stream, List<Message> messages, CancellationToken token)
     {
-        stream = await _security.ApplyAsync(destination, stream).ConfigureAwait(false);
+        stream = await security.ApplyAsync(destination, stream).ConfigureAwait(false);
         
-        var memory = _serializer.ToMemory(messages);
+        var memory = serializer.ToMemory(messages);
 
         var lengthBuffer = ArrayPool<byte>.Shared.Rent(sizeof(int));
         try
@@ -65,7 +61,7 @@ public class SendingProtocol(IMessageStore store, IStreamSecurity security, IMes
         var acknowledgeTask = WriteAcknowledgementAsync(stream, token);
         await Task.WhenAny(acknowledgeTask.AsTask(), receiveTask.AsTask()).ConfigureAwait(false);
         Logger.SenderSuccessfullyWroteAcknowledgement();
-        _store.SuccessfullySent(messages);
+        store.SuccessfullySent(messages);
         Logger.SenderStorageSuccessfullySent();
     }
 
@@ -110,7 +106,7 @@ public class SendingProtocol(IMessageStore store, IStreamSecurity security, IMes
 
     private async ValueTask SendRawImplAsync(Uri destination, Stream stream, List<RawOutgoingMessage> rawMessages, CancellationToken token)
     {
-        stream = await _security.ApplyAsync(destination, stream).ConfigureAwait(false);
+        stream = await security.ApplyAsync(destination, stream).ConfigureAwait(false);
 
         // Calculate total payload size: 4-byte count + sum of all message sizes
         var totalSize = 4; // Message count prefix
@@ -164,7 +160,7 @@ public class SendingProtocol(IMessageStore store, IStreamSecurity security, IMes
         Logger.SenderSuccessfullyWroteAcknowledgement();
 
         // Delete from storage using raw MessageIds
-        _store.SuccessfullySentByIds(rawMessages.Select(m => m.MessageId));
+        store.SuccessfullySentByIds(rawMessages.Select(m => m.MessageId));
         Logger.SenderStorageSuccessfullySent();
     }
 }
