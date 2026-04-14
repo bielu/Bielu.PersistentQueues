@@ -43,7 +43,7 @@ public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
             //even though we're not 'disconnecting', by making writable false it achieves the same outcome
             using var mockStream = new MemoryStream(ms.ToArray(), false);
             await Should.ThrowAsync<ProtocolViolationException>(async () =>
-                await protocol.ReceiveMessagesAsync(mockStream, token)).ConfigureAwait(false);
+                await protocol.ReceiveMessagesAsync(mockStream, token).ConfigureAwait(false)).ConfigureAwait(false);
         }).ConfigureAwait(false);
     }
 
@@ -63,7 +63,7 @@ public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
         await ReceivingScenarioAsync(async (protocol, _, token) =>
         {
             var ex = await Should.ThrowAsync<ProtocolViolationException>(async () =>
-                await RunLengthTestAsync(protocol, -2, token)).ConfigureAwait(false);
+                await RunLengthTestAsync(protocol, -2, token).ConfigureAwait(false)).ConfigureAwait(false);
             ex.Message.ShouldBe("Protocol violation: received length of 70 bytes, but 72 bytes were available");
         }).ConfigureAwait(false);
     }
@@ -74,7 +74,7 @@ public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
         await ReceivingScenarioAsync(async (protocol, _, token) =>
         {
             var ex = await Should.ThrowAsync<ProtocolViolationException>(async () =>
-                await RunLengthTestAsync(protocol, 5, token)).ConfigureAwait(false);
+                await RunLengthTestAsync(protocol, 5, token).ConfigureAwait(false)).ConfigureAwait(false);
             ex.Message.ShouldBe("Protocol violation: received length of 77 bytes, but 72 bytes were available");
         }).ConfigureAwait(false);
     }
@@ -135,7 +135,7 @@ public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
             ms.Position = 0;
 
             await Should.ThrowAsync<ProtocolViolationException>(async () =>
-                await protocol.ReceiveMessagesAsync(ms, token)).ConfigureAwait(false);
+                await protocol.ReceiveMessagesAsync(ms, token).ConfigureAwait(false)).ConfigureAwait(false);
         }).ConfigureAwait(false);
     }
 

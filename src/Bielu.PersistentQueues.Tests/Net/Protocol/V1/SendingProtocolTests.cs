@@ -34,7 +34,7 @@ public class SendingProtocolTests(ITestOutputHelper output) : TestBase
         using var ms = new MemoryStream();
         //not exercising full protocol
         await Should.ThrowAsync<ProtocolViolationException>(async () =>
-            await sender.SendAsync(new Uri("lq.tcp://localhost:5050"), ms, [expected], cancellation.Token)).ConfigureAwait(false);
+            await sender.SendAsync(new Uri("lq.tcp://localhost:5050"), ms, [expected], cancellation.Token).ConfigureAwait(false)).ConfigureAwait(false);
         var bytes = new ReadOnlySequence<byte>(ms.ToArray());
         var msg = serializer.ToMessage(bytes.Slice(sizeof(int) * 2).FirstSpan);
         msg.Id.ShouldBe(expected.Id);
