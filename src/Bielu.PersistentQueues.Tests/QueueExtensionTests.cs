@@ -25,13 +25,13 @@ public class QueueExtensionTests : TestBase
             var receiveTask = queue.Receive("test", cancellationToken: token).FirstAsync(token);
             queue.Enqueue(order, queueName: "test");
 
-            var result = await receiveTask;
+            var result = await receiveTask.ConfigureAwait(false);
             var deserialized = result.Message.GetContent<OrderMessage>();
             deserialized.ShouldNotBeNull();
             deserialized.OrderId.ShouldBe("ORD-EXT-001");
             deserialized.Amount.ShouldBe(55.00m);
             deserialized.Currency.ShouldBe("USD");
-        });
+        }).ConfigureAwait(false);
     }
 
     [Fact]
@@ -48,10 +48,10 @@ public class QueueExtensionTests : TestBase
             var receiveTask = queue.Receive("test", cancellationToken: token).FirstAsync(token);
             queue.Enqueue(order, queueName: "test", headers: headers);
 
-            var result = await receiveTask;
+            var result = await receiveTask.ConfigureAwait(false);
             result.Message.GetHeadersDictionary()["source"].ShouldBe("api");
             result.Message.GetContent<OrderMessage>()!.OrderId.ShouldBe("ORD-EXT-002");
-        });
+        }).ConfigureAwait(false);
     }
 
     [Fact]
@@ -66,11 +66,11 @@ public class QueueExtensionTests : TestBase
                 destinationUri: $"lq.tcp://localhost:{queue.Endpoint.Port}",
                 queueName: "test");
 
-            var result = await receiveTask;
+            var result = await receiveTask.ConfigureAwait(false);
             var deserialized = result.Message.GetContent<OrderMessage>();
             deserialized.ShouldNotBeNull();
             deserialized.OrderId.ShouldBe("ORD-SEND-001");
             deserialized.Amount.ShouldBe(25.00m);
-        });
+        }).ConfigureAwait(false);
     }
 }

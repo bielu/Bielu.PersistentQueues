@@ -69,14 +69,14 @@ public static class QueueConfigurationExtensions
             {
                 //client side with no validation of server certificate
                 var sslStream = new SslStream(stream, true, (_, _, _, _) => true, null);
-                await sslStream.AuthenticateAsClientAsync(uri.Host);
+                await sslStream.AuthenticateAsClientAsync(uri.Host).ConfigureAwait(false);
                 return sslStream;
             }),
             new TlsStreamSecurity(async (_, stream) =>
             {
                 var sslStream = new SslStream(stream, false);
                 await sslStream.AuthenticateAsServerAsync(certificate, false,
-                    checkCertificateRevocation: false, enabledSslProtocols: SslProtocols.Tls12);
+                    checkCertificateRevocation: false, enabledSslProtocols: SslProtocols.Tls12).ConfigureAwait(false);
                 return sslStream;
             }));
         return configuration;

@@ -26,11 +26,11 @@ public class QueueTests : TestBase
         {
             queue.ReceiveLater(NewMessage("test"), TimeSpan.FromSeconds(1));
             var receiveTask = queue.Receive("test", cancellationToken: token).FirstAsync(token);
-            await DeterministicDelay(100, token);
+            await DeterministicDelay(100, token).ConfigureAwait(false);
             receiveTask.IsCompleted.ShouldBeFalse();
-            await DeterministicDelay(2000, token);
+            await DeterministicDelay(2000, token).ConfigureAwait(false);
             receiveTask.IsCompleted.ShouldBeTrue();
-        }, TimeSpan.FromSeconds(4));
+        }, TimeSpan.FromSeconds(4)).ConfigureAwait(false);
     }
 
     [Fact]
@@ -40,11 +40,11 @@ public class QueueTests : TestBase
         {
             queue.ReceiveLater(NewMessage("test"), DateTimeOffset.Now.AddSeconds(1));
             var receiveTask = queue.Receive("test", cancellationToken: token).FirstAsync(token);
-            await DeterministicDelay(100, token);
+            await DeterministicDelay(100, token).ConfigureAwait(false);
             receiveTask.IsCompleted.ShouldBeFalse();
-            await DeterministicDelay(2000, token);
+            await DeterministicDelay(2000, token).ConfigureAwait(false);
             receiveTask.IsCompleted.ShouldBeTrue();
-        }, TimeSpan.FromSeconds(4));
+        }, TimeSpan.FromSeconds(4)).ConfigureAwait(false);
     }
 
     [Fact]
@@ -55,11 +55,11 @@ public class QueueTests : TestBase
             var expected = NewMessage("test");
             var receiveTask = queue.Receive("test", cancellationToken: token).FirstAsync(token);
             queue.Enqueue(expected);
-            var result = await receiveTask;
+            var result = await receiveTask.ConfigureAwait(false);
             result.Message.Id.ShouldBe(expected.Id);
             result.Message.QueueString.ShouldBe(expected.QueueString);
             result.Message.DataArray.ShouldBe(expected.DataArray);
-        });
+        }).ConfigureAwait(false);
     }
 
     [Fact]
@@ -70,12 +70,12 @@ public class QueueTests : TestBase
             queue.CreateQueue("another");
             var expected = NewMessage("test");
             queue.Enqueue(expected);
-            var message = await queue.Receive("test", 50, cancellationToken: token).FirstAsync(token);
+            var message = await queue.Receive("test", 50, cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
             queue.MoveToQueue("another", message.Message);
 
-            message = await queue.Receive("another", 50, cancellationToken: token).FirstAsync(token);
+            message = await queue.Receive("another", 50, cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
             message.Message.QueueString.ShouldBe("another");
-        });
+        }).ConfigureAwait(false);
     }
 
     [Fact]
@@ -89,11 +89,11 @@ public class QueueTests : TestBase
                 destinationUri: $"lq.tcp://localhost:{queue.Endpoint.Port}"
             );
             queue.Send(message);
-            var received = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            var received = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
             received.ShouldNotBeNull();
             received.Message.Queue.ShouldBe(message.Queue);
             received.Message.Data.ShouldBe(message.Data);
-        });
+        }).ConfigureAwait(false);
     }
 
     [Fact]
@@ -112,10 +112,10 @@ public class QueueTests : TestBase
                     maxAttempts: 1
                 );
                 queue.Send(message);
-                await DeterministicDelay(5000, token); //connect timeout cancellation, but windows is slow
+                await DeterministicDelay(5000, token).ConfigureAwait(false); //connect timeout cancellation, but windows is slow
                 var store = (LmdbMessageStore)queue.Store;
                 store.PersistedOutgoing().Any().ShouldBeFalse();
-            }, TimeSpan.FromSeconds(10));
+            }, TimeSpan.FromSeconds(10)).ConfigureAwait(false);
     }
 
     [Fact]
@@ -138,7 +138,7 @@ public class QueueTests : TestBase
         queue.Start();
         queue2.CreateQueue("test");
         queue2.Start();
-        await cancellation.CancelAsync();
+        await cancellation.CancelAsync().ConfigureAwait(false);
     }
     
     [Fact]
@@ -170,7 +170,7 @@ public class QueueTests : TestBase
             // Receive all the messages (should be 3)
             var receivedMessages = await queue.Receive("test", cancellationToken: token)
                 .Take(3)
-                .ToListAsync(token);
+                .ToListAsync(token).ConfigureAwait(false);
             
             receivedMessages.Count.ShouldBe(3);
             
@@ -182,12 +182,12 @@ public class QueueTests : TestBase
             payloads.ShouldContain("payload1");
             payloads.ShouldContain("payload2");
             payloads.ShouldContain("payload3");
-            await DeterministicDelay(TimeSpan.FromSeconds(1), token);
+            await DeterministicDelay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
             
             // Verify the message store shows they were all sent
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedOutgoing().Count().ShouldBe(0); // Should be 0 since they were processed
-        }, TimeSpan.FromSeconds(5));
+        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -215,9 +215,9 @@ public class QueueTests : TestBase
             var receiveQueue3Task = queue.Receive("queue3", pollIntervalInMilliseconds: 10, cancellationToken: token).FirstAsync(token);
             
             // Wait for all receives to complete and get results
-            var received1 = await receiveQueue1Task;
-            var received2 = await receiveQueue2Task;
-            var received3 = await receiveQueue3Task;
+            var received1 = await receiveQueue1Task.ConfigureAwait(false);
+            var received2 = await receiveQueue2Task.ConfigureAwait(false);
+            var received3 = await receiveQueue3Task.ConfigureAwait(false);
             
             System.Text.Encoding.UTF8.GetString(received1.Message.DataArray!).ShouldBe("payload1");
             System.Text.Encoding.UTF8.GetString(received2.Message.DataArray!).ShouldBe("payload2");
@@ -226,7 +226,7 @@ public class QueueTests : TestBase
             received1.Message.QueueString.ShouldBe("queue1");
             received2.Message.QueueString.ShouldBe("queue2");
             received3.Message.QueueString.ShouldBe("queue3");
-        }, TimeSpan.FromSeconds(5));
+        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -251,7 +251,7 @@ public class QueueTests : TestBase
             queueNames.ShouldContain("queue3");
             
             return Task.CompletedTask;
-        });
+        }).ConfigureAwait(false);
     }
     
     [Fact]
@@ -263,14 +263,14 @@ public class QueueTests : TestBase
             queue.Enqueue(NewMessage("test", "msg2"));
             queue.Enqueue(NewMessage("test", "msg3"));
             
-            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
             
             batchCtx.Messages.Length.ShouldBe(3);
             var payloads = batchCtx.Messages.Select(m => System.Text.Encoding.UTF8.GetString(m.DataArray!)).ToList();
             payloads.ShouldContain("msg1");
             payloads.ShouldContain("msg2");
             payloads.ShouldContain("msg3");
-        }, TimeSpan.FromSeconds(5));
+        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -282,10 +282,10 @@ public class QueueTests : TestBase
             queue.Enqueue(NewMessage("test", "msg2"));
             queue.Enqueue(NewMessage("test", "msg3"));
             
-            var batchCtx = await queue.ReceiveBatch("test", maxMessages: 2, cancellationToken: token).FirstAsync(token);
+            var batchCtx = await queue.ReceiveBatch("test", maxMessages: 2, cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
             
             batchCtx.Messages.Length.ShouldBe(2);
-        }, TimeSpan.FromSeconds(5));
+        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -299,10 +299,10 @@ public class QueueTests : TestBase
             var batches = await queue.ReceiveBatch("test", cancellationToken: linked.Token)
                 .ToListAsync(linked.Token)
                 .AsTask()
-                .ContinueWith(t => t.IsCompletedSuccessfully ? t.Result : new List<IBatchQueueContext>());
+                .ContinueWith(t => t.IsCompletedSuccessfully ? t.Result : new List<IBatchQueueContext>()).ConfigureAwait(false);
             
             batches.Count.ShouldBe(0);
-        }, TimeSpan.FromSeconds(3));
+        }, TimeSpan.FromSeconds(3)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -317,7 +317,7 @@ public class QueueTests : TestBase
                 .GetAsyncEnumerator(token);
             
             // First batch should contain the already-enqueued message
-            (await batchEnumerator.MoveNextAsync()).ShouldBeTrue();
+            (await batchEnumerator.MoveNextAsync().ConfigureAwait(false)).ShouldBeTrue();
             batches.Add(batchEnumerator.Current);
             batches[0].Messages.Length.ShouldBe(1);
             System.Text.Encoding.UTF8.GetString(batches[0].Messages[0].DataArray!).ShouldBe("first");
@@ -327,13 +327,13 @@ public class QueueTests : TestBase
             batches[0].CommitChanges();
             
             queue.Enqueue(NewMessage("test", "second"));
-            (await batchEnumerator.MoveNextAsync()).ShouldBeTrue();
+            (await batchEnumerator.MoveNextAsync().ConfigureAwait(false)).ShouldBeTrue();
             batches.Add(batchEnumerator.Current);
             batches[1].Messages.Length.ShouldBe(1);
             System.Text.Encoding.UTF8.GetString(batches[1].Messages[0].DataArray!).ShouldBe("second");
             
-            await batchEnumerator.DisposeAsync();
-        }, TimeSpan.FromSeconds(5));
+            await batchEnumerator.DisposeAsync().ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -347,14 +347,14 @@ public class QueueTests : TestBase
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, token);
             
             var batches = new List<IBatchQueueContext>();
-            await foreach (var batchCtx in queue.ReceiveBatch("test", pollIntervalInMilliseconds: 50, cancellationToken: linked.Token))
+            await foreach (var batchCtx in queue.ReceiveBatch("test", pollIntervalInMilliseconds: 50, cancellationToken: linked.Token).ConfigureAwait(false))
             {
                 batches.Add(batchCtx);
             }
             
             batches.Count.ShouldBeGreaterThanOrEqualTo(1);
             batches[0].Messages.Length.ShouldBe(1);
-        }, TimeSpan.FromSeconds(3));
+        }, TimeSpan.FromSeconds(3)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -368,7 +368,7 @@ public class QueueTests : TestBase
             // Enqueue second message after 200ms — within the 500ms timeout window
             _ = Task.Run(async () =>
             {
-                await DeterministicDelay(200, token);
+                await DeterministicDelay(200, token).ConfigureAwait(false);
                 queue.Enqueue(NewMessage("test", "msg2"));
             }, token);
             
@@ -377,7 +377,7 @@ public class QueueTests : TestBase
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var batchCtx = await queue.ReceiveBatch("test", batchTimeoutInMilliseconds: 500, 
                     pollIntervalInMilliseconds: 50, cancellationToken: token)
-                .FirstAsync(token);
+                .FirstAsync(token).ConfigureAwait(false);
             sw.Stop();
             
             batchCtx.Messages.Length.ShouldBe(2);
@@ -386,7 +386,7 @@ public class QueueTests : TestBase
             payloads.ShouldContain("msg2");
             // Should have waited for the full timeout window (~500ms), not yielded early
             sw.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(400);
-        }, TimeSpan.FromSeconds(5));
+        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -400,11 +400,11 @@ public class QueueTests : TestBase
             // Without timeout (default), should yield immediately with only the first message
             var batchCtx = await queue.ReceiveBatch("test", pollIntervalInMilliseconds: 50, 
                     cancellationToken: token)
-                .FirstAsync(token);
+                .FirstAsync(token).ConfigureAwait(false);
             
             // Should get the message immediately without waiting
             batchCtx.Messages.Length.ShouldBeGreaterThanOrEqualTo(1);
-        }, TimeSpan.FromSeconds(3));
+        }, TimeSpan.FromSeconds(3)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -418,14 +418,14 @@ public class QueueTests : TestBase
             
             var batches = new List<IBatchQueueContext>();
             await foreach (var batchCtx in queue.ReceiveBatch("test", batchTimeoutInMilliseconds: 200, 
-                pollIntervalInMilliseconds: 50, cancellationToken: linked.Token))
+                pollIntervalInMilliseconds: 50, cancellationToken: linked.Token).ConfigureAwait(false))
             {
                 batches.Add(batchCtx);
             }
             
             // No messages were enqueued, so no batches should have been yielded
             batches.Count.ShouldBe(0);
-        }, TimeSpan.FromSeconds(3));
+        }, TimeSpan.FromSeconds(3)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -443,13 +443,13 @@ public class QueueTests : TestBase
             var batchCtx = await queue.ReceiveBatch("test", maxMessages: 2, 
                     batchTimeoutInMilliseconds: 5000, pollIntervalInMilliseconds: 50, 
                     cancellationToken: token)
-                .FirstAsync(token);
+                .FirstAsync(token).ConfigureAwait(false);
             var elapsed = DateTime.UtcNow - start;
             
             batchCtx.Messages.Length.ShouldBe(2);
             // Should have returned well before the 5-second timeout
             elapsed.TotalMilliseconds.ShouldBeLessThan(2000);
-        }, TimeSpan.FromSeconds(5));
+        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -465,13 +465,13 @@ public class QueueTests : TestBase
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var batchCtx = await queue.ReceiveBatch("test", batchTimeoutInMilliseconds: 300, 
                     pollIntervalInMilliseconds: 50, cancellationToken: token)
-                .FirstAsync(token);
+                .FirstAsync(token).ConfigureAwait(false);
             sw.Stop();
             
             batchCtx.Messages.Length.ShouldBe(1);
             // Should have waited ~300ms for the timeout window, not returned instantly
             sw.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(250);
-        }, TimeSpan.FromSeconds(5));
+        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -484,23 +484,23 @@ public class QueueTests : TestBase
             
             _ = Task.Run(async () =>
             {
-                await DeterministicDelay(100, token);
+                await DeterministicDelay(100, token).ConfigureAwait(false);
                 queue.Enqueue(NewMessage("test", "msg2"));
-                await DeterministicDelay(100, token);
+                await DeterministicDelay(100, token).ConfigureAwait(false);
                 queue.Enqueue(NewMessage("test", "msg3"));
             }, token);
             
             // 500ms timeout should collect all 3 messages that arrive over ~200ms
             var batchCtx = await queue.ReceiveBatch("test", batchTimeoutInMilliseconds: 500, 
                     pollIntervalInMilliseconds: 50, cancellationToken: token)
-                .FirstAsync(token);
+                .FirstAsync(token).ConfigureAwait(false);
             
             batchCtx.Messages.Length.ShouldBe(3);
             var payloads = batchCtx.Messages.Select(m => System.Text.Encoding.UTF8.GetString(m.DataArray!)).ToList();
             payloads.ShouldContain("msg1");
             payloads.ShouldContain("msg2");
             payloads.ShouldContain("msg3");
-        }, TimeSpan.FromSeconds(5));
+        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -516,14 +516,14 @@ public class QueueTests : TestBase
             var batchCtx = await queue.ReceiveBatch("test", maxMessages: 30, 
                     batchTimeoutInMilliseconds: 300, pollIntervalInMilliseconds: 50, 
                     cancellationToken: token)
-                .FirstAsync(token);
+                .FirstAsync(token).ConfigureAwait(false);
             sw.Stop();
             
             batchCtx.Messages.Length.ShouldBe(1);
             // Timeout should have triggered — not returned early and not waited forever
             sw.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(250);
             sw.ElapsedMilliseconds.ShouldBeLessThan(1000);
-        }, TimeSpan.FromSeconds(5));
+        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -536,7 +536,7 @@ public class QueueTests : TestBase
             queue.Enqueue(NewMessage("test", "also-process"));
             
             // Get the batch
-            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
             batchCtx.Messages.Length.ShouldBe(3);
             
             // Split messages: defer one, mark the rest as received
@@ -554,9 +554,9 @@ public class QueueTests : TestBase
             batchCtx.CommitChanges();
             
             // The deferred message should reappear after the delay
-            var reappeared = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            var reappeared = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
             System.Text.Encoding.UTF8.GetString(reappeared.Message.DataArray!).ShouldBe("defer-me");
-        }, TimeSpan.FromSeconds(5));
+        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -567,7 +567,7 @@ public class QueueTests : TestBase
             queue.Enqueue(NewMessage("test", "process-now"));
             queue.Enqueue(NewMessage("test", "defer-me"));
             
-            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
             batchCtx.Messages.Length.ShouldBe(2);
             
             var toDefer = batchCtx.Messages.Where(m => 
@@ -580,9 +580,9 @@ public class QueueTests : TestBase
             batchCtx.CommitChanges();
             
             // The deferred message should reappear after the specified time
-            var reappeared = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
+            var reappeared = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
             System.Text.Encoding.UTF8.GetString(reappeared.Message.DataArray!).ShouldBe("defer-me");
-        }, TimeSpan.FromSeconds(5));
+        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
     }
     
     [Fact]
@@ -594,7 +594,7 @@ public class QueueTests : TestBase
             queue.Enqueue(NewMessage("test", "stay"));
             queue.Enqueue(NewMessage("test", "move-me"));
             
-            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
             batchCtx.Messages.Length.ShouldBe(2);
             
             var toMove = batchCtx.Messages.Where(m =>
@@ -607,8 +607,8 @@ public class QueueTests : TestBase
             batchCtx.CommitChanges();
             
             // The moved message should appear in the "other" queue
-            var moved = await queue.Receive("other", cancellationToken: token).FirstAsync(token);
+            var moved = await queue.Receive("other", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
             System.Text.Encoding.UTF8.GetString(moved.Message.DataArray!).ShouldBe("move-me");
-        }, TimeSpan.FromSeconds(5));
+        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
     }
 }
