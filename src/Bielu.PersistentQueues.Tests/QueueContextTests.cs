@@ -20,7 +20,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             var message = NewMessage("test");
             queue.Enqueue(message);
             
-            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             
             receivedContext.QueueContext.SuccessfullyReceived();
             receivedContext.QueueContext.CommitChanges();
@@ -30,7 +30,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             
             var allMessages = store.PersistedIncoming("test").ToList();
             allMessages.Count.ShouldBe(0);
-        }, TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(3));
     }
     
     [Fact]
@@ -42,17 +42,17 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             var message = NewMessage("test");
             queue.Enqueue(message);
             
-            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             
             receivedContext.QueueContext.MoveTo("another");
             receivedContext.QueueContext.CommitChanges();
             
-            var movedMessage = await queue.Receive("another", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var movedMessage = await queue.Receive("another", cancellationToken: token).FirstAsync(token);
             movedMessage.Message.QueueString.ShouldBe("another");
             
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").Any().ShouldBeFalse();
-        }).ConfigureAwait(false);
+        });
     }
     
     [Fact]
@@ -65,7 +65,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             var receivedMessage = NewMessage("test");
             queue.Enqueue(receivedMessage);
             
-            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             
             var responseMessage = Message.Create(
                 data: "hello"u8.ToArray(),
@@ -76,9 +76,9 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             receivedContext.QueueContext.Send(responseMessage);
             receivedContext.QueueContext.CommitChanges();
             
-            var sent = await queue.Receive("response", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var sent = await queue.Receive("response", cancellationToken: token).FirstAsync(token);
             sent.Message.QueueString.ShouldBe("response");
-        }, TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(3));
     }
     
     [Fact]
@@ -89,7 +89,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             var message = NewMessage("test");
             queue.Enqueue(message);
             
-            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             var messageId = receivedContext.Message.Id;
             
             receivedContext.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(800));
@@ -99,11 +99,11 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").Any().ShouldBeFalse();
             
-            await DeterministicDelayAsync(1000, token).ConfigureAwait(false);
+            await DeterministicDelayAsync(1000, token);
             
-            var delayedMessage = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var delayedMessage = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             delayedMessage.Message.Id.ShouldBe(messageId);
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
     
     [Fact]
@@ -120,7 +120,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             queue.Enqueue(originalMessage);
 
             // First read
-            var ctx1 = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var ctx1 = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             ctx1.Message.Id.ShouldBe(originalId);
             ctx1.Message.Id.SourceInstanceId.ShouldBe(originalId.SourceInstanceId);
             ctx1.Message.Id.MessageIdentifier.ShouldBe(originalId.MessageIdentifier);
@@ -129,10 +129,10 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             ctx1.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(100));
             ctx1.QueueContext.CommitChanges();
 
-            await DeterministicDelayAsync(200, token).ConfigureAwait(false);
+            await DeterministicDelayAsync(200, token);
 
             // Second read - should have exact same ID
-            var ctx2 = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var ctx2 = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             ctx2.Message.Id.ShouldBe(originalId);
             ctx2.Message.Id.SourceInstanceId.ShouldBe(originalId.SourceInstanceId);
             ctx2.Message.Id.MessageIdentifier.ShouldBe(originalId.MessageIdentifier);
@@ -141,17 +141,17 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             ctx2.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(100));
             ctx2.QueueContext.CommitChanges();
 
-            await DeterministicDelayAsync(200, token).ConfigureAwait(false);
+            await DeterministicDelayAsync(200, token);
 
             // Third read - should still have exact same ID
-            var ctx3 = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var ctx3 = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             ctx3.Message.Id.ShouldBe(originalId);
             ctx3.Message.Id.SourceInstanceId.ShouldBe(originalId.SourceInstanceId);
             ctx3.Message.Id.MessageIdentifier.ShouldBe(originalId.MessageIdentifier);
 
             ctx3.QueueContext.SuccessfullyReceived();
             ctx3.QueueContext.CommitChanges();
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             var message = NewMessage("test");
             queue.Enqueue(message);
 
-            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             var messageId = receivedContext.Message.Id;
 
             var futureTime = DateTimeOffset.Now.AddMilliseconds(800);
@@ -173,11 +173,11 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").Any().ShouldBeFalse();
             
-            await DeterministicDelayAsync(1000, token).ConfigureAwait(false);
+            await DeterministicDelayAsync(1000, token);
             
-            var delayedMessage = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var delayedMessage = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             delayedMessage.Message.Id.ShouldBe(messageId);
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
     
     [Fact]
@@ -188,7 +188,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             var receivedMessage = NewMessage("test");
             queue.Enqueue(receivedMessage);
             
-            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             
             var newMessage = NewMessage("test", "new payload");
             var newMessageId = newMessage.Id;
@@ -198,10 +198,10 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             receivedContext.QueueContext.SuccessfullyReceived();
             receivedContext.QueueContext.CommitChanges();
             
-            var enqueuedMessage = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var enqueuedMessage = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             enqueuedMessage.Message.Id.ShouldBe(newMessageId);
             Encoding.UTF8.GetString(enqueuedMessage.Message.DataArray!).ShouldBe("new payload");
-        }, TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(3));
     }
     
     [Fact]
@@ -214,7 +214,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             var message = NewMessage("test");
             queue.Enqueue(message);
             
-            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             
             var messageToMove = NewMessage("test", "move me");
             var messageToSend = Message.Create(
@@ -244,7 +244,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             
             var enqueuedMessages = await queue.Receive("test", cancellationToken: token)
                 .Take(2)
-                .ToListAsync(token).ConfigureAwait(false);
+                .ToListAsync(token);
             
             enqueuedMessages.Count.ShouldBe(2);
             
@@ -252,9 +252,9 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             foundIds.ShouldContain(moveMessageId);
             foundIds.ShouldContain(enqueueMessageId);
             
-            var sentMessage = await queue.Receive("response", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var sentMessage = await queue.Receive("response", cancellationToken: token).FirstAsync(token);
             sentMessage.Message.Id.ShouldBe(sendMessageId);
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
     
     [Fact]
@@ -269,7 +269,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             queue.Enqueue(msg2);
             queue.Enqueue(msg3);
             
-            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
             batchCtx.Messages.Length.ShouldBe(3);
             
             batchCtx.SuccessfullyReceived();
@@ -282,7 +282,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             store.PersistedIncoming("test").Any(m => m.Id == msg1.Id).ShouldBeFalse();
             store.PersistedIncoming("test").Any(m => m.Id == msg2.Id).ShouldBeFalse();
             store.PersistedIncoming("test").Any(m => m.Id == msg3.Id).ShouldBeFalse();
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
     
     [Fact]
@@ -294,7 +294,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             queue.Enqueue(NewMessage("test", "msg1"));
             queue.Enqueue(NewMessage("test", "msg2"));
             
-            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
             batchCtx.Messages.Length.ShouldBe(2);
             
             batchCtx.MoveTo("other");
@@ -305,10 +305,10 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             
             var movedMessages = await queue.Receive("other", cancellationToken: token)
                 .Take(2)
-                .ToListAsync(token).ConfigureAwait(false);
+                .ToListAsync(token);
             movedMessages.Count.ShouldBe(2);
             movedMessages.All(m => m.Message.QueueString == "other").ShouldBeTrue();
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
     
     [Fact]
@@ -320,7 +320,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             queue.Enqueue(NewMessage("test", "msg2"));
             queue.Enqueue(NewMessage("test", "msg3"));
             
-            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
             
             batchCtx.Messages.Length.ShouldBe(3);
             var payloads = batchCtx.Messages
@@ -329,7 +329,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             payloads.ShouldContain("msg1");
             payloads.ShouldContain("msg2");
             payloads.ShouldContain("msg3");
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
     
     [Fact]
@@ -339,7 +339,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
         {
             queue.Enqueue(NewMessage("test", "msg1"));
             
-            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
             batchCtx.Messages.Length.ShouldBe(1);
             
             batchCtx.SuccessfullyReceived();
@@ -347,7 +347,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").Any().ShouldBeFalse();
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
     
     [Fact]
@@ -359,14 +359,14 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             queue.Enqueue(message);
             
             // Single Receive should not be affected by BatchQueueContext changes
-            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var receivedContext = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             
             receivedContext.QueueContext.SuccessfullyReceived();
             receivedContext.QueueContext.CommitChanges();
             
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").Any().ShouldBeFalse();
-        }, TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(3));
     }
     
     [Fact]
@@ -386,7 +386,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             queue.Enqueue(msg3);
             queue.Enqueue(msg4);
             
-            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
             batchCtx.Messages.Length.ShouldBe(4);
             
             // Move only msg1 and msg3 to another queue, mark msg2 and msg4 as successfully received
@@ -404,7 +404,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             // Verify moved messages are in the "moved" queue
             var movedMessages = await queue.Receive("moved", cancellationToken: token)
                 .Take(2)
-                .ToListAsync(token).ConfigureAwait(false);
+                .ToListAsync(token);
             movedMessages.Count.ShouldBe(2);
             movedMessages.All(m => m.Message.QueueString == "moved").ShouldBeTrue();
             var movedIds = movedMessages.Select(m => m.Message.Id.MessageIdentifier).ToList();
@@ -414,7 +414,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             // Verify confirmed messages are gone
             store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg2.Id.MessageIdentifier).ShouldBeFalse();
             store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg4.Id.MessageIdentifier).ShouldBeFalse();
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
     
     [Fact]
@@ -432,7 +432,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             queue.Enqueue(msg3);
             queue.Enqueue(msg4);
             
-            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
             batchCtx.Messages.Length.ShouldBe(4);
             
             // Delay msg1 and msg3, mark msg2 and msg4 as successfully received
@@ -452,12 +452,12 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg4.Id.MessageIdentifier).ShouldBeFalse();
             
             // Wait for delayed messages to be re-enqueued
-            await DeterministicDelayAsync(1000, token).ConfigureAwait(false);
+            await DeterministicDelayAsync(1000, token);
             
             // Verify delayed messages reappear
             var delayedMessages = await queue.Receive("test", cancellationToken: token)
                 .Take(2)
-                .ToListAsync(token).ConfigureAwait(false);
+                .ToListAsync(token);
             delayedMessages.Count.ShouldBe(2);
             var delayedIds = delayedMessages.Select(m => m.Message.Id.MessageIdentifier).ToList();
             delayedIds.ShouldContain(msg1.Id.MessageIdentifier);
@@ -468,7 +468,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             allMessages.Count.ShouldBe(2); // Only msg1 and msg3 should be in storage
             allMessages.Any(m => m.Id.MessageIdentifier == msg2.Id.MessageIdentifier).ShouldBeFalse();
             allMessages.Any(m => m.Id.MessageIdentifier == msg4.Id.MessageIdentifier).ShouldBeFalse();
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
     
     [Fact]
@@ -490,7 +490,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             queue.Enqueue(msg4);
             queue.Enqueue(msg5);
             
-            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
             batchCtx.Messages.Length.ShouldBe(5);
             
             // Move msg1 and msg2 to another queue
@@ -512,7 +512,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             // Verify moved messages are in the "moved" queue
             var movedMessages = await queue.Receive("moved", cancellationToken: token)
                 .Take(2)
-                .ToListAsync(token).ConfigureAwait(false);
+                .ToListAsync(token);
             movedMessages.Count.ShouldBe(2);
             movedMessages.All(m => m.Message.QueueString == "moved").ShouldBeTrue();
             var movedIds = movedMessages.Select(m => m.Message.Id.MessageIdentifier).ToList();
@@ -523,12 +523,12 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg5.Id.MessageIdentifier).ShouldBeFalse();
             
             // Wait for delayed messages to be re-enqueued
-            await DeterministicDelayAsync(1000, token).ConfigureAwait(false);
+            await DeterministicDelayAsync(1000, token);
             
             // Verify delayed messages reappear in original queue
             var delayedMessages = await queue.Receive("test", cancellationToken: token)
                 .Take(2)
-                .ToListAsync(token).ConfigureAwait(false);
+                .ToListAsync(token);
             delayedMessages.Count.ShouldBe(2);
             var delayedIds = delayedMessages.Select(m => m.Message.Id.MessageIdentifier).ToList();
             delayedIds.ShouldContain(msg3.Id.MessageIdentifier);
@@ -540,7 +540,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             
             var movedQueueMessages = store.PersistedIncoming("moved").ToList();
             movedQueueMessages.Count.ShouldBe(2); // Only moved messages
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -556,7 +556,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             queue.Enqueue(msg2);
             queue.Enqueue(msg3);
 
-            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
             batchCtx.Messages.Length.ShouldBe(3);
 
             // Delay msg1 using subset operation
@@ -572,12 +572,12 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             store.PersistedIncoming("test").Any().ShouldBeFalse();
 
             // Wait for delayed message to be re-enqueued
-            await DeterministicDelayAsync(1000, token).ConfigureAwait(false);
+            await DeterministicDelayAsync(1000, token);
 
             // Only msg1 should reappear
             var delayedMessages = await queue.Receive("test", cancellationToken: token)
                 .Take(1)
-                .ToListAsync(token).ConfigureAwait(false);
+                .ToListAsync(token);
             delayedMessages.Count.ShouldBe(1);
             delayedMessages[0].Message.Id.MessageIdentifier.ShouldBe(msg1.Id.MessageIdentifier);
 
@@ -585,7 +585,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             store.PersistedIncoming("test").Count().ShouldBe(1);
             store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg2.Id.MessageIdentifier).ShouldBeFalse();
             store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg3.Id.MessageIdentifier).ShouldBeFalse();
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -602,7 +602,7 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             queue.Enqueue(msg2);
             queue.Enqueue(msg3);
 
-            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
+            var batchCtx = await queue.ReceiveBatch("test", cancellationToken: token).FirstAsync(token);
             batchCtx.Messages.Length.ShouldBe(3);
 
             // Move msg1 to DLQ using subset operation
@@ -627,6 +627,6 @@ public class QueueContextTests(ITestOutputHelper output) : TestBase
             store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg3.Id.MessageIdentifier).ShouldBeFalse();
             store.PersistedIncoming(DeadLetterConstants.QueueName).Any(m => m.Id.MessageIdentifier == msg2.Id.MessageIdentifier).ShouldBeFalse();
             store.PersistedIncoming(DeadLetterConstants.QueueName).Any(m => m.Id.MessageIdentifier == msg3.Id.MessageIdentifier).ShouldBeFalse();
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
 }

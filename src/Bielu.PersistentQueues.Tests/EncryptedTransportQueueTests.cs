@@ -23,13 +23,13 @@ public class EncryptedTransportQueueTests(ITestOutputHelper output) : TestBase
                 queue: "test",
                 destinationUri: $"lq.tcp://localhost:{queue.Endpoint.Port}"
             );
-            await DeterministicDelayAsync(100, token).ConfigureAwait(false);
+            await DeterministicDelayAsync(100, token);
             queue.Send(message);
             var received = await queue.Receive("test", cancellationToken: token)
-                .FirstAsync(token).ConfigureAwait(false);
+                .FirstAsync(token);
             received.ShouldNotBeNull();
             received.Message.QueueString.ShouldBe(message.QueueString);
             received.Message.DataArray.ShouldBe(message.DataArray);
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
 }

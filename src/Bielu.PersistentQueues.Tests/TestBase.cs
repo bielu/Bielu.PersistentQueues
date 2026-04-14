@@ -55,8 +55,8 @@ public class TestBase
          .StoreWithLmdb(() => env);
       queueBuilder(queueConfiguration);
       using var queue = queueConfiguration.BuildAndStartQueue(queueName);
-      await scenario(queue, cancellation.Token).ConfigureAwait(false);
-      await cancellation.CancelAsync().ConfigureAwait(false);
+      await scenario(queue, cancellation.Token);
+      await cancellation.CancelAsync();
    }
    
    protected Task QueueScenarioAsync(Action<QueueConfiguration> queueBuilder,

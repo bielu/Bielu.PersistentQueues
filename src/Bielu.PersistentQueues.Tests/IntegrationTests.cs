@@ -35,13 +35,13 @@ public class IntegrationTests(ITestOutputHelper output) : TestBase
             );
             sender.Send(message2);
             var received = await receiver.Receive("receiver", cancellationToken: token)
-                .FirstAsync(token).ConfigureAwait(false);
+                .FirstAsync(token);
             received.ShouldNotBeNull();
             received.Message.QueueString.ShouldBe(message2.QueueString);
             received.Message.DataArray.ShouldBe(message2.DataArray);
             
-            await DeterministicDelayAsync(100, token).ConfigureAwait(false);
+            await DeterministicDelayAsync(100, token);
             senderLogger.ErrorMessages.Any(x => x.Contains("Queue does not exist")).ShouldBeTrue();
-        }, TimeSpan.FromSeconds(2), "receiver").ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(2), "receiver");
     }
 }

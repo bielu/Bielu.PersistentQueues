@@ -205,7 +205,7 @@ public class PartitionedQueueTests(ITestOutputHelper output) : TestBase
 
             // Receive from the resolved partition
             var received = new List<Message>();
-            await foreach (var ctx in partitioned.ReceiveFromPartition("orders", p1, 50, token).ConfigureAwait(false))
+            await foreach (var ctx in partitioned.ReceiveFromPartition("orders", p1, 50, token))
             {
                 received.Add(ctx.Message);
                 ctx.QueueContext.SuccessfullyReceived();
@@ -216,7 +216,7 @@ public class PartitionedQueueTests(ITestOutputHelper output) : TestBase
             received.Count.ShouldBe(2);
             received[0].DataArray.ShouldBe(Encoding.UTF8.GetBytes("order-a"));
             received[1].DataArray.ShouldBe(Encoding.UTF8.GetBytes("order-b"));
-        }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -231,11 +231,11 @@ public class PartitionedQueueTests(ITestOutputHelper output) : TestBase
             partitioned.EnqueueToPartition(msg, 2);
 
             // Should be retrievable from partition 2
-            var received = await partitioned.ReceiveFromPartition("events", 2, 50, token).FirstAsync(token).ConfigureAwait(false);
+            var received = await partitioned.ReceiveFromPartition("events", 2, 50, token).FirstAsync(token);
             received.Message.DataArray.ShouldBe(Encoding.UTF8.GetBytes("event-data"));
             received.QueueContext.SuccessfullyReceived();
             received.QueueContext.CommitChanges();
-        }, TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(3));
     }
 
     [Fact]
@@ -254,14 +254,14 @@ public class PartitionedQueueTests(ITestOutputHelper output) : TestBase
             }
 
             await foreach (var batch in partitioned.ReceiveBatchFromPartition("batch-q", 0,
-                               maxMessages: 5, pollIntervalInMilliseconds: 50, cancellationToken: token).ConfigureAwait(false))
+                               maxMessages: 5, pollIntervalInMilliseconds: 50, cancellationToken: token))
             {
                 batch.Messages.Length.ShouldBe(5);
                 batch.SuccessfullyReceived();
                 batch.CommitChanges();
                 break;
             }
-        }, TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(3));
     }
 
     [Fact]
@@ -401,7 +401,7 @@ public class PartitionedQueueTests(ITestOutputHelper output) : TestBase
                 {
                     await foreach (var batch in partitioned.ReceiveBatchFromPartition("orders", 0,
                         maxMessages: 5, batchTimeoutInMilliseconds: 200,
-                        pollIntervalInMilliseconds: 50, cancellationToken: ct).ConfigureAwait(false))
+                        pollIntervalInMilliseconds: 50, cancellationToken: ct))
                     {
                         foreach (var msg in batch.Messages)
                             allReceived.Add(Encoding.UTF8.GetString(msg.DataArray!));
@@ -420,12 +420,12 @@ public class PartitionedQueueTests(ITestOutputHelper output) : TestBase
             cts.CancelAfter(TimeSpan.FromSeconds(5));
             var ct = cts.Token;
 
-            await Task.WhenAll(ConsumeAsync(ct), ConsumeAsync(ct)).ConfigureAwait(false);
+            await Task.WhenAll(ConsumeAsync(ct), ConsumeAsync(ct));
 
             // Each message should be received exactly once (no duplicates from concurrent access)
             allReceived.Count.ShouldBe(5);
             allReceived.Distinct().Count().ShouldBe(5);
-        }, TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(10));
     }
 
     /// <summary>
@@ -670,18 +670,18 @@ public class PartitionedQueueTests(ITestOutputHelper output) : TestBase
 
             var consumerTask = Task.Run(async () =>
             {
-                await foreach (var ctx in partitioned.ReceiveFromPartition("orders", 0, 50, cts.Token).ConfigureAwait(false))
+                await foreach (var ctx in partitioned.ReceiveFromPartition("orders", 0, 50, cts.Token))
                 {
                     consumerStarted.TrySetResult();
                     // Hold the lock while we wait — don't process
-                    try { await Task.Delay(Timeout.Infinite, cts.Token).ConfigureAwait(false); }
+                    try { await Task.Delay(Timeout.Infinite, cts.Token); }
                     catch (OperationCanceledException) { }
                     break;
                 }
             }, cts.Token);
 
             // Wait until the consumer has acquired the partition lock
-            await consumerStarted.Task.WaitAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+            await consumerStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
 
             // Partition 0 is locked, partition 1 has messages, partitions 2+3 are empty
             var available = partitioned.GetAvailablePartitions("orders");
@@ -691,10 +691,10 @@ public class PartitionedQueueTests(ITestOutputHelper output) : TestBase
             var active = partitioned.GetActivePartitions("orders");
             active.ShouldBe(new[] { 0, 1 });
 
-            await cts.CancelAsync().ConfigureAwait(false);
-            try { await consumerTask.ConfigureAwait(false); }
+            await cts.CancelAsync();
+            try { await consumerTask; }
             catch (OperationCanceledException) { }
-        }, TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        }, TimeSpan.FromSeconds(10));
     }
 
     [Fact]
@@ -1108,7 +1108,7 @@ public class PartitionedQueueTests(ITestOutputHelper output) : TestBase
             .SerializeWith(serializer)
             .StoreWithLmdb(() => env);
         using var queue = queueConfiguration.BuildAndStartQueue(queueName);
-        await scenario(queue, cancellation.Token).ConfigureAwait(false);
-        await cancellation.CancelAsync().ConfigureAwait(false);
+        await scenario(queue, cancellation.Token);
+        await cancellation.CancelAsync();
     }
 }

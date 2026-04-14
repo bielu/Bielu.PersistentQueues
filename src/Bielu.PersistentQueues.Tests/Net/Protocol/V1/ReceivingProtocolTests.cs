@@ -28,8 +28,8 @@ public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
             using var ms = new MemoryStream();
             ms.Write(BitConverter.GetBytes(-2), 0, 4);
             ms.Position = 0;
-            var result = await protocol.ReceiveMessagesAsync(ms, token).ConfigureAwait(false);
-        }).ConfigureAwait(false);
+            var result = await protocol.ReceiveMessagesAsync(ms, token);
+        });
     }
 
     [Fact]
@@ -43,8 +43,8 @@ public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
             //even though we're not 'disconnecting', by making writable false it achieves the same outcome
             using var mockStream = new MemoryStream(ms.ToArray(), false);
             await Should.ThrowAsync<ProtocolViolationException>(async () =>
-                await protocol.ReceiveMessagesAsync(mockStream, token).ConfigureAwait(false)).ConfigureAwait(false);
-        }).ConfigureAwait(false);
+                await protocol.ReceiveMessagesAsync(mockStream, token));
+        });
     }
 
     [Fact]
@@ -52,9 +52,9 @@ public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
     {
         await ReceivingScenarioAsync(async (protocol, logger, token) =>
         {
-            await RunLengthTestAsync(protocol, 0, token).ConfigureAwait(false);
+            await RunLengthTestAsync(protocol, 0, token);
             logger.DebugMessages.Any(x => x.StartsWith("Received length")).ShouldBeTrue();
-        }).ConfigureAwait(false);
+        });
     }
 
     [Fact]
@@ -63,9 +63,9 @@ public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
         await ReceivingScenarioAsync(async (protocol, _, token) =>
         {
             var ex = await Should.ThrowAsync<ProtocolViolationException>(async () =>
-                await RunLengthTestAsync(protocol, -2, token).ConfigureAwait(false)).ConfigureAwait(false);
+                await RunLengthTestAsync(protocol, -2, token));
             ex.Message.ShouldBe("Protocol violation: received length of 70 bytes, but 72 bytes were available");
-        }).ConfigureAwait(false);
+        });
     }
 
     [Fact]
@@ -74,9 +74,9 @@ public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
         await ReceivingScenarioAsync(async (protocol, _, token) =>
         {
             var ex = await Should.ThrowAsync<ProtocolViolationException>(async () =>
-                await RunLengthTestAsync(protocol, 5, token).ConfigureAwait(false)).ConfigureAwait(false);
+                await RunLengthTestAsync(protocol, 5, token));
             ex.Message.ShouldBe("Protocol violation: received length of 77 bytes, but 72 bytes were available");
-        }).ConfigureAwait(false);
+        });
     }
 
     private async Task RunLengthTestAsync(IReceivingProtocol protocol, int differenceFromActualLength, CancellationToken token)
@@ -91,7 +91,7 @@ public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
         ms.Write(BitConverter.GetBytes(memory.Length + differenceFromActualLength), 0, 4);
         ms.Write(memory.Span);
         ms.Position = 0;
-        var msgs = await protocol.ReceiveMessagesAsync(ms, token).ConfigureAwait(false);
+        var msgs = await protocol.ReceiveMessagesAsync(ms, token);
     }
 
     [Fact]
@@ -111,9 +111,9 @@ public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
             ms.Position = 0;
             await Should.ThrowAsync<QueueDoesNotExistException>(async Task () =>
             {
-                await protocol.ReceiveMessagesAsync(ms, token).ConfigureAwait(false);
-            }).ConfigureAwait(false);
-        }).ConfigureAwait(false);
+                await protocol.ReceiveMessagesAsync(ms, token);
+            });
+        });
     }
 
     [Fact]
@@ -135,8 +135,8 @@ public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
             ms.Position = 0;
 
             await Should.ThrowAsync<ProtocolViolationException>(async () =>
-                await protocol.ReceiveMessagesAsync(ms, token).ConfigureAwait(false)).ConfigureAwait(false);
-        }).ConfigureAwait(false);
+                await protocol.ReceiveMessagesAsync(ms, token));
+        });
     }
 
     [Fact]
@@ -147,11 +147,11 @@ public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
             var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
             using var ms = new MemoryStream();
             var msgs = protocol.ReceiveMessagesAsync(ms, cts.Token);
-            await DeterministicDelayAsync(TimeSpan.FromMilliseconds(200), CancellationToken.None).ConfigureAwait(false);
+            await DeterministicDelayAsync(TimeSpan.FromMilliseconds(200), CancellationToken.None);
             ms.Write(BitConverter.GetBytes(5));
             cts.Token.IsCancellationRequested.ShouldBe(true);
             logger.DebugMessages.ShouldBeEmpty();
-        }).ConfigureAwait(false);
+        });
     }
 
     private async Task ReceivingScenarioAsync(Func<ReceivingProtocol, RecordingLogger, CancellationToken, Task> scenario)
@@ -163,7 +163,7 @@ public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
         using var store = new LmdbMessageStore(env, serializer);
         store.CreateQueue("test");
         var protocol = new ReceivingProtocol(store, new NoSecurity(), serializer, new Uri("lq.tcp://localhost"), logger); 
-        await scenario(protocol, logger, cancellation.Token).ConfigureAwait(false);
-        await cancellation.CancelAsync().ConfigureAwait(false);
+        await scenario(protocol, logger, cancellation.Token);
+        await cancellation.CancelAsync();
     }
 }

@@ -28,12 +28,12 @@ public class ReceiverTests(ITestOutputHelper output) : TestBase
         {
             var listener = new TcpListener(endpoint);
             Should.Throw<SocketException>(() => listener.Start());
-            await token.CancelAsync().ConfigureAwait(false);
-            await DeterministicDelayAsync(500, CancellationToken.None).ConfigureAwait(false);
+            await token.CancelAsync();
+            await DeterministicDelayAsync(500, CancellationToken.None);
             receivingLoop.IsCompleted.ShouldBe(true);
             listener.Start();
             listener.Stop();
-        }).ConfigureAwait(false);
+        });
     }
 
 
@@ -44,10 +44,10 @@ public class ReceiverTests(ITestOutputHelper output) : TestBase
         {
             using (var client = new TcpClient())
             {
-                await client.ConnectAsync(endpoint.Address, endpoint.Port, token.Token).ConfigureAwait(false);
+                await client.ConnectAsync(endpoint.Address, endpoint.Port, token.Token);
             }
             receivingLoop.IsFaulted.ShouldBeFalse();
-        }).ConfigureAwait(false);
+        });
     }
 
     [Fact]
@@ -57,11 +57,11 @@ public class ReceiverTests(ITestOutputHelper output) : TestBase
         {
             using (var client = new TcpClient())
             {
-                await client.ConnectAsync(endpoint.Address, endpoint.Port, token.Token).ConfigureAwait(false);
-                await client.GetStream().WriteAsync((new byte[] { 1, 4, 6 }).AsMemory(0, 3), token.Token).ConfigureAwait(false);
+                await client.ConnectAsync(endpoint.Address, endpoint.Port, token.Token);
+                await client.GetStream().WriteAsync((new byte[] { 1, 4, 6 }).AsMemory(0, 3), token.Token);
             }
             receivingLoop.IsFaulted.ShouldBeFalse();
-        }).ConfigureAwait(false);
+        });
     }
 
     [Fact]
@@ -71,14 +71,14 @@ public class ReceiverTests(ITestOutputHelper output) : TestBase
         {
             using var client1 = new TcpClient();
             using var client2 = new TcpClient();
-            await client1.ConnectAsync(endpoint.Address, endpoint.Port, token.Token).ConfigureAwait(false);
-            await client2.ConnectAsync(endpoint.Address, endpoint.Port, token.Token).ConfigureAwait(false);
+            await client1.ConnectAsync(endpoint.Address, endpoint.Port, token.Token);
+            await client2.ConnectAsync(endpoint.Address, endpoint.Port, token.Token);
             await client2.GetStream()
-                .WriteAsync(new byte[] { 1, 4, 6 }.AsMemory(0, 3), token.Token).ConfigureAwait(false);
+                .WriteAsync(new byte[] { 1, 4, 6 }.AsMemory(0, 3), token.Token);
             await client1.GetStream()
-                .WriteAsync(new byte[] { 1, 4, 6 }.AsMemory(0, 3), token.Token).ConfigureAwait(false);
+                .WriteAsync(new byte[] { 1, 4, 6 }.AsMemory(0, 3), token.Token);
             receivingTask.IsFaulted.ShouldBeFalse();
-        }).ConfigureAwait(false);
+        });
     }
 
     [Fact]
@@ -89,15 +89,15 @@ public class ReceiverTests(ITestOutputHelper output) : TestBase
         {
             var messages = new List<Message>([expected]);
             using var client = new TcpClient();
-            await client.ConnectAsync(endpoint.Address, endpoint.Port, cancellation.Token).ConfigureAwait(false);
-            await sender.SendAsync(expected.Destination!, client.GetStream(), messages, cancellation.Token).ConfigureAwait(false);
+            await client.ConnectAsync(endpoint.Address, endpoint.Port, cancellation.Token);
+            await sender.SendAsync(expected.Destination!, client.GetStream(), messages, cancellation.Token);
 
-            var actual = await channel.Reader.ReadAsync(cancellation.Token).ConfigureAwait(false);
-            await cancellation.CancelAsync().ConfigureAwait(false);
+            var actual = await channel.Reader.ReadAsync(cancellation.Token);
+            await cancellation.CancelAsync();
             actual.Id.ShouldBe(expected.Id);
             actual.QueueString.ShouldBe(expected.QueueString);
             Encoding.UTF8.GetString(actual.DataArray!).ShouldBe("hello");
-        }, expected).ConfigureAwait(false);
+        }, expected);
 
     }
 
@@ -139,8 +139,8 @@ public class ReceiverTests(ITestOutputHelper output) : TestBase
         var channel = Channel.CreateUnbounded<Message>();
         var receivingTask = Task.Factory.StartNew(() => 
             receiver.StartReceivingAsync(channel.Writer, cancellation.Token), cancellation.Token);
-        await DeterministicDelayAsync(50, CancellationToken.None).ConfigureAwait(false);
-        await scenario(endpoint, sender, receiver, cancellation, receivingTask, channel).ConfigureAwait(false);
-        await cancellation.CancelAsync().ConfigureAwait(false);
+        await DeterministicDelayAsync(50, CancellationToken.None);
+        await scenario(endpoint, sender, receiver, cancellation, receivingTask, channel);
+        await cancellation.CancelAsync();
     }
 }
