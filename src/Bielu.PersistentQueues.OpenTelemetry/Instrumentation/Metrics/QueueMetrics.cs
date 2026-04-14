@@ -339,10 +339,19 @@ public sealed class QueueMetrics
             description: "Total number of messages currently in each queue");
     }
 
-    public void RecordTimeInQueue(double durationMs, string queueName)
+    public void RecordTimeInQueue(double durationMs, string queueName, int? partition = null)
     {
-        _timeInQueueHistogram.Record(durationMs,
-            new KeyValuePair<string, object?>("queue.name", queueName));
+        if (partition.HasValue)
+        {
+            _timeInQueueHistogram.Record(durationMs,
+                new KeyValuePair<string, object?>("queue.name", queueName),
+                new KeyValuePair<string, object?>("partition", partition.Value));
+        }
+        else
+        {
+            _timeInQueueHistogram.Record(durationMs,
+                new KeyValuePair<string, object?>("queue.name", queueName));
+        }
     }
 
     /// <summary>
@@ -355,6 +364,14 @@ public sealed class QueueMetrics
             MetricNames.DeadLetterQueueDepth,
             observeValues,
             description: "Number of messages currently waiting in dead letter queues");
+    }
+
+    public ObservableGauge<long> CreatePartitionDepthGauge(Func<IEnumerable<Measurement<long>>> observeValues)
+    {
+        return _meter.CreateObservableGauge(
+            MetricNames.PartitionDepth,
+            observeValues,
+            description: "Number of messages currently in each partition, tagged with queue.name and partition");
     }
 
     public void RecordPartitionConsumerStarted(string queueName, int partition)

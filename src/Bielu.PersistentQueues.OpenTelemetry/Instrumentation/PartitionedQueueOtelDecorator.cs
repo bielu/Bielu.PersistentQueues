@@ -63,11 +63,30 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
             }
             return measurements;
         });
+
+        // Per-partition depth: message count in each partition, tagged with queue.name and partition
+        _partitionDepthGauge = _metrics.CreatePartitionDepthGauge(() =>
+        {
+            var measurements = new List<Measurement<long>>();
+            foreach (var queueName in GetPartitionedQueueNames())
+            {
+                var partitionCount = _partitionedQueue.GetPartitionCount(queueName);
+                for (var i = 0; i < partitionCount; i++)
+                {
+                    var depth = _partitionedQueue.GetPartitionMessageCount(queueName, i);
+                    measurements.Add(new Measurement<long>(depth,
+                        new KeyValuePair<string, object?>("queue.name", queueName),
+                        new KeyValuePair<string, object?>("partition", i)));
+                }
+            }
+            return measurements;
+        });
     }
 
     private readonly ObservableGauge<int> _activePartitionsGauge;
     private readonly ObservableGauge<int> _partitionsPerQueueGauge;
     private readonly ObservableGauge<int> _activePartitionsPerQueueGauge;
+    private readonly ObservableGauge<long> _partitionDepthGauge;
 
     /// <summary>
     /// Returns the base names of all partitioned queues currently known to the system.
@@ -128,7 +147,7 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
             _metrics.RecordPartitionConsumerStarted(queueName, partition);
 
             var timeInQueue = Math.Max(0, (DateTime.UtcNow - messageContext.Message.SentAt).TotalMilliseconds);
-            _metrics.RecordTimeInQueue(timeInQueue, queueName);
+            _metrics.RecordTimeInQueue(timeInQueue, queueName, partition);
 
             using var messageActivity =
                 _activitySource.StartActivity(ActivityNames.ProcessMessage, ActivityKind.Consumer);
@@ -164,7 +183,7 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
             foreach (var msg in batchContext.Messages)
             {
                 var timeInQueue = Math.Max(0, (now - msg.SentAt).TotalMilliseconds);
-                _metrics.RecordTimeInQueue(timeInQueue, queueName);
+                _metrics.RecordTimeInQueue(timeInQueue, queueName, partition);
             }
 
             using var batchActivity =
