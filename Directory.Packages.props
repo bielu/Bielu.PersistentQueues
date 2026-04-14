@@ -11,7 +11,7 @@
     <PackageVersion Include="LightningDB" Version="0.21.0" />
     <!-- Test frameworks -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.4.0" />
-    <PackageVersion Include="OpenTelemetry.Api" Version="1.15.1" />
+    <PackageVersion Include="OpenTelemetry.Api" Version="1.15.2" />
     <PackageVersion Include="Scrutor" Version="7.0.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
