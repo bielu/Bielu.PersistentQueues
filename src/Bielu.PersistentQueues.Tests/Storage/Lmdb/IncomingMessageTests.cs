@@ -1,102 +1,77 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+using LightningDB;
 using Bielu.PersistentQueues.Serialization;
 using Bielu.PersistentQueues.Storage;
 using Bielu.PersistentQueues.Storage.LMDB;
+using Bielu.PersistentQueues.Tests.Storage.Shared;
 using Shouldly;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests.Storage.Lmdb;
 
-public class IncomingMessageTests : TestBase
+/// <summary>
+/// Runs the shared IncomingMessageTests against the LMDB provider,
+/// plus LMDB-specific incoming message tests.
+/// </summary>
+public class LmdbIncomingMessageTests : Shared.IncomingMessageTests
 {
-    public IncomingMessageTests(ITestOutputHelper output)
+    public LmdbIncomingMessageTests(ITestOutputHelper output)
     {
         Output = output;
     }
 
-    [Fact]
-    public void happy_path_success()
+    protected override IMessageStore CreateStoreForPath(string path)
     {
-        StorageScenario(store =>
+        var env = new LightningEnvironment(path, new EnvironmentConfiguration
         {
-            var headers = new Dictionary<string, string> { ["my_key"] = "my_value" };
-            var message = Message.Create(
-                data: "hello"u8.ToArray(),
-                queue: "test",
-                headers: headers
-            );
-            store.CreateQueue(message.QueueString!);
-            store.StoreIncoming(message);
-            var msg = store.GetMessage(message.QueueString!, message.Id);
-            System.Text.Encoding.UTF8.GetString(msg!.Value.DataArray!).ShouldBe("hello");
-            msg.Value.GetHeadersDictionary().First().Value.ShouldBe("my_value");
+            MaxDatabases = 20,
+            MapSize = 1024 * 1024 * 100
         });
-    }
-
-    [Fact]
-    public void storing_message_for_queue_that_doesnt_exist()
-    {
-        StorageScenario(store =>
-        {
-            var message = NewMessage("blah");
-            Should.Throw<QueueDoesNotExistException>(() => { store.StoreIncoming(message); });
-        });
+        return new LmdbMessageStore(env, new MessageSerializer());
     }
 
     [Fact]
     public void crash_before_commit()
     {
-        StorageScenario(store =>
+        var path = TempPath();
+        var message = NewMessage();
+        using (var store = (LmdbMessageStore)CreateStoreForPath(path))
         {
-            var message = NewMessage();
-            store.CreateQueue(message.QueueString!);
+            store.CreateQueue("test");
             using (var transaction = store.BeginTransaction())
             {
                 store.StoreIncoming(transaction, message);
                 //crash
             }
+        }
 
-            store.Dispose();
-            using var env = LightningEnvironment();
-            using var store2 = new LmdbMessageStore(env, new MessageSerializer());
-            store2.CreateQueue(message.QueueString!);
-            var msg = store2.GetMessage(message.QueueString!, message.Id);
-            msg.ShouldBeNull();
-        });
-
-    }
-
-    [Fact]
-    public void rollback_messages_received()
-    {
-        StorageScenario(store =>
+        using var env2 = new LightningEnvironment(path, new EnvironmentConfiguration
         {
-            var message = NewMessage();
-            store.CreateQueue(message.QueueString!);
-            using (var transaction = store.BeginTransaction())
-            {
-                store.StoreIncoming(transaction, message);
-            }
-
-            var msg = store.GetMessage(message.QueueString!, message.Id);
-            msg.ShouldBeNull();
+            MaxDatabases = 20,
+            MapSize = 1024 * 1024 * 100
         });
+        using var store2 = new LmdbMessageStore(env2, new MessageSerializer());
+        store2.CreateQueue("test");
+        var msg = store2.GetMessage("test", message.Id);
+        // After crash (dispose without commit), message should not be persisted
+        msg.ShouldBeNull();
     }
 
     [Fact]
     public void creating_multiple_stores()
     {
-        StorageScenario(store =>
-        {
-            store.Dispose();
-            using var env = LightningEnvironment();
-            var store2 = new LmdbMessageStore(env, new MessageSerializer());
-            store2.Dispose();
-            using var env2 = LightningEnvironment();
-            using var store3 = new LmdbMessageStore(env2, new MessageSerializer());
-        });
+        var path1 = TempPath();
+        var env1 = new LightningEnvironment(path1, new EnvironmentConfiguration { MaxDatabases = 20, MapSize = 1024 * 1024 * 100 });
+        var store1 = new LmdbMessageStore(env1, new MessageSerializer());
+        store1.Dispose();
 
+        var path2 = TempPath();
+        var env2 = new LightningEnvironment(path2, new EnvironmentConfiguration { MaxDatabases = 20, MapSize = 1024 * 1024 * 100 });
+        var store2 = new LmdbMessageStore(env2, new MessageSerializer());
+        store2.Dispose();
+
+        var path3 = TempPath();
+        var env3 = new LightningEnvironment(path3, new EnvironmentConfiguration { MaxDatabases = 20, MapSize = 1024 * 1024 * 100 });
+        using var store3 = new LmdbMessageStore(env3, new MessageSerializer());
     }
 }

@@ -20,4 +20,5 @@
   <Project Path="Bielu.PersistentQueues/Bielu.PersistentQueues.csproj" />
   <Project Path="Bielu.PersistentQueues.OpenTelemetry/Bielu.PersistentQueues.OpenTelemetry.csproj" />
   <Project Path="Bielu.PersistentQueues.Storage.LMDB/Bielu.PersistentQueues.Storage.LMDB.csproj" />
+  <Project Path="Bielu.PersistentQueues.Storage.ZoneTree/Bielu.PersistentQueues.Storage.ZoneTree.csproj" />
 </Solution>
