@@ -194,7 +194,7 @@ internal class QueueContext : IQueueContext
     private class EnqueueAction(QueueContext context, Message message) : IQueueAction
     {
         private readonly QueueContext _context = context;
-        private readonly Message _message;
+        private readonly Message _message = message;
 
         public void Execute(IStoreTransaction transaction)
         {

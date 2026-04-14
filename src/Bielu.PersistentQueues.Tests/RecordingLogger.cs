@@ -8,7 +8,7 @@ namespace Bielu.PersistentQueues.Logging;
 public class RecordingLogger(TextWriter? console = null, LogLevel logLevel = LogLevel.Debug) : ILogger
 {
     private readonly LogLevel _level = logLevel;
-    private readonly TextWriter? _console;
+    private readonly TextWriter? _console = console;
     private readonly IList<string> _debug = new List<string>();
     private readonly IList<string> _error = new List<string>();
     private readonly IList<string> _info = new List<string>();

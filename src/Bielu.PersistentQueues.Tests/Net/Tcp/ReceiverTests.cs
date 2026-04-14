@@ -20,6 +20,7 @@ namespace Bielu.PersistentQueues.Tests.Net.Tcp;
 
 public class ReceiverTests(ITestOutputHelper output) : TestBase
 {
+    Output = output;
 
     [Fact]
     public async Task stops_listening_on_task_cancellation()

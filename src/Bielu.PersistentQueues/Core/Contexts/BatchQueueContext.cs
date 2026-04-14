@@ -395,7 +395,7 @@ public class BatchQueueContext : IBatchQueueContext
 
     private class DeadLetterAllAction(Queue queue, Message[] messages, string reason) : IBatchAction
     {
-        private readonly Queue _queue;
+        private readonly Queue _queue = queue;
         private readonly Message[] _messages = messages;
         private readonly string _reason = reason;
 

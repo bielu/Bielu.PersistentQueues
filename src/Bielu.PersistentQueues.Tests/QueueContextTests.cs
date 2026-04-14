@@ -11,6 +11,7 @@ namespace Bielu.PersistentQueues.Tests;
 
 public class QueueContextTests(ITestOutputHelper output) : TestBase
 {
+    Output = output;
 
     [Fact]
     public async Task SuccessfullyReceived_RemovesMessageFromQueue()

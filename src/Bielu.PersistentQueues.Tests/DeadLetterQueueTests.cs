@@ -11,6 +11,7 @@ namespace Bielu.PersistentQueues.Tests;
 
 public class DeadLetterQueueTests(ITestOutputHelper output) : TestBase
 {
+    Output = output;
 
     // ─── DeadLetterConstants ───────────────────────────────────────────────
 

@@ -10,6 +10,7 @@ namespace Bielu.PersistentQueues.Tests;
 
 public class SerializationTests(ITestOutputHelper output) : TestBase
 {
+    Output = output;
 
     [Fact]
     public void can_serialize_and_deserialize_message_as_span()

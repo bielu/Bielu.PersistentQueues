@@ -15,6 +15,7 @@ namespace Bielu.PersistentQueues.Tests.Storage.Lmdb;
 /// </summary>
 public class LmdbIncomingMessageTests(ITestOutputHelper output) : Shared.IncomingMessageTests
 {
+    Output = output;
 
     protected override IMessageStore CreateStoreForPath(string path)
     {

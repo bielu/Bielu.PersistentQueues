@@ -13,7 +13,7 @@ public class JsonContentSerializer(JsonSerializerOptions? options = null) : ICon
     /// </summary>
     public static readonly JsonContentSerializer Default = new();
 
-    private readonly JsonSerializerOptions? _options;
+    private readonly JsonSerializerOptions? _options = options;
 
     /// <summary>
     /// Initializes a new instance of <see cref="JsonContentSerializer"/>.

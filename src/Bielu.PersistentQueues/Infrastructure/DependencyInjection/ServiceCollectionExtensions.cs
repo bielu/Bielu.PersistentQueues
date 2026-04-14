@@ -58,7 +58,7 @@ public class PersistentQueuesBuilder(IServiceCollection services)
     /// <summary>
     /// Gets the service collection being configured.
     /// </summary>
-    public IServiceCollection Services { get; }
+    public IServiceCollection Services { get; } = services;
 
     /// <summary>
     /// Configures the endpoint to listen on for incoming messages.

@@ -8,6 +8,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- Suppress BIELU008 (ConfigureAwait) in tests - conflicts with xUnit1030 -->
+    <NoWarn>$(NoWarn);BIELU008</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

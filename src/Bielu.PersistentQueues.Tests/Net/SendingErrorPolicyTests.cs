@@ -17,6 +17,7 @@ namespace Bielu.PersistentQueues.Tests.Net;
 
 public class SendingErrorPolicyTests(ITestOutputHelper output) : TestBase
 {
+    Output = output;
 
     [Fact]
     public void max_attempts_is_reached()

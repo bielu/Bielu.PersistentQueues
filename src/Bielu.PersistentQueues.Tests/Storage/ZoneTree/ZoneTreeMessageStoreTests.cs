@@ -11,6 +11,7 @@ namespace Bielu.PersistentQueues.Tests.Storage.ZoneTree;
 /// </summary>
 public class ZoneTreeMessageStoreTests(ITestOutputHelper output) : MessageStoreTests
 {
+    Output = output;
 
     protected override IMessageStore CreateStoreForPath(string path)
     {

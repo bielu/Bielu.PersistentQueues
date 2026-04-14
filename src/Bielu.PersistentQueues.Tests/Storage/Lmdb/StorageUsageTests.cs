@@ -7,6 +7,7 @@ namespace Bielu.PersistentQueues.Tests.Storage.Lmdb;
 
 public class StorageUsageTests(ITestOutputHelper output) : TestBase
 {
+    Output = output;
 
     [Fact]
     public void get_storage_usage_info_returns_non_null()

@@ -10,6 +10,7 @@ namespace Bielu.PersistentQueues.Tests;
 
 public class IntegrationTests(ITestOutputHelper output) : TestBase
 {
+    Output = output;
 
     [Fact]
     public async Task can_send_and_receive_after_queue_not_found()
