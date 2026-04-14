@@ -33,7 +33,7 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
         _activePartitionsGauge = _metrics.CreateActivePartitionsGauge(() =>
         {
             int total = 0;
-            foreach (var queueName in GetPartitionedQueueNames())
+            foreach (var (queueName, _) in GetPartitionedQueueNames())
                 total += _partitionedQueue.GetActivePartitions(queueName).Length;
             return total;
         });
@@ -42,10 +42,9 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
         _partitionsPerQueueGauge = _metrics.CreatePartitionsPerQueueGauge(() =>
         {
             var measurements = new List<Measurement<int>>();
-            foreach (var queueName in GetPartitionedQueueNames())
+            foreach (var (queueName, partitionCount) in GetPartitionedQueueNames())
             {
-                var count = _partitionedQueue.GetPartitionCount(queueName);
-                measurements.Add(new Measurement<int>(count,
+                measurements.Add(new Measurement<int>(partitionCount,
                     new KeyValuePair<string, object?>("queue.name", queueName)));
             }
             return measurements;
@@ -55,7 +54,7 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
         _activePartitionsPerQueueGauge = _metrics.CreateActivePartitionsPerQueueGauge(() =>
         {
             var measurements = new List<Measurement<int>>();
-            foreach (var queueName in GetPartitionedQueueNames())
+            foreach (var (queueName, _) in GetPartitionedQueueNames())
             {
                 var active = _partitionedQueue.GetActivePartitions(queueName).Length;
                 measurements.Add(new Measurement<int>(active,
@@ -68,9 +67,8 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
         _partitionDepthGauge = _metrics.CreatePartitionDepthGauge(() =>
         {
             var measurements = new List<Measurement<long>>();
-            foreach (var queueName in GetPartitionedQueueNames())
+            foreach (var (queueName, partitionCount) in GetPartitionedQueueNames())
             {
-                var partitionCount = _partitionedQueue.GetPartitionCount(queueName);
                 for (var i = 0; i < partitionCount; i++)
                 {
                     var depth = _partitionedQueue.GetPartitionMessageCount(queueName, i);
@@ -89,16 +87,18 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
     private readonly ObservableGauge<long> _partitionDepthGauge;
 
     /// <summary>
-    /// Returns the base names of all partitioned queues currently known to the system.
-    /// Uses the logical <see cref="IQueue.Queues"/> view (which already collapses
-    /// partition sub-queues) and filters to those that have partitions.
+    /// Returns the base names and partition counts of all partitioned queues currently known
+    /// to the system. Uses the logical <see cref="IQueue.Queues"/> view (which already
+    /// collapses partition sub-queues) and filters to those that have partitions.
+    /// The partition count is computed once per queue per observation to avoid redundant calls.
     /// </summary>
-    private IEnumerable<string> GetPartitionedQueueNames()
+    private IEnumerable<(string QueueName, int PartitionCount)> GetPartitionedQueueNames()
     {
         foreach (var queueName in _partitionedQueue.Queues)
         {
-            if (_partitionedQueue.GetPartitionCount(queueName) > 0)
-                yield return queueName;
+            var count = _partitionedQueue.GetPartitionCount(queueName);
+            if (count > 0)
+                yield return (queueName, count);
         }
     }
 

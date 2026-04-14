@@ -339,19 +339,17 @@ public sealed class QueueMetrics
             description: "Total number of messages currently in each queue");
     }
 
-    public void RecordTimeInQueue(double durationMs, string queueName, int? partition = null)
+    public void RecordTimeInQueue(double durationMs, string queueName)
     {
-        if (partition.HasValue)
-        {
-            _timeInQueueHistogram.Record(durationMs,
-                new KeyValuePair<string, object?>("queue.name", queueName),
-                new KeyValuePair<string, object?>("partition", partition.Value));
-        }
-        else
-        {
-            _timeInQueueHistogram.Record(durationMs,
-                new KeyValuePair<string, object?>("queue.name", queueName));
-        }
+        _timeInQueueHistogram.Record(durationMs,
+            new KeyValuePair<string, object?>("queue.name", queueName));
+    }
+
+    public void RecordTimeInQueue(double durationMs, string queueName, int partition)
+    {
+        _timeInQueueHistogram.Record(durationMs,
+            new KeyValuePair<string, object?>("queue.name", queueName),
+            new KeyValuePair<string, object?>("partition", partition));
     }
 
     /// <summary>

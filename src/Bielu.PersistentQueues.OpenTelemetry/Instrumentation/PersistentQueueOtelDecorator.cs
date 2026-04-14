@@ -58,20 +58,24 @@ public class PersistentQueueOtelDecorator : IQueue
         });
 
         // Register queue depth gauge — reports message count per logical queue
+        var isPartitioned = _queue is IPartitionedQueue;
         _queueDepthGauge = _metrics.CreateQueueDepthGauge(() =>
         {
             var measurements = new List<Measurement<long>>();
-            var physicalQueueNames = store.GetAllQueues();
 
             foreach (var queueName in _queue.Queues)
             {
                 long depth;
-                if (_queue is IPartitionedQueue)
+                if (isPartitioned)
                 {
-                    var partitionQueuePrefix = queueName + PartitionConstants.PartitionSeparator;
-                    depth = physicalQueueNames
-                        .Where(pq => pq == queueName || pq.StartsWith(partitionQueuePrefix))
-                        .Sum(store.GetMessageCount);
+                    var pq = (IPartitionedQueue)_queue;
+                    var partitionCount = pq.GetPartitionCount(queueName);
+                    depth = store.GetMessageCount(queueName);
+                    for (var i = 0; i < partitionCount; i++)
+                    {
+                        depth += store.GetMessageCount(
+                            PartitionConstants.FormatPartitionQueueName(queueName, i));
+                    }
                 }
                 else
                 {
