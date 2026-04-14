@@ -178,12 +178,9 @@ internal class QueueContext : IQueueContext
 
     private class SendAction(QueueContext context, Message message) : IQueueAction
     {
-        private readonly QueueContext _context = context;
-        private readonly Message _message = message;
-
         public void Execute(IStoreTransaction transaction)
         {
-            _context._queue.Store.StoreOutgoing(transaction, _message);
+            context._queue.Store.StoreOutgoing(transaction, message);
         }
 
         public void Success()
@@ -193,12 +190,9 @@ internal class QueueContext : IQueueContext
 
     private class EnqueueAction(QueueContext context, Message message) : IQueueAction
     {
-        private readonly QueueContext _context = context;
-        private readonly Message _message = message;
-
         public void Execute(IStoreTransaction transaction)
         {
-            _context._queue.Store.StoreIncoming(transaction, _message);
+            context._queue.Store.StoreIncoming(transaction, message);
         }
 
         public void Success()
@@ -208,12 +202,9 @@ internal class QueueContext : IQueueContext
 
     private class MoveAction(QueueContext context, string queueName) : IQueueAction
     {
-        private readonly QueueContext _context = context;
-        private readonly string _queueName = queueName;
-
         public void Execute(IStoreTransaction transaction)
         {
-            _context._queue.Store.MoveToQueue(transaction, _queueName, _context._message);
+            context._queue.Store.MoveToQueue(transaction, queueName, context._message);
         }
 
         public void Success()
@@ -223,11 +214,9 @@ internal class QueueContext : IQueueContext
 
     private class SuccessAction(QueueContext context) : IQueueAction
     {
-        private readonly QueueContext _context = context;
-
         public void Execute(IStoreTransaction transaction)
         {
-            _context._queue.Store.SuccessfullyReceived(transaction, _context._message);
+            context._queue.Store.SuccessfullyReceived(transaction, context._message);
         }
 
         public void Success()
@@ -237,58 +226,45 @@ internal class QueueContext : IQueueContext
 
     private class ReceiveLaterTimeSpanAction(QueueContext context, Message updatedMessage, TimeSpan timeSpan) : IQueueAction
     {
-        private readonly QueueContext _context = context;
-        private readonly Message _updatedMessage = updatedMessage;
-        private readonly TimeSpan _timeSpan = timeSpan;
-
         public void Execute(IStoreTransaction transaction)
         {
             // Remove the message from current queue before scheduling it for later
-            _context._queue.Store.SuccessfullyReceived(transaction, _context._message);
+            context._queue.Store.SuccessfullyReceived(transaction, context._message);
         }
 
         public void Success()
         {
-            _context._queue.ReceiveLater(_updatedMessage, _timeSpan);
+            context._queue.ReceiveLater(updatedMessage, timeSpan);
         }
     }
 
     private class ReceiveLaterDateTimeOffsetAction(QueueContext context, Message updatedMessage, DateTimeOffset time) : IQueueAction
     {
-        private readonly QueueContext _context = context;
-        private readonly Message _updatedMessage = updatedMessage;
-        private readonly DateTimeOffset _time = time;
-
         public void Execute(IStoreTransaction transaction)
         {
             // Remove the message from current queue before scheduling it for later
-            _context._queue.Store.SuccessfullyReceived(transaction, _context._message);
+            context._queue.Store.SuccessfullyReceived(transaction, context._message);
         }
 
         public void Success()
         {
-            _context._queue.ReceiveLater(_updatedMessage, _time);
+            context._queue.ReceiveLater(updatedMessage, time);
         }
     }
 
     private class DeadLetterAction(QueueContext context, string dlqName, Message messageToStore, string reason) : IQueueAction
     {
-        private readonly QueueContext _context = context;
-        private readonly string _dlqName = dlqName;
-        private readonly Message _messageToStore = messageToStore;
-        private readonly string _reason = reason;
-
         public void Execute(IStoreTransaction transaction)
         {
-            var messageWithOrigin = _messageToStore.WithOriginalQueue(
-                _context._message.QueueString ?? "unknown");
-            _context._queue.Store.MoveToQueue(transaction, _dlqName, messageWithOrigin);
+            var messageWithOrigin = messageToStore.WithOriginalQueue(
+                context._message.QueueString ?? "unknown");
+            context._queue.Store.MoveToQueue(transaction, dlqName, messageWithOrigin);
         }
 
         public void Success()
         {
             DeadLetterDiagnostics.RecordMessageDeadLettered(
-                _context._message.QueueString ?? "unknown", _reason);
+                context._message.QueueString ?? "unknown", reason);
         }
     }
 }
