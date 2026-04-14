@@ -33,6 +33,7 @@ internal static class MetricNames
 
     // Queue depth metrics
     public const string QueueDepth = "bielupersistentqueues.queue.depth";
+    public const string PartitionDepth = "bielupersistentqueues.partition.depth";
     public const string TimeInQueue = "bielupersistentqueues.message.time_in_queue";
 
     // Dead letter queue metrics
