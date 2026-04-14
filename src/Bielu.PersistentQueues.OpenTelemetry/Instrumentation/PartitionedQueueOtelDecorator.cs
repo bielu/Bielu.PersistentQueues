@@ -127,6 +127,10 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
             _metrics.RecordPartitionReceived(1, queueName, partition);
             _metrics.RecordPartitionConsumerStarted(queueName, partition);
 
+            var timeInQueue = (DateTime.UtcNow - messageContext.Message.SentAt).TotalMilliseconds;
+            if (timeInQueue > 0)
+                _metrics.RecordTimeInQueue(timeInQueue, queueName);
+
             using var messageActivity =
                 _activitySource.StartActivity(ActivityNames.ProcessMessage, ActivityKind.Consumer);
             QueueActivitySource.SetMessageTags(messageActivity, messageContext.Message.Id.MessageIdentifier, queueName);
@@ -157,6 +161,13 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
             _metrics.RecordPartitionReceived(batchSize, queueName, partition);
             _metrics.RecordBatchSize(batchSize, queueName);
 
+            foreach (var msg in batchContext.Messages)
+            {
+                var timeInQueue = (DateTime.UtcNow - msg.SentAt).TotalMilliseconds;
+                if (timeInQueue > 0)
+                    _metrics.RecordTimeInQueue(timeInQueue, queueName);
+            }
+
             using var batchActivity =
                 _activitySource.StartActivity(ActivityNames.ProcessBatch, ActivityKind.Consumer);
             QueueActivitySource.SetBatchTags(batchActivity, batchSize, queueName);
@@ -180,6 +191,10 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
                            queueName, partitions, pollIntervalInMilliseconds, cancellationToken))
         {
             _metrics.RecordMessagesReceived(1, queueName);
+
+            var timeInQueue = (DateTime.UtcNow - messageContext.Message.SentAt).TotalMilliseconds;
+            if (timeInQueue > 0)
+                _metrics.RecordTimeInQueue(timeInQueue, queueName);
 
             yield return messageContext;
         }

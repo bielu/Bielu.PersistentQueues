@@ -22,6 +22,7 @@ public sealed class QueueMetrics
     private readonly Histogram<double> _partitionEnqueueDuration;
     private readonly UpDownCounter<long> _partitionConsumersActive;
     private readonly UpDownCounter<long> _partitionProducersActive;
+    private readonly Histogram<double> _timeInQueueHistogram;
 
     public QueueMetrics()
     {
@@ -95,6 +96,11 @@ public sealed class QueueMetrics
         _partitionProducersActive = _meter.CreateUpDownCounter<long>(
             MetricNames.PartitionProducersActive,
             description: "Number of currently active partition producers");
+
+        _timeInQueueHistogram = _meter.CreateHistogram<double>(
+            MetricNames.TimeInQueue,
+            unit: "ms",
+            description: "Time a message spent waiting in the queue before being received");
     }
 
     public ObservableGauge<int> CreateActiveQueuesGauge(Func<int> observeValue)
@@ -323,6 +329,20 @@ public sealed class QueueMetrics
             MetricNames.PartitionsActivePerQueue,
             observeValues,
             description: "Number of active (non-empty) partitions per queue");
+    }
+
+    public ObservableGauge<long> CreateQueueDepthGauge(Func<IEnumerable<Measurement<long>>> observeValues)
+    {
+        return _meter.CreateObservableGauge(
+            MetricNames.QueueDepth,
+            observeValues,
+            description: "Total number of messages currently in each queue");
+    }
+
+    public void RecordTimeInQueue(double durationMs, string queueName)
+    {
+        _timeInQueueHistogram.Record(durationMs,
+            new KeyValuePair<string, object?>("queue.name", queueName));
     }
 
     /// <summary>
