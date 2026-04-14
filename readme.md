@@ -435,7 +435,7 @@ Times are in microseconds (μs). Lower is better.
 
 | Operation | LMDB (64B) | ZoneTree (64B) | LMDB (512B) | ZoneTree (512B) |
 |-----------|------------|----------------|-------------|-----------------|
-| **StoreIncoming** | **1,541 μs** | 2,041 μs | 2,117 μs | **2,149 μs** |
+| **StoreIncoming** | **1,541 μs** | 2,041 μs | **2,117 μs** | 2,149 μs |
 | **GetMessage** | **4,406 μs** | 4,703 μs | **4,863 μs** | 5,060 μs |
 | **PersistedIncoming** | **4,254 μs** | 5,161 μs | **4,390 μs** | 5,172 μs |
 | **DeleteIncoming** | **2,871 μs** | 3,575 μs | **3,664 μs** | 3,766 μs |
