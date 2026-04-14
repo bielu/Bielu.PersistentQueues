@@ -5,7 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'src/Bielu.PersistentQueues/**'
-      - 'src/Bielu.PersistentQueues.Storage.LMDB/**'
+      - 'src/Bielu.PersistentQueues.Storage.*/**'
       - 'src/Bielu.PersistentQueues.Benchmarks/**'
   workflow_dispatch:  # Allow manual trigger
 
@@ -36,15 +36,28 @@ jobs:
         dotnet run --project src/Bielu.PersistentQueues.Benchmarks/Bielu.PersistentQueues.Benchmarks.csproj \
           -c Release --no-build -- \
           --filter "*RegressionBenchmark*" \
-          --exporters fulljson \
+          --exporters json \
           --artifacts ./BenchmarkDotNet.Artifacts
 
-    - name: Store baseline
+    - name: Store results to GitHub Pages
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: Regression Benchmarks
+        tool: 'benchmarkdotnet'
+        output-file-path: ./BenchmarkDotNet.Artifacts/results/Bielu.PersistentQueues.Benchmarks.RegressionBenchmark-report-full-compressed.json
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        gh-pages-branch: gh-pages
+        benchmark-data-dir-path: benchmarks
+        comment-on-alert: false
+        alert-threshold: '150%'
+
+    - name: Store baseline artifact
       uses: actions/upload-artifact@v7
       with:
         name: benchmark-baseline
         path: ./BenchmarkDotNet.Artifacts/results/
-        retention-days: 365  # Keep baseline for 1 year
+        retention-days: 365
 
     - name: Generate summary report
       run: |
@@ -53,9 +66,11 @@ jobs:
         echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
         echo "**Date:** $(date -u)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "Baseline benchmark results have been stored and will be used for PR comparisons." >> $GITHUB_STEP_SUMMARY
+        echo "Baseline results have been stored to GitHub Pages for historical tracking." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📈 View performance trends: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/dev/bench/" >> $GITHUB_STEP_SUMMARY
 
-    - name: Commit baseline to repository (optional)
+    - name: Commit baseline to repository
       continue-on-error: true
       run: |
         mkdir -p .benchmarks

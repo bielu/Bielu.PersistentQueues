@@ -54,37 +54,55 @@ Located in `src/Bielu.PersistentQueues.Benchmarks/`, these are comprehensive ben
 
 ## CI/CD Integration
 
+All benchmark workflows use [`benchmark-action/github-action-benchmark`](https://github.com/benchmark-action/github-action-benchmark) to store results in the `gh-pages` branch for historical tracking and trend visualization.
+
+📈 **View performance trends**: `https://<owner>.github.io/Bielu.PersistentQueues/dev/bench/`
+
 ### Workflow: `benchmark-pr.yml`
 
 **Triggers**: Pull requests to `main` or `develop` branches affecting:
 - `src/Bielu.PersistentQueues/**`
-- `src/Bielu.PersistentQueues.Storage.LMDB/**`
+- `src/Bielu.PersistentQueues.Storage.*/**`
 - `src/Bielu.PersistentQueues.Benchmarks/**`
 
 **Process**:
 1. Run `RegressionBenchmark` suite
-2. Compare results with baseline from main branch
-3. Post comparison comment on PR
-4. **Fail PR** if regressions > 10% threshold detected
+2. Compare results with historical data from `gh-pages` branch
+3. Post detailed benchmark comparison comment on PR (always)
+4. **Fail PR** if regressions > 15% threshold detected
 5. Upload results as artifacts (90-day retention)
 
 **Outputs**:
-- PR comment with performance comparison table
+- PR comment with per-benchmark comparison table and delta percentages
 - Downloadable benchmark artifacts
 - Pass/fail status for performance gate
 
 ### Workflow: `benchmark-baseline.yml`
 
 **Triggers**:
-- Push to `main` branch
+- Push to `main` branch (when source/benchmark code changes)
 - Manual dispatch
 
 **Process**:
 1. Run `RegressionBenchmark` suite on main branch
-2. Store results as baseline artifact (365-day retention)
-3. Optionally commit baseline to `.benchmarks/` directory
+2. Push results to `gh-pages` branch for historical tracking
+3. Store baseline artifact (365-day retention)
+4. Commit baseline to `.benchmarks/` directory
 
-**Purpose**: Maintain up-to-date performance baseline for PR comparisons
+**Purpose**: Maintain up-to-date performance baseline and feed the historical tracking dashboard
+
+### Workflow: `benchmark-weekly.yml`
+
+**Triggers**:
+- Scheduled: every Sunday at 02:00 UTC
+- Manual dispatch
+
+**Process**:
+1. Run `RegressionBenchmark` suite on main branch
+2. Push results to `gh-pages` branch for trend tracking
+3. Store results artifact (365-day retention)
+
+**Purpose**: Automated weekly performance snapshots for long-term trajectory analysis, independent of code changes
 
 ## Running Benchmarks Locally
 
@@ -236,13 +254,13 @@ Baselines are automatically updated on merge to `main`. Manual baseline updates 
 
 Potential improvements to benchmark strategy:
 
-- [ ] Historical trend tracking (performance over time)
+- [x] Historical trend tracking (performance over time) — via `gh-pages` dashboard
+- [x] Continuous benchmarking (scheduled runs) — via weekly `benchmark-weekly.yml`
+- [x] Automated performance regression reports — via `benchmark-action/github-action-benchmark` PR comments
 - [ ] Cross-platform benchmarks (Windows/Linux/macOS)
-- [ ] Benchmark result visualization dashboard
-- [ ] Automated performance regression reports
+- [ ] Benchmark result visualization dashboard (custom)
 - [ ] Memory leak detection integration
 - [ ] Percentile-based SLO tracking (p50, p99)
-- [ ] Continuous benchmarking (scheduled runs)
 
 ## References
 

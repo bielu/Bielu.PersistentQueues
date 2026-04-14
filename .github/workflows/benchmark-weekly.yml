@@ -1,21 +1,17 @@
-name: Performance Benchmark on PR
+name: Weekly Performance Benchmark
 
 on:
-  pull_request:
-    branches: [ main, develop ]
-    paths:
-      - 'src/Bielu.PersistentQueues/**'
-      - 'src/Bielu.PersistentQueues.Storage.*/**'
-      - 'src/Bielu.PersistentQueues.Benchmarks/**'
+  schedule:
+    - cron: '0 2 * * 0'  # Every Sunday at 02:00 UTC
+  workflow_dispatch:  # Allow manual trigger
 
 permissions:
-  contents: read
-  pull-requests: write
+  contents: write
 
 jobs:
   benchmark:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
     - uses: actions/checkout@v6
@@ -39,27 +35,37 @@ jobs:
           --exporters json \
           --artifacts ./BenchmarkDotNet.Artifacts
 
-    - name: Post benchmark results
+    - name: Store results to GitHub Pages
       uses: benchmark-action/github-action-benchmark@v1
       with:
         name: Regression Benchmarks
         tool: 'benchmarkdotnet'
         output-file-path: ./BenchmarkDotNet.Artifacts/results/Bielu.PersistentQueues.Benchmarks.RegressionBenchmark-report-full-compressed.json
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        comment-on-alert: true
-        comment-always: true
-        summary-always: true
-        alert-threshold: '115%'
-        fail-on-alert: true
-        # Compare with historical data from gh-pages but do not push (PR context)
-        auto-push: false
+        auto-push: true
         gh-pages-branch: gh-pages
         benchmark-data-dir-path: benchmarks
+        comment-on-alert: false
+        alert-threshold: '200%'
+        max-items-in-chart: 50
 
     - name: Upload benchmark results
       if: always()
       uses: actions/upload-artifact@v7
       with:
-        name: benchmark-results-pr-${{ github.event.pull_request.number }}
+        name: benchmark-weekly-${{ github.run_number }}
         path: ./BenchmarkDotNet.Artifacts/results/
-        retention-days: 90
+        retention-days: 365
+
+    - name: Generate summary report
+      if: always()
+      run: |
+        echo "# 📊 Weekly Performance Benchmark" > $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "**Date:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+        echo "**Run:** #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Results have been added to the performance tracking dashboard." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📈 **View trends:** https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/dev/bench/" >> $GITHUB_STEP_SUMMARY
