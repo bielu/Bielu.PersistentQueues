@@ -10,7 +10,7 @@ using Bielu.PersistentQueues.Storage;
 
 namespace Bielu.PersistentQueues.OpenTelemetry.Instrumentation;
 
-public class PersistentQueueOtelDecorator : IQueue
+public class OtelQueueDecorator : IQueue
 {
     private readonly IQueue _queue;
     private readonly QueueMetrics _metrics;
@@ -22,7 +22,7 @@ public class PersistentQueueOtelDecorator : IQueue
     private readonly ObservableGauge<long> _deadLetterQueueDepthGauge;
     private readonly ObservableGauge<long> _queueDepthGauge;
 
-    public PersistentQueueOtelDecorator(IQueue queue, QueueMetrics queueMetrics, QueueActivitySource activitySource)
+    public OtelQueueDecorator(IQueue queue, QueueMetrics queueMetrics, QueueActivitySource activitySource)
     {
         _queue = queue;
         _metrics = queueMetrics;

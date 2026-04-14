@@ -39,7 +39,9 @@ public class Queue : IQueue
     /// <param name="logger">The logger for recording queue operations.</param>
     /// <param name="contentSerializer">The content serializer for strongly-typed message operations. If null, defaults to <see cref="JsonContentSerializer.Default"/>.</param>
     /// <param name="deadLetterOptions">Dead letter queue options. If null, DLQ is enabled by default.</param>
+#pragma warning disable BIELU004 // ILogger is used intentionally to support both DI (ILogger<T>) and builder (ILogger) patterns
     public Queue(Receiver receiver, Sender sender, IMessageStore messageStore, ILogger logger, IContentSerializer? contentSerializer = null, DeadLetterOptions? deadLetterOptions = null)
+#pragma warning restore BIELU004
     {
         _receiver = receiver;
         _sender = sender;

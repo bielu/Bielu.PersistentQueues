@@ -17,7 +17,9 @@ public class SendingErrorPolicy
     private readonly Channel<Message> _retries;
     private readonly DeadLetterOptions _deadLetterOptions;
 
+#pragma warning disable BIELU004 // ILogger is used intentionally to support both DI (ILogger<T>) and builder (ILogger) patterns
     public SendingErrorPolicy(ILogger logger, IMessageStore store, Channel<OutgoingMessageFailure> failedToConnect, DeadLetterOptions? deadLetterOptions = null)
+#pragma warning restore BIELU004
     {
         _logger = logger;
         _store = store;

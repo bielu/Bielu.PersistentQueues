@@ -14,8 +14,10 @@ using Bielu.PersistentQueues.Storage;
 
 namespace Bielu.PersistentQueues.Network.Protocol.V1;
 
+#pragma warning disable BIELU004 // ILogger is used intentionally to support both DI (ILogger<T>) and builder (ILogger) patterns
 public class ReceivingProtocol(IMessageStore store, IStreamSecurity security, IMessageSerializer serializer, Uri receivingUri, ILogger logger)
     : ProtocolBase(logger), IReceivingProtocol
+#pragma warning restore BIELU004
 {
     public async Task<IList<Message>> ReceiveMessagesAsync(Stream stream, CancellationToken cancellationToken)
     {

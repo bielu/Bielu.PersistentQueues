@@ -9,7 +9,9 @@ using Bielu.PersistentQueues.Serialization;
 
 namespace Bielu.PersistentQueues.Storage.LMDB;
 
+#pragma warning disable BIELU010 // LmdbMessageStore is not a wrapper - it's a full IMessageStore implementation using LightningDB
 public class LmdbMessageStore : IMessageStore
+#pragma warning restore BIELU010
 {
     private const string OutgoingQueue = "outgoing";
     private readonly ReaderWriterLockSlim _lock;

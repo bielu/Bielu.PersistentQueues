@@ -8,7 +8,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Bielu.PersistentQueues.Network.Protocol;
 
+#pragma warning disable BIELU004 // ILogger is used intentionally to support both DI (ILogger<T>) and builder (ILogger) patterns
 public abstract class ProtocolBase(ILogger logger)
+#pragma warning restore BIELU004
 {
     protected readonly ILogger Logger = logger;
     protected async ValueTask ReceiveIntoBufferAsync(PipeWriter writer, Stream stream, CancellationToken cancellationToken)
@@ -28,7 +30,7 @@ public abstract class ProtocolBase(ILogger logger)
 
                 writer.Advance(bytesRead);
 
-        var result = await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+                var result = await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
 
                 if (result.IsCompleted)
                 {

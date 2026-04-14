@@ -5,7 +5,9 @@ using Bielu.PersistentQueues.Storage;
 
 namespace Bielu.PersistentQueues;
 
+#pragma warning disable BIELU010 // QueueContext is not a wrapper - it provides a context API around a Queue instance
 internal class QueueContext : IQueueContext
+#pragma warning restore BIELU010
 {
     private readonly Queue _queue;
     private readonly Message _message;

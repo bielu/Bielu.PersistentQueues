@@ -13,13 +13,13 @@ namespace Bielu.PersistentQueues.OpenTelemetry.Instrumentation;
 /// OpenTelemetry decorator for <see cref="IPartitionedQueue"/> that adds metrics and tracing
 /// for all partition-specific operations.
 /// </summary>
-public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPartitionedQueue
+public class OtelPartitionedQueueDecorator : OtelQueueDecorator, IPartitionedQueue
 {
     private readonly IPartitionedQueue _partitionedQueue;
     private readonly QueueMetrics _metrics;
     private readonly QueueActivitySource _activitySource;
 
-    public PartitionedQueueOtelDecorator(
+    public OtelPartitionedQueueDecorator(
         IPartitionedQueue partitionedQueue,
         QueueMetrics queueMetrics,
         QueueActivitySource activitySource)

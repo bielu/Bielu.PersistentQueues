@@ -4,8 +4,10 @@ using LightningDB;
 
 namespace Bielu.PersistentQueues.Storage.LMDB;
 
+#pragma warning disable BIELU010 // LmdbTransaction is an IStoreTransaction adapter, not a LightningTransaction wrapper
 public class LmdbTransaction(LightningTransaction tx, ReaderWriterLockSlim transactionLock)
     : IStoreTransaction
+#pragma warning restore BIELU010
 {
     public LightningTransaction Transaction { get; } = tx;
 

@@ -17,12 +17,12 @@ public static class ServiceCollectionExtensions
         serviceCollection.AddSingleton<QueueMetrics>();
         serviceCollection.AddSingleton<QueueActivitySource>();
 
-        serviceCollection.Decorate<IQueue, PersistentQueueOtelDecorator>();
+        serviceCollection.Decorate<IQueue, OtelQueueDecorator>();
 
         // Only decorate IPartitionedQueue if it has been registered in the container
         if (serviceCollection.Any(sd => sd.ServiceType == typeof(IPartitionedQueue)))
         {
-            serviceCollection.Decorate<IPartitionedQueue, PartitionedQueueOtelDecorator>();
+            serviceCollection.Decorate<IPartitionedQueue, OtelPartitionedQueueDecorator>();
         }
 
         return serviceCollection;

@@ -21,7 +21,9 @@ namespace Bielu.PersistentQueues;
 /// pending actions in a single atomic transaction — one store call per action type,
 /// not one per message.
 /// </remarks>
+#pragma warning disable BIELU010 // BatchQueueContext is not a wrapper - it provides a batch context API around a Queue instance
 public class BatchQueueContext : IBatchQueueContext
+#pragma warning restore BIELU010
 {
     private readonly Queue _queue;
     private readonly List<IBatchAction> _actions;

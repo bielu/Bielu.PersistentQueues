@@ -16,8 +16,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Bielu.PersistentQueues.Network.Protocol.V1;
 
+#pragma warning disable BIELU004 // ILogger is used intentionally to support both DI (ILogger<T>) and builder (ILogger) patterns
 public class SendingProtocol(IMessageStore store, IStreamSecurity security, IMessageSerializer serializer, ILogger logger)
     : ProtocolBase(logger), ISendingProtocol
+#pragma warning restore BIELU004
 {
     private readonly IMessageStore _store = store;
     private readonly IStreamSecurity _security = security;

@@ -39,7 +39,9 @@ public class Sender : IDisposable
         public bool IsExpired => DateTime.UtcNow - CachedAt > TimeSpan.FromMilliseconds(DnsCacheTimeoutMs);
     }
 
+#pragma warning disable BIELU004 // ILogger is used intentionally to support both DI (ILogger<T>) and builder (ILogger) patterns
     public Sender(ISendingProtocol protocol, IMessageSerializer serializer, ILogger logger, TimeSpan sendTimeout)
+#pragma warning restore BIELU004
     {
         _protocol = protocol;
         _serializer = serializer;
