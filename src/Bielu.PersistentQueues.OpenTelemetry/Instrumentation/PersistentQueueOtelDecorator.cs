@@ -68,7 +68,7 @@ public class PersistentQueueOtelDecorator : IQueue
                 long depth;
                 if (_queue is IPartitionedQueue)
                 {
-                    var partitionQueuePrefix = queueName + Partitioning.PartitionConstants.PartitionSeparator;
+                    var partitionQueuePrefix = queueName + PartitionConstants.PartitionSeparator;
                     depth = physicalQueueNames
                         .Where(pq => pq == queueName || pq.StartsWith(partitionQueuePrefix))
                         .Sum(store.GetMessageCount);
