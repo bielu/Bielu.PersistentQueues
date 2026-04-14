@@ -18,7 +18,7 @@ public class QueueExtensionTests : TestBase
     [Fact]
     public async Task enqueue_strongly_typed_content()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var order = new OrderMessage("ORD-EXT-001", 55.00m, "USD");
 
@@ -37,7 +37,7 @@ public class QueueExtensionTests : TestBase
     [Fact]
     public async Task enqueue_strongly_typed_content_with_headers()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var order = new OrderMessage("ORD-EXT-002", 99.00m, "EUR");
             var headers = new System.Collections.Generic.Dictionary<string, string>
@@ -57,7 +57,7 @@ public class QueueExtensionTests : TestBase
     [Fact]
     public async Task send_strongly_typed_content()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var order = new OrderMessage("ORD-SEND-001", 25.00m, "GBP");
 

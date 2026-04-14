@@ -6,7 +6,7 @@ namespace Bielu.PersistentQueues.Network.Security;
 
 public class NoSecurity : IStreamSecurity
 {
-    public ValueTask<Stream> Apply(Uri endpoint, Stream stream)
+    public ValueTask<Stream> ApplyAsync(Uri endpoint, Stream stream)
     {
         return new ValueTask<Stream>(stream);
     }

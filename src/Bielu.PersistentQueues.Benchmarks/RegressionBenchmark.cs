@@ -88,7 +88,7 @@ public class RegressionBenchmark
     /// Enqueues the pre-generated messages into the "test" queue before each iteration of benchmarks
     /// that require a pre-populated queue (receive, move, and batch operations).
     /// </summary>
-    [IterationSetup(Targets = new[] { nameof(ReceiveAndAcknowledge), nameof(BatchReceiveAndAcknowledge), nameof(ReceiveLater), nameof(MoveTo), nameof(BatchMixedOperations) })]
+    [IterationSetup(Targets = new[] { nameof(ReceiveAndAcknowledgeAsync), nameof(BatchReceiveAndAcknowledgeAsync), nameof(ReceiveLaterAsync), nameof(MoveToAsync), nameof(BatchMixedOperationsAsync) })]
     public void SetupQueueMessages()
     {
         foreach (var message in _messages!)
@@ -145,7 +145,7 @@ public class RegressionBenchmark
     /// Messages are pre-enqueued by the iteration setup.
     /// </summary>
     [Benchmark(Description = "Receive and acknowledge messages")]
-    public async Task ReceiveAndAcknowledge()
+    public async Task ReceiveAndAcknowledgeAsync()
     {
         var count = 0;
         await foreach (var ctx in _queue!.Receive("test", cancellationToken: _cts!.Token))
@@ -163,7 +163,7 @@ public class RegressionBenchmark
     /// Messages are pre-enqueued by the iteration setup.
     /// </summary>
     [Benchmark(Description = "Batch receive and acknowledge")]
-    public async Task BatchReceiveAndAcknowledge()
+    public async Task BatchReceiveAndAcknowledgeAsync()
     {
         var received = 0;
         await foreach (var batch in _queue!.ReceiveBatch("test", maxMessages: 10, cancellationToken: _cts!.Token))
@@ -181,7 +181,7 @@ public class RegressionBenchmark
     /// Messages are pre-enqueued by the iteration setup; delayed messages are drained in iteration cleanup.
     /// </summary>
     [Benchmark(Description = "ReceiveLater (retry pattern)")]
-    public async Task ReceiveLater()
+    public async Task ReceiveLaterAsync()
     {
         var count = 0;
         await foreach (var ctx in _queue!.Receive("test", cancellationToken: _cts!.Token))
@@ -198,7 +198,7 @@ public class RegressionBenchmark
     /// The "target" queue is created once in global setup; messages are pre-enqueued by the iteration setup.
     /// </summary>
     [Benchmark(Description = "MoveTo (queue transfer)")]
-    public async Task MoveTo()
+    public async Task MoveToAsync()
     {
         var count = 0;
         await foreach (var ctx in _queue!.Receive("test", cancellationToken: _cts!.Token))
@@ -216,7 +216,7 @@ public class RegressionBenchmark
     /// marks the batch as successfully received, and commits changes until MessageCount messages are handled.
     /// </summary>
     [Benchmark(Description = "Batch mixed operations")]
-    public async Task BatchMixedOperations()
+    public async Task BatchMixedOperationsAsync()
     {
         var received = 0;
         await foreach (var batch in _queue!.ReceiveBatch("test", maxMessages: 10, cancellationToken: _cts!.Token))

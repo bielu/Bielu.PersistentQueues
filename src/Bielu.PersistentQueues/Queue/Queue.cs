@@ -114,7 +114,7 @@ public class Queue : IQueue
     {
         _logger.QueueStarting();
         var errorPolicy = new SendingErrorPolicy(_logger, Store, _sender.FailedToSend(), _deadLetterOptions);
-        var errorTask = errorPolicy.StartRetries(token);
+        var errorTask = errorPolicy.StartRetriesAsync(token);
         
         // Task to handle retry messages by putting them back into outgoing storage
         var retryTask = Task.Run(async () =>
@@ -387,7 +387,7 @@ public class Queue : IQueue
         {
             try
             {
-                await Task.Delay(timeSpan, _cancelOnDispose.Token);
+                await Task.Delay(timeSpan, _cancelOnDispose.Token).ConfigureAwait(false);
                 if (_cancelOnDispose.IsCancellationRequested)
                     return;
                 Store.StoreIncoming(message);

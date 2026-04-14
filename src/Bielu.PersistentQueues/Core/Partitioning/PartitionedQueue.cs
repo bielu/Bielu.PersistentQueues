@@ -194,7 +194,7 @@ public class PartitionedQueue : IPartitionedQueue
         foreach (var semaphore in _partitionLocks.Values)
             semaphore.Dispose();
         _partitionLocks.Clear();
-        await _innerQueue.DisposeAsync();
+        await _innerQueue.DisposeAsync().ConfigureAwait(false);
     }
 
     // ---- IPartitionedQueue operations ----
@@ -243,10 +243,10 @@ public class PartitionedQueue : IPartitionedQueue
         var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
         var partitionLock = GetPartitionLock(partitionQueueName);
 
-        await partitionLock.WaitAsync(cancellationToken);
+        await partitionLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await foreach (var ctx in _innerQueue.Receive(partitionQueueName, pollIntervalInMilliseconds, cancellationToken))
+            await foreach (var ctx in _innerQueue.Receive(partitionQueueName, pollIntervalInMilliseconds, cancellationToken).ConfigureAwait(false))
             {
                 yield return ctx;
             }
@@ -266,10 +266,10 @@ public class PartitionedQueue : IPartitionedQueue
         var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
         var partitionLock = GetPartitionLock(partitionQueueName);
 
-        await partitionLock.WaitAsync(cancellationToken);
+        await partitionLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await foreach (var batch in _innerQueue.ReceiveBatch(partitionQueueName, maxMessages, batchTimeoutInMilliseconds, pollIntervalInMilliseconds, cancellationToken))
+            await foreach (var batch in _innerQueue.ReceiveBatch(partitionQueueName, maxMessages, batchTimeoutInMilliseconds, pollIntervalInMilliseconds, cancellationToken).ConfigureAwait(false))
             {
                 yield return batch;
             }
@@ -305,7 +305,7 @@ public class PartitionedQueue : IPartitionedQueue
                     yield break;
 
                 var partitionLock = GetPartitionLock(pqn);
-                await partitionLock.WaitAsync(cancellationToken);
+                await partitionLock.WaitAsync(cancellationToken).ConfigureAwait(false);
                 try
                 {
                     var messages = Store.PersistedIncoming(pqn)

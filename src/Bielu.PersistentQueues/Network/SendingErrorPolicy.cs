@@ -28,7 +28,7 @@ public class SendingErrorPolicy
 
     public ChannelReader<Message> Retries => _retries.Reader;
 
-    public async ValueTask StartRetries(CancellationToken cancellationToken)
+    public async ValueTask StartRetriesAsync(CancellationToken cancellationToken)
     {
         await foreach (var messageFailure in _failedToConnect.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -36,11 +36,11 @@ public class SendingErrorPolicy
                 break;
             var incrementedMessages = IncrementSentAttempt(messageFailure.Messages).ToList();
             IncrementAttemptAndStoreForRecovery(!messageFailure.ShouldRetry, incrementedMessages);
-            await HandleMessageRetries(messageFailure.ShouldRetry, cancellationToken, incrementedMessages).ConfigureAwait(false);
+            await HandleMessageRetriesAsync(messageFailure.ShouldRetry, cancellationToken, incrementedMessages).ConfigureAwait(false);
         }
     }
 
-    private async Task HandleMessageRetries(bool shouldRetry, CancellationToken cancellationToken, params IEnumerable<Message> messages)
+    private async Task HandleMessageRetriesAsync(bool shouldRetry, CancellationToken cancellationToken, params IEnumerable<Message> messages)
     {
         foreach (var message in messages)
         {

@@ -191,7 +191,7 @@ public class PartitionedQueueTests : TestBase
     [Fact]
     public async Task enqueue_to_partition_routes_by_key()
     {
-        await PartitionedQueueScenario(async (queue, token) =>
+        await PartitionedQueueScenarioAsync(async (queue, token) =>
         {
             var partitioned = new PartitionedQueue(queue, new HashPartitionStrategy());
             partitioned.CreatePartitionedQueue("orders", 4);
@@ -226,7 +226,7 @@ public class PartitionedQueueTests : TestBase
     [Fact]
     public async Task enqueue_to_specific_partition()
     {
-        await PartitionedQueueScenario(async (queue, token) =>
+        await PartitionedQueueScenarioAsync(async (queue, token) =>
         {
             var partitioned = new PartitionedQueue(queue, new HashPartitionStrategy());
             partitioned.CreatePartitionedQueue("events", 3);
@@ -245,7 +245,7 @@ public class PartitionedQueueTests : TestBase
     [Fact]
     public async Task receive_batch_from_partition()
     {
-        await PartitionedQueueScenario(async (queue, token) =>
+        await PartitionedQueueScenarioAsync(async (queue, token) =>
         {
             var partitioned = new PartitionedQueue(queue, new RoundRobinPartitionStrategy());
             partitioned.CreatePartitionedQueue("batch-q", 2);
@@ -382,7 +382,7 @@ public class PartitionedQueueTests : TestBase
     [Fact]
     public async Task concurrent_receive_from_same_partition_does_not_duplicate()
     {
-        await PartitionedQueueScenario(async (queue, token) =>
+        await PartitionedQueueScenarioAsync(async (queue, token) =>
         {
             var partitioned = new PartitionedQueue(queue, new HashPartitionStrategy());
             partitioned.CreatePartitionedQueue("orders", 2);
@@ -656,7 +656,7 @@ public class PartitionedQueueTests : TestBase
     [Fact]
     public async Task get_available_partitions_excludes_locked_partitions()
     {
-        await PartitionedQueueScenario(async (queue, token) =>
+        await PartitionedQueueScenarioAsync(async (queue, token) =>
         {
             var partitioned = new PartitionedQueue(queue, new HashPartitionStrategy());
             partitioned.CreatePartitionedQueue("orders", 4);
@@ -1101,7 +1101,7 @@ public class PartitionedQueueTests : TestBase
     /// <summary>
     /// QueueScenario variant with higher MaxDatabases to support partitioned queues.
     /// </summary>
-    private async Task PartitionedQueueScenario(Func<IQueue, CancellationToken, Task> scenario, TimeSpan timeout, string queueName = "test")
+    private async Task PartitionedQueueScenarioAsync(Func<IQueue, CancellationToken, Task> scenario, TimeSpan timeout, string queueName = "test")
     {
         using var cancellation = new CancellationTokenSource(timeout);
         var serializer = new MessageSerializer();

@@ -23,7 +23,7 @@ public class ReceivingProtocol(IMessageStore store, IStreamSecurity security, IM
         var linkedCancel = CancellationTokenSource.CreateLinkedTokenSource(doneCancellation.Token, cancellationToken);
         try
         {
-            return await ReceiveMessagesAsyncImpl(stream, linkedCancel.Token).ConfigureAwait(false);
+            return await ReceiveMessagesImplAsync(stream, linkedCancel.Token).ConfigureAwait(false);
         }
         catch (ArgumentOutOfRangeException)
         {
@@ -39,11 +39,11 @@ public class ReceivingProtocol(IMessageStore store, IStreamSecurity security, IM
         }
     }
 
-    private async Task<IList<Message>> ReceiveMessagesAsyncImpl(Stream stream, CancellationToken cancellationToken)
+    private async Task<IList<Message>> ReceiveMessagesImplAsync(Stream stream, CancellationToken cancellationToken)
     {
         var pipe = new Pipe();
-        stream = await security.Apply(receivingUri, stream).ConfigureAwait(false);
-        var receivingTask = ReceiveIntoBuffer(pipe.Writer, stream, cancellationToken);
+        stream = await security.ApplyAsync(receivingUri, stream).ConfigureAwait(false);
+        var receivingTask = ReceiveIntoBufferAsync(pipe.Writer, stream, cancellationToken);
         if (cancellationToken.IsCancellationRequested)
             return [];
 
@@ -93,12 +93,12 @@ public class ReceivingProtocol(IMessageStore store, IStreamSecurity security, IM
             }
             catch (QueueDoesNotExistException)
             {
-                await SendQueueNotFound(stream, cancellationToken);
+                await SendQueueNotFoundAsync(stream, cancellationToken).ConfigureAwait(false);
                 throw;
             }
             catch (Exception)
             {
-                await SendProcessingError(stream, cancellationToken);
+                await SendProcessingErrorAsync(stream, cancellationToken).ConfigureAwait(false);
                 throw;
             }
 
@@ -119,21 +119,21 @@ public class ReceivingProtocol(IMessageStore store, IStreamSecurity security, IM
         }
 
         if (!cancellationToken.IsCancellationRequested)
-            await SendReceived(stream, cancellationToken);
+            await SendReceivedAsync(stream, cancellationToken).ConfigureAwait(false);
         if (cancellationToken.IsCancellationRequested)
             return [];
-        var acknowledgeTask = ReadAcknowledged(pipe, cancellationToken);
+        var acknowledgeTask = ReadAcknowledgedAsync(pipe, cancellationToken);
         await Task.WhenAny(acknowledgeTask.AsTask(), receivingTask.AsTask()).ConfigureAwait(false);
         return messages;
     }
 
-    private static async ValueTask SendReceived(Stream stream, CancellationToken cancellationToken)
+    private static async ValueTask SendReceivedAsync(Stream stream, CancellationToken cancellationToken)
     {
         await stream.WriteAsync(Constants.ReceivedMemory, cancellationToken)
             .ConfigureAwait(false);
     }
     
-    private async ValueTask SendQueueNotFound(Stream stream, CancellationToken cancellationToken)
+    private async ValueTask SendQueueNotFoundAsync(Stream stream, CancellationToken cancellationToken)
     {
         try
         {
@@ -146,7 +146,7 @@ public class ReceivingProtocol(IMessageStore store, IStreamSecurity security, IM
         }
     }
 
-    private async ValueTask SendProcessingError(Stream stream, CancellationToken cancellationToken)
+    private async ValueTask SendProcessingErrorAsync(Stream stream, CancellationToken cancellationToken)
     {
         try
         {
@@ -159,7 +159,7 @@ public class ReceivingProtocol(IMessageStore store, IStreamSecurity security, IM
         }
     }
 
-    private static async ValueTask ReadAcknowledged(Pipe pipe, CancellationToken cancellationToken)
+    private static async ValueTask ReadAcknowledgedAsync(Pipe pipe, CancellationToken cancellationToken)
     {
         var ackLength = Constants.AcknowledgedBuffer.Length;
         var result = await pipe.Reader.ReadAtLeastAsync(ackLength, cancellationToken).ConfigureAwait(false);

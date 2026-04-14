@@ -77,7 +77,7 @@ public class PersistentQueueOtelDecorator : IQueue
 
     public async ValueTask DisposeAsync()
     {
-        await _queue.DisposeAsync();
+        await _queue.DisposeAsync().ConfigureAwait(false);
     }
 
     public void CreateQueue(string queueName)

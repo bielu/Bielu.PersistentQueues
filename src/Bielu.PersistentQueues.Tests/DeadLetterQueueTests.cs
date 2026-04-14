@@ -67,7 +67,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task MoveToDeadLetter_MovesMessageToDlq()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -87,7 +87,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task MoveToDeadLetter_DlqQueueCreatedAutomatically()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -105,7 +105,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task MoveToDeadLetter_DlqMessageHasOriginalQueueHeader()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -125,7 +125,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task MoveToDeadLetter_CannotBeCalledAfterSuccessfullyReceived()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -143,7 +143,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task ReceiveLater_WhenMaxAttemptsReached_MovesToDlq()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -168,7 +168,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task ReceiveLater_WhenMaxAttemptsReached_DlqMessageHasOriginalQueueHeader()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -192,7 +192,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task ReceiveLater_WhenBelowMaxAttempts_DoesNotMoveToDlq()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -216,7 +216,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task ReceiveLater_WhenMaxAttemptsReached_DlqMessageHasIncrementedAttempts()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -242,7 +242,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task Batch_MoveToDeadLetter_MovesAllMessagesToDlq()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -263,7 +263,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task Batch_MoveToDeadLetter_SubsetByMessage()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -288,7 +288,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task Batch_ReceiveLater_WhenMaxAttemptsReached_AutoMovesToDlq()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -311,7 +311,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task Batch_MoveToDeadLetter_DlqMessagesHaveOriginalQueueHeader()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -345,7 +345,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task CreateQueue_WhenDlqEnabled_AutoCreatesDlqCompanion()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -358,7 +358,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task CreateQueue_WhenDlqDisabled_DoesNotCreateDlqCompanion()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var dlqName = DeadLetterConstants.QueueName;
             queue.Queues.ShouldNotContain(dlqName);
@@ -369,7 +369,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task CreateQueue_DoesNotDoubleCreateDlqForDlqName()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -385,7 +385,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task MoveToDeadLetter_WhenDlqDisabled_Throws()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.Enqueue(NewMessage("test"));
 
@@ -397,7 +397,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task ReceiveLater_WhenDlqDisabled_DoesNotDlqEvenAtMaxAttempts()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var message = Message.Create(
                 data: Encoding.UTF8.GetBytes("hello"),
@@ -420,7 +420,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task RequeueDeadLetterMessages_MovesMessagesBackToOriginalQueue()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -449,7 +449,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task RequeueDeadLetterMessages_ResetsProcessingAttempts()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -479,7 +479,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task RequeueDeadLetterMessages_ReturnsZeroForEmptyDlq()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -494,7 +494,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task ClearDeadLetterQueue_RemovesAllMessages()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -540,7 +540,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task ClearDeadLetterQueue_ReturnsZeroForEmptyDlq()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -555,7 +555,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task ReceiveLater_PreservesMessageId()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var message = NewMessage("test");
             var originalId = message.Id;
@@ -567,7 +567,7 @@ public class DeadLetterQueueTests : TestBase
             ctx1.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(100));
             ctx1.QueueContext.CommitChanges();
 
-            await DeterministicDelay(200, token).ConfigureAwait(false);
+            await DeterministicDelayAsync(200, token).ConfigureAwait(false);
 
             // Second receive - ID should still be the same
             var ctx2 = await queue.Receive("test", cancellationToken: token).FirstAsync(token).ConfigureAwait(false);
@@ -580,7 +580,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task MoveToDlq_PreservesMessageId()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {
@@ -611,7 +611,7 @@ public class DeadLetterQueueTests : TestBase
     [Fact]
     public async Task MoveToDeadLetter_Explicit_PreservesMessageId()
     {
-        await QueueScenario(
+        await QueueScenarioAsync(
             config => config.WithDeadLetterQueue(),
             async (queue, token) =>
         {

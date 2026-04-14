@@ -75,7 +75,7 @@ public class SendingErrorPolicyTests : TestBase
     [Fact]
     public Task message_is_observed_after_time()
     {
-        return ErrorPolicyScenario(async (policy, store, failures, cancellation) =>
+        return ErrorPolicyScenarioAsync(async (policy, store, failures, cancellation) =>
         {
             var message = Message.Create(
                 destinationUri: "lq.tcp://localhost:5150/blah",
@@ -87,7 +87,7 @@ public class SendingErrorPolicyTests : TestBase
                 tx.Commit();
             }
 
-            var errorTask = policy.StartRetries(cancellation.Token);
+            var errorTask = policy.StartRetriesAsync(cancellation.Token);
             var failure = new OutgoingMessageFailure
             {
                 Messages = [message],
@@ -99,7 +99,7 @@ public class SendingErrorPolicyTests : TestBase
             var retryMessage = await retryTask.ConfigureAwait(false);
             retryMessage.Id.ShouldBe(message.Id);
             await cancellation.CancelAsync().ConfigureAwait(false);
-            await DeterministicDelay(50, CancellationToken.None).ConfigureAwait(false);
+            await DeterministicDelayAsync(50, CancellationToken.None).ConfigureAwait(false);
             errorTask.IsCanceled.ShouldBeTrue();
         });
     }
@@ -107,7 +107,7 @@ public class SendingErrorPolicyTests : TestBase
     [Fact]
     public Task message_removed_from_storage_after_max()
     {
-        return ErrorPolicyScenario(async (policy, store, failures, cancellation) =>
+        return ErrorPolicyScenarioAsync(async (policy, store, failures, cancellation) =>
         {
             var message = Message.Create(
                 destinationUri: "lq.tcp://localhost:5150/blah",
@@ -123,14 +123,14 @@ public class SendingErrorPolicyTests : TestBase
             {
                 Messages = [message]
             };
-            var errorTask = policy.StartRetries(cancellation.Token);
+            var errorTask = policy.StartRetriesAsync(cancellation.Token);
             var retryTask = policy.Retries.ReadAllAsync(cancellation.Token).FirstAsync(cancellation.Token);
             failures.Writer.TryWrite(failure);
-            await DeterministicDelay(TimeSpan.FromSeconds(1), cancellation.Token).ConfigureAwait(false);
+            await DeterministicDelayAsync(TimeSpan.FromSeconds(1), cancellation.Token).ConfigureAwait(false);
             retryTask.IsCompleted.ShouldBeFalse();
             store.PersistedOutgoing().Any().ShouldBeFalse();
             await cancellation.CancelAsync().ConfigureAwait(false);
-            await DeterministicDelay(50, CancellationToken.None).ConfigureAwait(false);
+            await DeterministicDelayAsync(50, CancellationToken.None).ConfigureAwait(false);
             errorTask.IsCanceled.ShouldBeTrue();
         });
     }
@@ -138,7 +138,7 @@ public class SendingErrorPolicyTests : TestBase
     [Fact]
     public Task time_increases_with_each_failure()
     {
-        return ErrorPolicyScenario(async (policy, store, failures, _) =>
+        return ErrorPolicyScenarioAsync(async (policy, store, failures, _) =>
         {
             using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(6));
             Message? observed = null;
@@ -152,7 +152,7 @@ public class SendingErrorPolicyTests : TestBase
                 tx.Commit();
             }
 
-            var errorTask = policy.StartRetries(cancellation.Token);
+            var errorTask = policy.StartRetriesAsync(cancellation.Token);
             var failure = new OutgoingMessageFailure
             {
                 Messages = [message],
@@ -166,14 +166,14 @@ public class SendingErrorPolicyTests : TestBase
                 }
             }, cancellation.Token);
             failures.Writer.TryWrite(failure);
-            await DeterministicDelay(TimeSpan.FromSeconds(1.5), cancellation.Token).ConfigureAwait(false);
+            await DeterministicDelayAsync(TimeSpan.FromSeconds(1.5), cancellation.Token).ConfigureAwait(false);
             observed.ShouldNotBeNull("first");
             observed = null;
             failures.Writer.TryWrite(failure);
             observed.ShouldBeNull("second");
-            await DeterministicDelay(TimeSpan.FromSeconds(1), cancellation.Token).ConfigureAwait(false);
+            await DeterministicDelayAsync(TimeSpan.FromSeconds(1), cancellation.Token).ConfigureAwait(false);
             observed.ShouldBeNull("third");
-            await Task.WhenAny(DeterministicDelay(TimeSpan.FromSeconds(4), cancellation.Token)).ConfigureAwait(false);
+            await Task.WhenAny(DeterministicDelayAsync(TimeSpan.FromSeconds(4), cancellation.Token)).ConfigureAwait(false);
             observed.ShouldNotBeNull("fourth");
             await cancellation.CancelAsync().ConfigureAwait(false);
             await Task.WhenAny(errorTask.AsTask(), retriesTask).ConfigureAwait(false);
@@ -201,7 +201,7 @@ public class SendingErrorPolicyTests : TestBase
             ended = true;
         }, cancellation.Token);
         failures.Writer.TryWrite(failure);
-        await Task.WhenAny(retryTask, DeterministicDelay(TimeSpan.FromSeconds(1), cancellation.Token)).ConfigureAwait(false);
+        await Task.WhenAny(retryTask, DeterministicDelayAsync(TimeSpan.FromSeconds(1), cancellation.Token)).ConfigureAwait(false);
         ended.ShouldBeFalse();
         await cancellation.CancelAsync().ConfigureAwait(false);
     }
@@ -216,7 +216,7 @@ public class SendingErrorPolicyTests : TestBase
         scenario(errorPolicy, store, failures);
     }
 
-    private async Task ErrorPolicyScenario(
+    private async Task ErrorPolicyScenarioAsync(
         Func<SendingErrorPolicy, IMessageStore, Channel<OutgoingMessageFailure>, CancellationTokenSource, Task> scenario)
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
