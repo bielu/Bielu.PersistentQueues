@@ -32,7 +32,7 @@ internal sealed class PartitionWorkerService(
             if (available.Length == 0)
             {
                 // No work right now — sleep briefly and re-check.
-                try { await Task.Delay(10, stoppingToken); }
+                try { await Task.Delay(10, stoppingToken).ConfigureAwait(false); }
                 catch (OperationCanceledException) { break; }
                 continue;
             }
@@ -47,7 +47,7 @@ internal sealed class PartitionWorkerService(
                     maxMessages: 50,
                     batchTimeoutInMilliseconds: 10,
                     pollIntervalInMilliseconds: 5,
-                    cancellationToken: stoppingToken))
+                    cancellationToken: stoppingToken).ConfigureAwait(false))
                 {
                     if (batch.Messages.Length > 0)
                     {

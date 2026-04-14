@@ -17,7 +17,7 @@ internal sealed class ProgressDisplayService(DemoStats stats) : BackgroundServic
             Console.Write(
                 $"\r  Sent   orders: {stats.OrdersSent,7:N0}  alerts: {stats.PrioritySent,5:N0}  │" +
                 $"  Processed  orders: {stats.OrdersProcessed,7:N0}  alerts: {stats.PriorityProcessed,5:N0}   ");
-            await Task.Delay(250, stoppingToken);
+            await Task.Delay(250, stoppingToken).ConfigureAwait(false);
         }
     }
 }

@@ -54,7 +54,7 @@ public class DeadLetterDemoService : BackgroundService
         cts1.CancelAfter(TimeSpan.FromSeconds(2));
         try
         {
-            await foreach (var ctx in _queue.Receive(QueueName, cancellationToken: cts1.Token))
+            await foreach (var ctx in _queue.Receive(QueueName, cancellationToken: cts1.Token).ConfigureAwait(false))
             {
                 Console.WriteLine($"    [{ctx.Message.ProcessingAttempts + 1}/2] Processing '{Encoding.UTF8.GetString(ctx.Message.Data.Span)}' … failing.");
                 ctx.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(50));
@@ -64,7 +64,7 @@ public class DeadLetterDemoService : BackgroundService
         catch (OperationCanceledException) { /* expected */ }
 
         // Short delay for scheduled messages to reappear
-        await Task.Delay(200, stoppingToken);
+        await Task.Delay(200, stoppingToken).ConfigureAwait(false);
 
         // Second pass: ReceiveLater bumps ProcessingAttempts to 2 → triggers auto-DLQ
         Console.WriteLine("    Second failure attempt – messages should land in DLQ …");
@@ -72,7 +72,7 @@ public class DeadLetterDemoService : BackgroundService
         cts2.CancelAfter(TimeSpan.FromSeconds(2));
         try
         {
-            await foreach (var ctx in _queue.Receive(QueueName, cancellationToken: cts2.Token))
+            await foreach (var ctx in _queue.Receive(QueueName, cancellationToken: cts2.Token).ConfigureAwait(false))
             {
                 Console.WriteLine($"    [{ctx.Message.ProcessingAttempts + 1}/2] Processing '{Encoding.UTF8.GetString(ctx.Message.Data.Span)}' … failing → auto-DLQ.");
                 ctx.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(50));
@@ -93,7 +93,7 @@ public class DeadLetterDemoService : BackgroundService
         cts3.CancelAfter(TimeSpan.FromSeconds(2));
         try
         {
-            await foreach (var ctx in _queue.Receive(QueueName, cancellationToken: cts3.Token))
+            await foreach (var ctx in _queue.Receive(QueueName, cancellationToken: cts3.Token).ConfigureAwait(false))
             {
                 Console.WriteLine($"    Received '{Encoding.UTF8.GetString(ctx.Message.Data.Span)}' → calling MoveToDeadLetter()");
                 ctx.QueueContext.MoveToDeadLetter();

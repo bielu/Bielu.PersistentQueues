@@ -146,7 +146,7 @@ _ = Task.Delay(TimeSpan.FromSeconds(DemoSeconds))
         catch (ObjectDisposedException) { /* host already stopped */ }
     }, TaskScheduler.Default);
 
-await host.RunAsync();
+await host.RunAsync().ConfigureAwait(false);
 
 // ── Results ───────────────────────────────────────────────────────────────────
 Console.WriteLine();
