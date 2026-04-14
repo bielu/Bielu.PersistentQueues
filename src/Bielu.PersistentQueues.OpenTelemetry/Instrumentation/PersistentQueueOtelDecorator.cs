@@ -126,9 +126,8 @@ public class PersistentQueueOtelDecorator : IQueue
 
             _metrics.RecordMessagesReceived(1, queueName);
 
-            var timeInQueue = (DateTime.UtcNow - messageContext.Message.SentAt).TotalMilliseconds;
-            if (timeInQueue > 0)
-                _metrics.RecordTimeInQueue(timeInQueue, queueName);
+            var timeInQueue = Math.Max(0, (DateTime.UtcNow - messageContext.Message.SentAt).TotalMilliseconds);
+            _metrics.RecordTimeInQueue(timeInQueue, queueName);
 
             var dequeueElapsed = Stopwatch.GetElapsedTime(dequeueStartTime).TotalMilliseconds;
             _metrics.RecordDequeueDuration(dequeueElapsed, queueName);
@@ -168,9 +167,8 @@ public class PersistentQueueOtelDecorator : IQueue
 
             foreach (var msg in messageContext.Messages)
             {
-                var timeInQueue = (DateTime.UtcNow - msg.SentAt).TotalMilliseconds;
-                if (timeInQueue > 0)
-                    _metrics.RecordTimeInQueue(timeInQueue, queueName);
+                var timeInQueue = Math.Max(0, (DateTime.UtcNow - msg.SentAt).TotalMilliseconds);
+                _metrics.RecordTimeInQueue(timeInQueue, queueName);
             }
 
             var dequeueElapsed = Stopwatch.GetElapsedTime(dequeueStartTime).TotalMilliseconds;
