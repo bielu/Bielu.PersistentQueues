@@ -7,9 +7,8 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests;
 
-public class EncryptedTransportQueueTests(ITestOutputHelper output) : TestBase
+public class EncryptedTransportQueueTests(ITestOutputHelper output) : TestBase(output)
 {
-    Output = output;
 
     [Fact]
     public async Task can_send_and_receive_messages_over_TLS1_2()

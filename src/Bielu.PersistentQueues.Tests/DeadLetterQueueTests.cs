@@ -9,9 +9,8 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests;
 
-public class DeadLetterQueueTests(ITestOutputHelper output) : TestBase
+public class DeadLetterQueueTests(ITestOutputHelper output) : TestBase(output)
 {
-    Output = output;
 
     // ─── DeadLetterConstants ───────────────────────────────────────────────
 

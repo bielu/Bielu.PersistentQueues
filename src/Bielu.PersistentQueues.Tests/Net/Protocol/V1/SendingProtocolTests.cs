@@ -15,9 +15,8 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests.Net.Protocol.V1;
 
-public class SendingProtocolTests(ITestOutputHelper output) : TestBase
+public class SendingProtocolTests(ITestOutputHelper output) : TestBase(output)
 {
-    Output = output;
 
     [Fact]
     public async Task writing_single_message()

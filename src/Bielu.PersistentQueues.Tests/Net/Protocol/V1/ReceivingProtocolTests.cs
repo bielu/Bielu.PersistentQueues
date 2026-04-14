@@ -17,9 +17,8 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests.Net.Protocol.V1;
 
-public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase
+public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase(output)
 {
-    Output = output;
 
     [Fact]
     public async Task client_sending_negative_length_is_ignored()

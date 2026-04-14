@@ -10,10 +10,10 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests;
 
-public class TestBase
+public class TestBase(ITestOutputHelper? output = null)
 {
    private static readonly string _tempPath = Path.Combine(Path.GetTempPath(), $"lightningqueuestests-{Environment.Version.ToString()}");
-   protected ITestOutputHelper? Output { get; set; }
+   protected ITestOutputHelper? Output { get; set; } = output;
    protected TextWriter? OutputWriter => Output != null ? new TestOutputHelperWriter(Output) : null;
 
    protected static Task DeterministicDelayAsync(int delayMs, CancellationToken token)

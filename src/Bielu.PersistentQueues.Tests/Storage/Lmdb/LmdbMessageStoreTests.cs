@@ -10,9 +10,8 @@ namespace Bielu.PersistentQueues.Tests.Storage.Lmdb;
 /// <summary>
 /// Runs the shared MessageStoreTests against the LMDB provider.
 /// </summary>
-public class LmdbMessageStoreTests(ITestOutputHelper output) : MessageStoreTests
+public class LmdbMessageStoreTests(ITestOutputHelper output) : MessageStoreTests(output)
 {
-    Output = output;
 
     protected override IMessageStore CreateStoreForPath(string path)
     {

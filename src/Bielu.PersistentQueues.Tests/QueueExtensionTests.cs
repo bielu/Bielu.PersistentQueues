@@ -6,9 +6,8 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests;
 
-public class QueueExtensionTests(ITestOutputHelper output) : TestBase
+public class QueueExtensionTests(ITestOutputHelper output) : TestBase(output)
 {
-    Output = output;
     private record OrderMessage(string OrderId, decimal Amount, string Currency);
 
     [Fact]
