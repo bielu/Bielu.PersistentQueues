@@ -310,111 +310,86 @@ public class BatchQueueContext : IBatchQueueContext
 
     private class SuccessAllAction(Queue queue, Message[] messages) : IBatchAction
     {
-        private readonly Queue _queue = queue;
-        private readonly Message[] _messages = messages;
-
         public void Execute(IStoreTransaction transaction) =>
-            _queue.Store.SuccessfullyReceived(transaction, _messages);
+            queue.Store.SuccessfullyReceived(transaction, messages);
 
         public void Success() { }
     }
 
     private class MoveAllAction(Queue queue, Message[] messages, string queueName) : IBatchAction
     {
-        private readonly Queue _queue = queue;
-        private readonly Message[] _messages = messages;
-        private readonly string _queueName = queueName;
-
         public void Execute(IStoreTransaction transaction) =>
-            _queue.Store.MoveToQueue(transaction, _queueName, _messages);
+            queue.Store.MoveToQueue(transaction, queueName, messages);
 
         public void Success() { }
     }
 
     private class SendAction(Queue queue, Message message) : IBatchAction
     {
-        private readonly Queue _queue = queue;
-        private readonly Message _message = message;
-
         public void Execute(IStoreTransaction transaction) =>
-            _queue.Store.StoreOutgoing(transaction, _message);
+            queue.Store.StoreOutgoing(transaction, message);
 
         public void Success() { }
     }
 
     private class EnqueueAction(Queue queue, Message message) : IBatchAction
     {
-        private readonly Queue _queue = queue;
-        private readonly Message _message = message;
-
         public void Execute(IStoreTransaction transaction) =>
-            _queue.Store.StoreIncoming(transaction, _message);
+            queue.Store.StoreIncoming(transaction, message);
 
         public void Success() { }
     }
 
     private class ReceiveLaterTimeSpanAction(Queue queue, Message[] messages, TimeSpan timeSpan) : IBatchAction
     {
-        private readonly Queue _queue = queue;
-        private readonly Message[] _messages = messages;
-        private readonly TimeSpan _timeSpan = timeSpan;
-
         public void Execute(IStoreTransaction transaction)
         {
             // Remove the messages from current queue before scheduling them for later.
             // IDs are unchanged by WithProcessingAttempts, so deletion is correct.
-            _queue.Store.SuccessfullyReceived(transaction, _messages);
+            queue.Store.SuccessfullyReceived(transaction, messages);
         }
 
         public void Success()
         {
-            foreach (var message in _messages)
-                _queue.ReceiveLater(message, _timeSpan);
+            foreach (var message in messages)
+                queue.ReceiveLater(message, timeSpan);
         }
     }
 
     private class ReceiveLaterDateTimeOffsetAction(Queue queue, Message[] messages, DateTimeOffset time) : IBatchAction
     {
-        private readonly Queue _queue = queue;
-        private readonly Message[] _messages = messages;
-        private readonly DateTimeOffset _time = time;
-
         public void Execute(IStoreTransaction transaction)
         {
             // Remove the messages from current queue before scheduling them for later.
             // IDs are unchanged by WithProcessingAttempts, so deletion is correct.
-            _queue.Store.SuccessfullyReceived(transaction, _messages);
+            queue.Store.SuccessfullyReceived(transaction, messages);
         }
 
         public void Success()
         {
-            foreach (var message in _messages)
-                _queue.ReceiveLater(message, _time);
+            foreach (var message in messages)
+                queue.ReceiveLater(message, time);
         }
     }
 
     private class DeadLetterAllAction(Queue queue, Message[] messages, string reason) : IBatchAction
     {
-        private readonly Queue _queue = queue;
-        private readonly Message[] _messages = messages;
-        private readonly string _reason = reason;
-
         public void Execute(IStoreTransaction transaction)
         {
-            foreach (var message in _messages)
+            foreach (var message in messages)
             {
                 var sourceQueue = message.QueueString ?? "unknown";
                 var messageWithOrigin = message.WithOriginalQueue(sourceQueue);
-                _queue.Store.MoveToQueue(transaction, DeadLetterConstants.QueueName, messageWithOrigin);
+                queue.Store.MoveToQueue(transaction, DeadLetterConstants.QueueName, messageWithOrigin);
             }
         }
 
         public void Success()
         {
-            foreach (var message in _messages)
+            foreach (var message in messages)
             {
                 DeadLetterDiagnostics.RecordMessageDeadLettered(
-                    message.QueueString ?? "unknown", _reason);
+                    message.QueueString ?? "unknown", reason);
             }
         }
     }
