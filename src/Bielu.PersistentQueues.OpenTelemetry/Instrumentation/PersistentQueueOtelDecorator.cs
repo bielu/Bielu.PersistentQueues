@@ -20,6 +20,7 @@ public class PersistentQueueOtelDecorator : IQueue
     private readonly ObservableGauge<long>? _storageTotalBytesGauge;
     private readonly ObservableGauge<double>? _storageUsagePercentGauge;
     private readonly ObservableGauge<long> _deadLetterQueueDepthGauge;
+    private readonly ObservableGauge<long> _queueDepthGauge;
 
     public PersistentQueueOtelDecorator(IQueue queue, QueueMetrics queueMetrics, QueueActivitySource activitySource)
     {
@@ -49,6 +50,19 @@ public class PersistentQueueOtelDecorator : IQueue
                 if (!DeadLetterConstants.IsDeadLetterQueue(queueName))
                     continue;
                 var depth = store.PersistedIncoming(queueName).Count();
+                measurements.Add(new Measurement<long>(depth,
+                    new KeyValuePair<string, object?>("queue.name", queueName)));
+            }
+            return measurements;
+        });
+
+        // Register queue depth gauge — reports message count per queue
+        _queueDepthGauge = _metrics.CreateQueueDepthGauge(() =>
+        {
+            var measurements = new List<Measurement<long>>();
+            foreach (var queueName in store.GetAllQueues())
+            {
+                var depth = store.GetMessageCount(queueName);
                 measurements.Add(new Measurement<long>(depth,
                     new KeyValuePair<string, object?>("queue.name", queueName)));
             }
@@ -112,6 +126,10 @@ public class PersistentQueueOtelDecorator : IQueue
 
             _metrics.RecordMessagesReceived(1, queueName);
 
+            var timeInQueue = (DateTime.UtcNow - messageContext.Message.SentAt).TotalMilliseconds;
+            if (timeInQueue > 0)
+                _metrics.RecordTimeInQueue(timeInQueue, queueName);
+
             var dequeueElapsed = Stopwatch.GetElapsedTime(dequeueStartTime).TotalMilliseconds;
             _metrics.RecordDequeueDuration(dequeueElapsed, queueName);
 
@@ -147,6 +165,14 @@ public class PersistentQueueOtelDecorator : IQueue
             _metrics.RecordMessagesReceived(batchSize, queueName);
             _metrics.RecordBatchSize(batchSize, queueName);
             _metrics.RecordBatchProcessed(queueName);
+
+            foreach (var msg in messageContext.Messages)
+            {
+                var timeInQueue = (DateTime.UtcNow - msg.SentAt).TotalMilliseconds;
+                if (timeInQueue > 0)
+                    _metrics.RecordTimeInQueue(timeInQueue, queueName);
+            }
+
             var dequeueElapsed = Stopwatch.GetElapsedTime(dequeueStartTime).TotalMilliseconds;
             _metrics.RecordDequeueDuration(dequeueElapsed, queueName, batchSize);
 

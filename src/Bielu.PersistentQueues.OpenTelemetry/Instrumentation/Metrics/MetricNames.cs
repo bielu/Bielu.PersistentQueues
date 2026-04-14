@@ -31,6 +31,10 @@ internal static class MetricNames
     public const string PartitionConsumersActive = "bielupersistentqueues.partition.consumers.active";
     public const string PartitionProducersActive = "bielupersistentqueues.partition.producers.active";
 
+    // Queue depth metrics
+    public const string QueueDepth = "bielupersistentqueues.queue.depth";
+    public const string TimeInQueue = "bielupersistentqueues.message.time_in_queue";
+
     // Dead letter queue metrics
     public const string MessagesDeadLettered = "bielupersistentqueues.messages.dead_lettered";
     public const string DeadLetterQueueDepth = "bielupersistentqueues.dead_letter.queue.depth";
