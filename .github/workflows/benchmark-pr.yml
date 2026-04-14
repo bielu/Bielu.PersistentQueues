@@ -39,25 +39,28 @@ jobs:
           --exporters fulljson \
           --artifacts ./BenchmarkDotNet.Artifacts
 
-    - name: Download baseline
-      id: download-baseline
-      continue-on-error: true
-      uses: actions/download-artifact@v4
-      with:
-        name: benchmark-baseline
-        path: ./baseline
+    - name: Check for committed baseline
+      id: check-baseline
+      run: |
+        if [ -d ".benchmarks" ] && ls .benchmarks/*.json 1>/dev/null 2>&1; then
+          echo "has_baseline=true" >> "$GITHUB_OUTPUT"
+          echo "Found committed baseline in .benchmarks/"
+        else
+          echo "has_baseline=false" >> "$GITHUB_OUTPUT"
+          echo "No committed baseline found"
+        fi
 
     - name: Compare with baseline
-      if: steps.download-baseline.outcome == 'success'
+      if: steps.check-baseline.outputs.has_baseline == 'true'
       id: compare
       run: |
         # Install ResultsComparer tool if not present
         dotnet tool install -g BenchmarkDotNet.ResultsComparer || true
 
-        # Compare current results with baseline
+        # Compare current results with committed baseline
         dotnet-results-comparer \
-          --base ./baseline \
-          --diff ./BenchmarkDotNet.Artifacts/results/*.json \
+          --base .benchmarks \
+          --diff ./BenchmarkDotNet.Artifacts/results \
           --threshold 10% \
           --output ./comparison.md || echo "No significant changes"
 
@@ -118,7 +121,7 @@ jobs:
       if: steps.compare.outcome == 'success'
       run: |
         # Fail the build if there are significant performance regressions
-        if grep -q "slower" ./comparison.md; then
+        if [ -f ./comparison.md ] && grep -q "slower" ./comparison.md; then
           echo "⚠️ Performance regression detected!"
           echo "Review the comparison above to see which benchmarks regressed."
           exit 1

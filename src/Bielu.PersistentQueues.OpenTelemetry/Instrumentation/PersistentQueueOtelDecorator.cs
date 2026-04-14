@@ -6,6 +6,7 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics;
 using Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing;
+using Bielu.PersistentQueues.Partitioning;
 using Bielu.PersistentQueues.Storage;
 
 namespace Bielu.PersistentQueues.OpenTelemetry.Instrumentation;
@@ -56,13 +57,27 @@ public class PersistentQueueOtelDecorator : IQueue
             return measurements;
         });
 
-        // Register queue depth gauge — reports message count per queue
+        // Register queue depth gauge — reports message count per logical queue
         _queueDepthGauge = _metrics.CreateQueueDepthGauge(() =>
         {
             var measurements = new List<Measurement<long>>();
-            foreach (var queueName in store.GetAllQueues())
+            var physicalQueueNames = store.GetAllQueues();
+
+            foreach (var queueName in _queue.Queues)
             {
-                var depth = store.GetMessageCount(queueName);
+                long depth;
+                if (_queue is IPartitionedQueue)
+                {
+                    var partitionQueuePrefix = queueName + Partitioning.PartitionConstants.PartitionSeparator;
+                    depth = physicalQueueNames
+                        .Where(pq => pq == queueName || pq.StartsWith(partitionQueuePrefix))
+                        .Sum(store.GetMessageCount);
+                }
+                else
+                {
+                    depth = store.GetMessageCount(queueName);
+                }
+
                 measurements.Add(new Measurement<long>(depth,
                     new KeyValuePair<string, object?>("queue.name", queueName)));
             }
@@ -165,9 +180,10 @@ public class PersistentQueueOtelDecorator : IQueue
             _metrics.RecordBatchSize(batchSize, queueName);
             _metrics.RecordBatchProcessed(queueName);
 
+            var now = DateTime.UtcNow;
             foreach (var msg in messageContext.Messages)
             {
-                var timeInQueue = Math.Max(0, (DateTime.UtcNow - msg.SentAt).TotalMilliseconds);
+                var timeInQueue = Math.Max(0, (now - msg.SentAt).TotalMilliseconds);
                 _metrics.RecordTimeInQueue(timeInQueue, queueName);
             }
 

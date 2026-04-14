@@ -160,9 +160,10 @@ public class PartitionedQueueOtelDecorator : PersistentQueueOtelDecorator, IPart
             _metrics.RecordPartitionReceived(batchSize, queueName, partition);
             _metrics.RecordBatchSize(batchSize, queueName);
 
+            var now = DateTime.UtcNow;
             foreach (var msg in batchContext.Messages)
             {
-                var timeInQueue = Math.Max(0, (DateTime.UtcNow - msg.SentAt).TotalMilliseconds);
+                var timeInQueue = Math.Max(0, (now - msg.SentAt).TotalMilliseconds);
                 _metrics.RecordTimeInQueue(timeInQueue, queueName);
             }
 
