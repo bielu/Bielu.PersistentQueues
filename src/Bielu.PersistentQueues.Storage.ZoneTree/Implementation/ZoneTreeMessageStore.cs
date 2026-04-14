@@ -957,26 +957,18 @@ public class ZoneTreeMessageStore : IMessageStore
     /// <summary>
     /// Streaming enumerable that iterates over ZoneTree entries and deserializes messages.
     /// </summary>
-    private class ZoneTreeMessageEnumerable : IEnumerable<Message>
+    private class ZoneTreeMessageEnumerable(ZoneTreeMessageStore store, string queueName) : IEnumerable<Message>
     {
-        private readonly ZoneTreeMessageStore _store;
-        private readonly string _queueName;
-
         /// <summary>
         /// Initializes a new instance of <see cref="ZoneTreeMessageEnumerable"/> for the specified queue.
         /// </summary>
         /// <param name="queueName">The name of the queue whose persisted messages will be enumerated.</param>
-        public ZoneTreeMessageEnumerable(ZoneTreeMessageStore store, string queueName)
-        {
-            _store = store;
-            _queueName = queueName;
-        }
 
         /// <summary>
         /// Provides an enumerator that iterates persisted, non-deleted messages for the store's captured queue.
         /// </summary>
         /// <returns>An <see cref="IEnumerator{Message}"/> that enumerates persisted messages from the specified queue.</returns>
-        public IEnumerator<Message> GetEnumerator() => new ZoneTreeMessageEnumerator(_store, _queueName);
+        public IEnumerator<Message> GetEnumerator() => new ZoneTreeMessageEnumerator(store, queueName);
 
         /// <summary>
         /// Get a non-generic enumerator that iterates through the messages in the queue.

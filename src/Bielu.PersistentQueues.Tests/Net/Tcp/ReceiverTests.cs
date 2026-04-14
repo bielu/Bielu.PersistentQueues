@@ -18,22 +18,18 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests.Net.Tcp;
 
-public class ReceiverTests : TestBase
+public class ReceiverTests(ITestOutputHelper output) : TestBase(output)
 {
-    public ReceiverTests(ITestOutputHelper output)
-    {
-        Output = output;
-    }
 
     [Fact]
     public async Task stops_listening_on_task_cancellation()
     {
-        await NetworkScenario(async (endpoint, _, _, token, receivingLoop, _) =>
+        await NetworkScenarioAsync(async (endpoint, _, _, token, receivingLoop, _) =>
         {
             var listener = new TcpListener(endpoint);
             Should.Throw<SocketException>(() => listener.Start());
             await token.CancelAsync();
-            await DeterministicDelay(500, CancellationToken.None);
+            await DeterministicDelayAsync(500, CancellationToken.None);
             receivingLoop.IsCompleted.ShouldBe(true);
             listener.Start();
             listener.Stop();
@@ -44,7 +40,7 @@ public class ReceiverTests : TestBase
     [Fact]
     public async Task can_handle_connect_then_disconnect()
     {
-        await NetworkScenario(async (endpoint, _, _, token, receivingLoop, _) =>
+        await NetworkScenarioAsync(async (endpoint, _, _, token, receivingLoop, _) =>
         {
             using (var client = new TcpClient())
             {
@@ -57,7 +53,7 @@ public class ReceiverTests : TestBase
     [Fact]
     public async Task can_handle_sending_three_bytes_then_disconnect()
     {
-        await NetworkScenario(async (endpoint, _, _, token, receivingLoop, _) =>
+        await NetworkScenarioAsync(async (endpoint, _, _, token, receivingLoop, _) =>
         {
             using (var client = new TcpClient())
             {
@@ -71,7 +67,7 @@ public class ReceiverTests : TestBase
     [Fact]
     public async Task accepts_concurrently_connected_clients()
     {
-        await NetworkScenario(async (endpoint, _, _, token, receivingTask, _) =>
+        await NetworkScenarioAsync(async (endpoint, _, _, token, receivingTask, _) =>
         {
             using var client1 = new TcpClient();
             using var client2 = new TcpClient();
@@ -89,7 +85,7 @@ public class ReceiverTests : TestBase
     public async Task receiving_a_valid_message()
     {
         var expected = NewMessage("test");
-        await NetworkScenario(async (endpoint, sender, _, cancellation, _, channel) =>
+        await NetworkScenarioAsync(async (endpoint, sender, _, cancellation, _, channel) =>
         {
             var messages = new List<Message>([expected]);
             using var client = new TcpClient();
@@ -105,7 +101,7 @@ public class ReceiverTests : TestBase
 
     }
 
-    private async Task NetworkScenario(Func<IPEndPoint, SendingProtocol, Receiver, CancellationTokenSource, Task, Channel<Message>, Task> scenario, Message? expected = null)
+    private async Task NetworkScenarioAsync(Func<IPEndPoint, SendingProtocol, Receiver, CancellationTokenSource, Task, Channel<Message>, Task> scenario, Message? expected = null)
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         var endpoint = new IPEndPoint(IPAddress.Loopback, PortFinder.FindPort());
@@ -143,7 +139,7 @@ public class ReceiverTests : TestBase
         var channel = Channel.CreateUnbounded<Message>();
         var receivingTask = Task.Factory.StartNew(() => 
             receiver.StartReceivingAsync(channel.Writer, cancellation.Token), cancellation.Token);
-        await DeterministicDelay(50, CancellationToken.None);
+        await DeterministicDelayAsync(50, CancellationToken.None);
         await scenario(endpoint, sender, receiver, cancellation, receivingTask, channel);
         await cancellation.CancelAsync();
     }

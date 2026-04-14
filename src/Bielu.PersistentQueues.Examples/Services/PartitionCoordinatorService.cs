@@ -52,14 +52,14 @@ internal sealed class PartitionCoordinatorService(
         });
 
         // Park here until the host requests shutdown.
-        try { await Task.Delay(Timeout.Infinite, stoppingToken); }
+        try { await Task.Delay(Timeout.Infinite, stoppingToken).ConfigureAwait(false); }
         catch (OperationCanceledException) { }
 
         // Drain all worker tasks cleanly.
         if (_workersCts is not null)
         {
-            await _workersCts.CancelAsync();
-            try { await Task.WhenAll(_workerTasks); }
+            await _workersCts.CancelAsync().ConfigureAwait(false);
+            try { await Task.WhenAll(_workerTasks).ConfigureAwait(false); }
             catch (OperationCanceledException) { }
             _workersCts.Dispose();
             _workersCts = null;
@@ -108,7 +108,7 @@ internal sealed class PartitionCoordinatorService(
         bool lockAcquired = false;
         try
         {
-            await _scaleLock.WaitAsync(stoppingToken);
+            await _scaleLock.WaitAsync(stoppingToken).ConfigureAwait(false);
             lockAcquired = true;
 
             Console.WriteLine($"\n  [Coordinator] Rescaling to {newCount} worker(s)…");
@@ -116,8 +116,8 @@ internal sealed class PartitionCoordinatorService(
             // Stop current pool.
             if (_workersCts is not null)
             {
-                await _workersCts.CancelAsync();
-                try { await Task.WhenAll(_workerTasks); }
+                await _workersCts.CancelAsync().ConfigureAwait(false);
+                try { await Task.WhenAll(_workerTasks).ConfigureAwait(false); }
                 catch (OperationCanceledException) { }
                 _workersCts.Dispose();
                 _workersCts = null;
@@ -148,7 +148,7 @@ internal sealed class PartitionCoordinatorService(
             if (available.Length == 0)
             {
                 // No work right now — sleep briefly and re-check.
-                try { await Task.Delay(10, ct); }
+                try { await Task.Delay(10, ct).ConfigureAwait(false); }
                 catch (OperationCanceledException) { break; }
                 continue;
             }
@@ -160,7 +160,7 @@ internal sealed class PartitionCoordinatorService(
                 bool lockAcquired = false;
                 try
                 {
-                    await batchLock.WaitAsync(ct);
+                    await batchLock.WaitAsync(ct).ConfigureAwait(false);
                     lockAcquired = true;
 
                     await foreach (var batch in queue.ReceiveBatchFromPartition(
@@ -169,7 +169,7 @@ internal sealed class PartitionCoordinatorService(
                         maxMessages: 50,
                         batchTimeoutInMilliseconds: 10,
                         pollIntervalInMilliseconds: 5,
-                        cancellationToken: ct))
+                        cancellationToken: ct).ConfigureAwait(false))
                     {
                         if (batch.Messages.Length > 0)
                         {

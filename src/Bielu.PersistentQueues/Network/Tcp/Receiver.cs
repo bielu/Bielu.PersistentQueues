@@ -16,7 +16,9 @@ public class Receiver : IDisposable
     private readonly ILogger _logger;
     private bool _disposed;
         
+#pragma warning disable BIELU004 // ILogger is used intentionally to support both DI (ILogger<T>) and builder (ILogger) patterns
     public Receiver(IPEndPoint endpoint, IReceivingProtocol protocol, ILogger logger)
+#pragma warning restore BIELU004
     {
         Endpoint = endpoint;
         _protocol = protocol;

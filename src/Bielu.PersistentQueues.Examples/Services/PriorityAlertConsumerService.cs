@@ -24,7 +24,7 @@ internal sealed class PriorityAlertConsumerService(
             bool lockAcquired = false;
             try
             {
-                await batchLock.WaitAsync(stoppingToken);
+                await batchLock.WaitAsync(stoppingToken).ConfigureAwait(false);
                 lockAcquired = true;
 
                 await foreach (var batch in queue.ReceiveBatch(
@@ -32,7 +32,7 @@ internal sealed class PriorityAlertConsumerService(
                     maxMessages: 10,
                     batchTimeoutInMilliseconds: 100,
                     pollIntervalInMilliseconds: 10,
-                    cancellationToken: stoppingToken))
+                    cancellationToken: stoppingToken).ConfigureAwait(false))
                 {
                     if (batch.Messages.Length > 0)
                     {

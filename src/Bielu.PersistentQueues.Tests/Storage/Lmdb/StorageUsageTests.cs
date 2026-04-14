@@ -5,12 +5,8 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests.Storage.Lmdb;
 
-public class StorageUsageTests : TestBase
+public class StorageUsageTests(ITestOutputHelper output) : TestBase(output)
 {
-    public StorageUsageTests(ITestOutputHelper output)
-    {
-        Output = output;
-    }
 
     [Fact]
     public void get_storage_usage_info_returns_non_null()

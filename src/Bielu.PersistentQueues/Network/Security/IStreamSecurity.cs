@@ -26,5 +26,5 @@ public interface IStreamSecurity
     /// and returns the wrapped stream. The endpoint parameter can be used to determine
     /// endpoint-specific security settings.
     /// </remarks>
-    ValueTask<Stream> Apply(Uri endpoint, Stream stream);
+    ValueTask<Stream> ApplyAsync(Uri endpoint, Stream stream);
 }

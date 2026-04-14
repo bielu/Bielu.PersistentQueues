@@ -102,7 +102,7 @@ public class SendAndReceive
     }
 
     [Benchmark]
-    public async ValueTask Run()
+    public async ValueTask RunAsync()
     {
         for (var i = 0; i < MessageCount; ++i)
         {
@@ -110,6 +110,6 @@ public class SendAndReceive
         }
 
         if(_receivingTask != null)
-            await _receivingTask;
+            await _receivingTask.ConfigureAwait(false);
     }
 }

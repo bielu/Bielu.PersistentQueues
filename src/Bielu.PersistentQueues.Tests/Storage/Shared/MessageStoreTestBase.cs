@@ -10,12 +10,12 @@ namespace Bielu.PersistentQueues.Tests.Storage.Shared;
 /// Abstract base for IMessageStore tests. Concrete derived classes provide
 /// the store instance via <see cref="CreateStore"/> and <see cref="CreateStoreForPath"/>.
 /// </summary>
-public abstract class MessageStoreTestBase
+public abstract class MessageStoreTestBase(ITestOutputHelper? output = null)
 {
     private static readonly string TempBasePath = Path.Combine(
         Path.GetTempPath(), $"pqtests-{Environment.Version}");
 
-    protected ITestOutputHelper? Output { get; set; }
+    protected ITestOutputHelper? Output { get; set; } = output;
 
     /// <summary>
     /// Creates a new IMessageStore rooted at the given path.

@@ -39,7 +39,9 @@ public class Queue : IQueue
     /// <param name="logger">The logger for recording queue operations.</param>
     /// <param name="contentSerializer">The content serializer for strongly-typed message operations. If null, defaults to <see cref="JsonContentSerializer.Default"/>.</param>
     /// <param name="deadLetterOptions">Dead letter queue options. If null, DLQ is enabled by default.</param>
+#pragma warning disable BIELU004 // ILogger is used intentionally to support both DI (ILogger<T>) and builder (ILogger) patterns
     public Queue(Receiver receiver, Sender sender, IMessageStore messageStore, ILogger logger, IContentSerializer? contentSerializer = null, DeadLetterOptions? deadLetterOptions = null)
+#pragma warning restore BIELU004
     {
         _receiver = receiver;
         _sender = sender;
@@ -114,7 +116,7 @@ public class Queue : IQueue
     {
         _logger.QueueStarting();
         var errorPolicy = new SendingErrorPolicy(_logger, Store, _sender.FailedToSend(), _deadLetterOptions);
-        var errorTask = errorPolicy.StartRetries(token);
+        var errorTask = errorPolicy.StartRetriesAsync(token);
         
         // Task to handle retry messages by putting them back into outgoing storage
         var retryTask = Task.Run(async () =>
@@ -387,7 +389,7 @@ public class Queue : IQueue
         {
             try
             {
-                await Task.Delay(timeSpan, _cancelOnDispose.Token);
+                await Task.Delay(timeSpan, _cancelOnDispose.Token).ConfigureAwait(false);
                 if (_cancelOnDispose.IsCancellationRequested)
                     return;
                 Store.StoreIncoming(message);

@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests.Storage.Shared;
 
 /// <summary>
 /// Universal outgoing message tests that run against every IMessageStore provider.
 /// </summary>
-public abstract class OutgoingMessageTests : MessageStoreTestBase
+public abstract class OutgoingMessageTests(ITestOutputHelper? output = null) : MessageStoreTestBase(output)
 {
     [Fact]
     public void happy_path_messages_sent()

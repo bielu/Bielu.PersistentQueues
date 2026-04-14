@@ -17,7 +17,9 @@ public class SendingErrorPolicy
     private readonly Channel<Message> _retries;
     private readonly DeadLetterOptions _deadLetterOptions;
 
+#pragma warning disable BIELU004 // ILogger is used intentionally to support both DI (ILogger<T>) and builder (ILogger) patterns
     public SendingErrorPolicy(ILogger logger, IMessageStore store, Channel<OutgoingMessageFailure> failedToConnect, DeadLetterOptions? deadLetterOptions = null)
+#pragma warning restore BIELU004
     {
         _logger = logger;
         _store = store;
@@ -28,7 +30,7 @@ public class SendingErrorPolicy
 
     public ChannelReader<Message> Retries => _retries.Reader;
 
-    public async ValueTask StartRetries(CancellationToken cancellationToken)
+    public async ValueTask StartRetriesAsync(CancellationToken cancellationToken)
     {
         await foreach (var messageFailure in _failedToConnect.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -36,11 +38,11 @@ public class SendingErrorPolicy
                 break;
             var incrementedMessages = IncrementSentAttempt(messageFailure.Messages).ToList();
             IncrementAttemptAndStoreForRecovery(!messageFailure.ShouldRetry, incrementedMessages);
-            await HandleMessageRetries(messageFailure.ShouldRetry, cancellationToken, incrementedMessages).ConfigureAwait(false);
+            await HandleMessageRetriesAsync(messageFailure.ShouldRetry, cancellationToken, incrementedMessages).ConfigureAwait(false);
         }
     }
 
-    private async Task HandleMessageRetries(bool shouldRetry, CancellationToken cancellationToken, params IEnumerable<Message> messages)
+    private async Task HandleMessageRetriesAsync(bool shouldRetry, CancellationToken cancellationToken, params IEnumerable<Message> messages)
     {
         foreach (var message in messages)
         {

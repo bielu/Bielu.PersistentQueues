@@ -8,17 +8,13 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests;
 
-public class IntegrationTests : TestBase
+public class IntegrationTests(ITestOutputHelper output) : TestBase(output)
 {
-    public IntegrationTests(ITestOutputHelper output)
-    {
-        Output = output;
-    }
 
     [Fact]
     public async Task can_send_and_receive_after_queue_not_found()
     {
-        await QueueScenario(async (receiver, token) =>
+        await QueueScenarioAsync(async (receiver, token) =>
         {
             var senderLogger = new RecordingLogger(OutputWriter);
             using var sender = new QueueConfiguration()
@@ -44,7 +40,7 @@ public class IntegrationTests : TestBase
             received.Message.QueueString.ShouldBe(message2.QueueString);
             received.Message.DataArray.ShouldBe(message2.DataArray);
             
-            await DeterministicDelay(100, token);
+            await DeterministicDelayAsync(100, token);
             senderLogger.ErrorMessages.Any(x => x.Contains("Queue does not exist")).ShouldBeTrue();
         }, TimeSpan.FromSeconds(2), "receiver");
     }

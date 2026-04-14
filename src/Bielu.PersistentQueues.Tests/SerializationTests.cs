@@ -8,12 +8,8 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests;
 
-public class SerializationTests : TestBase
+public class SerializationTests(ITestOutputHelper output) : TestBase(output)
 {
-    public SerializationTests(ITestOutputHelper output)
-    {
-        Output = output;
-    }
 
     [Fact]
     public void can_serialize_and_deserialize_message_as_span()

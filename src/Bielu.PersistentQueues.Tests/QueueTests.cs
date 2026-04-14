@@ -12,23 +12,19 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests;
 
-public class QueueTests : TestBase
+public class QueueTests(ITestOutputHelper output) : TestBase(output)
 {
-    public QueueTests(ITestOutputHelper output)
-    {
-        Output = output;
-    }
 
     [Fact]
     public async Task receive_at_a_later_time()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.ReceiveLater(NewMessage("test"), TimeSpan.FromSeconds(1));
             var receiveTask = queue.Receive("test", cancellationToken: token).FirstAsync(token);
-            await DeterministicDelay(100, token);
+            await DeterministicDelayAsync(100, token);
             receiveTask.IsCompleted.ShouldBeFalse();
-            await DeterministicDelay(2000, token);
+            await DeterministicDelayAsync(2000, token);
             receiveTask.IsCompleted.ShouldBeTrue();
         }, TimeSpan.FromSeconds(4));
     }
@@ -36,13 +32,13 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_at_a_specified_time()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.ReceiveLater(NewMessage("test"), DateTimeOffset.Now.AddSeconds(1));
             var receiveTask = queue.Receive("test", cancellationToken: token).FirstAsync(token);
-            await DeterministicDelay(100, token);
+            await DeterministicDelayAsync(100, token);
             receiveTask.IsCompleted.ShouldBeFalse();
-            await DeterministicDelay(2000, token);
+            await DeterministicDelayAsync(2000, token);
             receiveTask.IsCompleted.ShouldBeTrue();
         }, TimeSpan.FromSeconds(4));
     }
@@ -50,7 +46,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task enqueue_a_message()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var expected = NewMessage("test");
             var receiveTask = queue.Receive("test", cancellationToken: token).FirstAsync(token);
@@ -65,7 +61,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task moving_queues()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.CreateQueue("another");
             var expected = NewMessage("test");
@@ -81,7 +77,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task send_message_to_self()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var message = Message.Create(
                 data: "hello"u8.ToArray(),
@@ -99,7 +95,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task sending_to_bad_endpoint_no_retries_integration_test()
     {
-        await QueueScenario(config =>
+        await QueueScenarioAsync(config =>
             {
                 config.TimeoutNetworkBatchAfter(TimeSpan.FromSeconds(1));
             },
@@ -112,7 +108,7 @@ public class QueueTests : TestBase
                     maxAttempts: 1
                 );
                 queue.Send(message);
-                await DeterministicDelay(5000, token); //connect timeout cancellation, but windows is slow
+                await DeterministicDelayAsync(5000, token); //connect timeout cancellation, but windows is slow
                 var store = (LmdbMessageStore)queue.Store;
                 store.PersistedOutgoing().Any().ShouldBeFalse();
             }, TimeSpan.FromSeconds(10));
@@ -144,7 +140,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task send_batch_of_messages()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             // Create batch of messages for self
             var destination = $"lq.tcp://localhost:{queue.Endpoint.Port}";
@@ -182,7 +178,7 @@ public class QueueTests : TestBase
             payloads.ShouldContain("payload1");
             payloads.ShouldContain("payload2");
             payloads.ShouldContain("payload3");
-            await DeterministicDelay(TimeSpan.FromSeconds(1), token);
+            await DeterministicDelayAsync(TimeSpan.FromSeconds(1), token);
             
             // Verify the message store shows they were all sent
             var store = (LmdbMessageStore)queue.Store;
@@ -193,7 +189,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_from_multiple_queues_concurrently()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             // Create multiple queues
             queue.CreateQueue("queue1");
@@ -232,7 +228,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task get_all_queue_names()
     {
-        await QueueScenario((queue, token) =>
+        await QueueScenarioAsync((queue, token) =>
         {
             // Create multiple queues
             queue.CreateQueue("queue1");
@@ -257,7 +253,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_of_enqueued_messages()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.Enqueue(NewMessage("test", "msg1"));
             queue.Enqueue(NewMessage("test", "msg2"));
@@ -276,7 +272,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_with_max_messages_limit()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.Enqueue(NewMessage("test", "msg1"));
             queue.Enqueue(NewMessage("test", "msg2"));
@@ -291,7 +287,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_returns_empty_on_timeout_when_no_messages()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, token);
@@ -308,7 +304,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_yields_multiple_batches_as_messages_arrive()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.Enqueue(NewMessage("test", "first"));
             
@@ -339,7 +335,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_respects_cancellation_token()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.Enqueue(NewMessage("test", "msg1"));
             
@@ -360,7 +356,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_with_timeout_collects_messages_over_window()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             // Enqueue first message immediately
             queue.Enqueue(NewMessage("test", "msg1"));
@@ -368,7 +364,7 @@ public class QueueTests : TestBase
             // Enqueue second message after 200ms — within the 500ms timeout window
             _ = Task.Run(async () =>
             {
-                await DeterministicDelay(200, token);
+                await DeterministicDelayAsync(200, token);
                 queue.Enqueue(NewMessage("test", "msg2"));
             }, token);
             
@@ -392,7 +388,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_without_timeout_yields_immediately()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             // Enqueue one message
             queue.Enqueue(NewMessage("test", "msg1"));
@@ -410,7 +406,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_timeout_does_not_yield_empty_batches()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             // With a short timeout and no messages, the stream should not yield empty batches
             using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(600));
@@ -431,7 +427,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_timeout_with_max_messages_yields_early_when_full()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             // Enqueue 3 messages
             queue.Enqueue(NewMessage("test", "msg1"));
@@ -455,7 +451,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_timeout_alone_waits_for_window()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             // Enqueue a message immediately
             queue.Enqueue(NewMessage("test", "msg1"));
@@ -477,16 +473,16 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_timeout_collects_late_arriving_messages()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             // Enqueue messages at different times within the timeout window
             queue.Enqueue(NewMessage("test", "msg1"));
             
             _ = Task.Run(async () =>
             {
-                await DeterministicDelay(100, token);
+                await DeterministicDelayAsync(100, token);
                 queue.Enqueue(NewMessage("test", "msg2"));
-                await DeterministicDelay(100, token);
+                await DeterministicDelayAsync(100, token);
                 queue.Enqueue(NewMessage("test", "msg3"));
             }, token);
             
@@ -506,7 +502,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_either_max_or_timeout_whichever_first()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             // Only 1 message available — maxMessages=30 won't be reached,
             // so timeout (300ms) should trigger the yield.
@@ -529,7 +525,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_receive_later_subset_of_messages()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.Enqueue(NewMessage("test", "process-now"));
             queue.Enqueue(NewMessage("test", "defer-me"));
@@ -562,7 +558,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_receive_later_subset_with_datetimeoffset()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.Enqueue(NewMessage("test", "process-now"));
             queue.Enqueue(NewMessage("test", "defer-me"));
@@ -588,7 +584,7 @@ public class QueueTests : TestBase
     [Fact]
     public async Task receive_batch_move_subset_of_messages()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.CreateQueue("other");
             queue.Enqueue(NewMessage("test", "stay"));

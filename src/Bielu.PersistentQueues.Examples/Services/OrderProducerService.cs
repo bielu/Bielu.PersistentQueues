@@ -48,7 +48,7 @@ internal sealed class OrderProducerService(
                 stats.IncrementPrioritySent();
             }
 
-            await Task.Delay(10, stoppingToken);
+            await Task.Delay(10, stoppingToken).ConfigureAwait(false);
         }
     }
 }

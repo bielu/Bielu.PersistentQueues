@@ -1,6 +1,7 @@
 using System.Linq;
 using Shouldly;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests.Storage.Shared;
 
@@ -8,7 +9,7 @@ namespace Bielu.PersistentQueues.Tests.Storage.Shared;
 /// Universal message store tests that run against every IMessageStore provider.
 /// Derive from this class and implement <see cref="MessageStoreTestBase.CreateStoreForPath"/> for each provider.
 /// </summary>
-public abstract class MessageStoreTests : MessageStoreTestBase
+public abstract class MessageStoreTests(ITestOutputHelper? output = null) : MessageStoreTestBase(output)
 {
     [Fact]
     public void getting_all_queues()

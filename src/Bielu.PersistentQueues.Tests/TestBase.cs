@@ -10,13 +10,13 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests;
 
-public class TestBase
+public class TestBase(ITestOutputHelper? output = null)
 {
    private static readonly string _tempPath = Path.Combine(Path.GetTempPath(), $"lightningqueuestests-{Environment.Version.ToString()}");
-   protected ITestOutputHelper? Output { get; set; }
+   protected ITestOutputHelper? Output { get; set; } = output;
    protected TextWriter? OutputWriter => Output != null ? new TestOutputHelperWriter(Output) : null;
 
-   protected static Task DeterministicDelay(int delayMs, CancellationToken token)
+   protected static Task DeterministicDelayAsync(int delayMs, CancellationToken token)
    {
        if (token.IsCancellationRequested)
            return Task.FromCanceled(token);
@@ -38,12 +38,12 @@ public class TestBase
        return tcs.Task;
    }
    
-   protected static Task DeterministicDelay(TimeSpan delay, CancellationToken token)
+   protected static Task DeterministicDelayAsync(TimeSpan delay, CancellationToken token)
    {
-       return DeterministicDelay((int)delay.TotalMilliseconds, token);
+       return DeterministicDelayAsync((int)delay.TotalMilliseconds, token);
    }
 
-   protected async Task QueueScenario(Action<QueueConfiguration> queueBuilder,
+   protected async Task QueueScenarioAsync(Action<QueueConfiguration> queueBuilder,
       Func<IQueue, CancellationToken, Task> scenario, TimeSpan timeout, string queueName = "test")
    {
       using var cancellation = new CancellationTokenSource(timeout);
@@ -59,21 +59,21 @@ public class TestBase
       await cancellation.CancelAsync();
    }
    
-   protected Task QueueScenario(Action<QueueConfiguration> queueBuilder,
+   protected Task QueueScenarioAsync(Action<QueueConfiguration> queueBuilder,
       Func<IQueue, CancellationToken, Task> scenario, string queueName = "test")
    {
-      return QueueScenario(queueBuilder, scenario, TimeSpan.FromSeconds(1), queueName);
+      return QueueScenarioAsync(queueBuilder, scenario, TimeSpan.FromSeconds(1), queueName);
    }
 
-   protected Task QueueScenario(Func<IQueue, CancellationToken, Task> scenario, TimeSpan timeout,
+   protected Task QueueScenarioAsync(Func<IQueue, CancellationToken, Task> scenario, TimeSpan timeout,
       string queueName = "test")
    {
-      return QueueScenario(config => { }, scenario, timeout, queueName);
+      return QueueScenarioAsync(config => { }, scenario, timeout, queueName);
    }
 
-   protected Task QueueScenario(Func<IQueue, CancellationToken, Task> scenario, string queueName = "test")
+   protected Task QueueScenarioAsync(Func<IQueue, CancellationToken, Task> scenario, string queueName = "test")
    {
-      return QueueScenario(scenario, TimeSpan.FromSeconds(1), queueName);
+      return QueueScenarioAsync(scenario, TimeSpan.FromSeconds(1), queueName);
    }
    
    protected void StorageScenario(Action<LmdbMessageStore> action)

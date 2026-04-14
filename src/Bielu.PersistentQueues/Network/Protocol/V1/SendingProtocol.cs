@@ -16,20 +16,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Bielu.PersistentQueues.Network.Protocol.V1;
 
+#pragma warning disable BIELU004 // ILogger is used intentionally to support both DI (ILogger<T>) and builder (ILogger) patterns
 public class SendingProtocol(IMessageStore store, IStreamSecurity security, IMessageSerializer serializer, ILogger logger)
     : ProtocolBase(logger), ISendingProtocol
+#pragma warning restore BIELU004
 {
-    private readonly IMessageStore _store = store;
-    private readonly IStreamSecurity _security = security;
-    private readonly IMessageSerializer _serializer = serializer;
-
     public async ValueTask SendAsync(Uri destination, Stream stream, List<Message> batch, CancellationToken token)
     {
         using var doneCancellation = new CancellationTokenSource();
         using var linkedCancel = CancellationTokenSource.CreateLinkedTokenSource(doneCancellation.Token, token);
         try
         {
-            await SendAsyncImpl(destination, stream, batch, linkedCancel.Token).ConfigureAwait(false);
+            await SendImplAsync(destination, stream, batch, linkedCancel.Token).ConfigureAwait(false);
         }
         finally
         {
@@ -37,11 +35,11 @@ public class SendingProtocol(IMessageStore store, IStreamSecurity security, IMes
         }
     }
 
-    private async ValueTask SendAsyncImpl(Uri destination, Stream stream, List<Message> messages, CancellationToken token)
+    private async ValueTask SendImplAsync(Uri destination, Stream stream, List<Message> messages, CancellationToken token)
     {
-        stream = await _security.Apply(destination, stream).ConfigureAwait(false);
+        stream = await security.ApplyAsync(destination, stream).ConfigureAwait(false);
         
-        var memory = _serializer.ToMemory(messages);
+        var memory = serializer.ToMemory(messages);
 
         var lengthBuffer = ArrayPool<byte>.Shared.Rent(sizeof(int));
         try
@@ -57,17 +55,17 @@ public class SendingProtocol(IMessageStore store, IStreamSecurity security, IMes
         await stream.WriteAsync(memory, token).ConfigureAwait(false);
         Logger.SenderSuccessfullyWroteMessageBatch();
         var pipe = new Pipe();
-        var receiveTask = ReceiveIntoBuffer(pipe.Writer, stream, token);
-        await ReadReceived(pipe.Reader, token).ConfigureAwait(false);
+        var receiveTask = ReceiveIntoBufferAsync(pipe.Writer, stream, token);
+        await ReadReceivedAsync(pipe.Reader, token).ConfigureAwait(false);
         Logger.SenderSuccessfullyReadReceived();
-        var acknowledgeTask = WriteAcknowledgement(stream, token);
+        var acknowledgeTask = WriteAcknowledgementAsync(stream, token);
         await Task.WhenAny(acknowledgeTask.AsTask(), receiveTask.AsTask()).ConfigureAwait(false);
         Logger.SenderSuccessfullyWroteAcknowledgement();
-        _store.SuccessfullySent(messages);
+        store.SuccessfullySent(messages);
         Logger.SenderStorageSuccessfullySent();
     }
 
-    private static async ValueTask ReadReceived(PipeReader reader, CancellationToken token)
+    private static async ValueTask ReadReceivedAsync(PipeReader reader, CancellationToken token)
     {
         var result = await reader.ReadAtLeastAsync(Constants.ReceivedBuffer.Length, token).ConfigureAwait(false);
         var buffer = result.Buffer;
@@ -87,7 +85,7 @@ public class SendingProtocol(IMessageStore store, IStreamSecurity security, IMes
         throw new ProtocolViolationException("Unexpected outcome from send operation");
     }
 
-    private static async ValueTask WriteAcknowledgement(Stream stream, CancellationToken token)
+    private static async ValueTask WriteAcknowledgementAsync(Stream stream, CancellationToken token)
     {
         await stream.WriteAsync(Constants.AcknowledgedMemory, token).ConfigureAwait(false);
     }
@@ -98,7 +96,7 @@ public class SendingProtocol(IMessageStore store, IStreamSecurity security, IMes
         using var linkedCancel = CancellationTokenSource.CreateLinkedTokenSource(doneCancellation.Token, token);
         try
         {
-            await SendRawAsyncImpl(destination, stream, rawMessages, linkedCancel.Token).ConfigureAwait(false);
+            await SendRawImplAsync(destination, stream, rawMessages, linkedCancel.Token).ConfigureAwait(false);
         }
         finally
         {
@@ -106,9 +104,9 @@ public class SendingProtocol(IMessageStore store, IStreamSecurity security, IMes
         }
     }
 
-    private async ValueTask SendRawAsyncImpl(Uri destination, Stream stream, List<RawOutgoingMessage> rawMessages, CancellationToken token)
+    private async ValueTask SendRawImplAsync(Uri destination, Stream stream, List<RawOutgoingMessage> rawMessages, CancellationToken token)
     {
-        stream = await _security.Apply(destination, stream).ConfigureAwait(false);
+        stream = await security.ApplyAsync(destination, stream).ConfigureAwait(false);
 
         // Calculate total payload size: 4-byte count + sum of all message sizes
         var totalSize = 4; // Message count prefix
@@ -153,16 +151,16 @@ public class SendingProtocol(IMessageStore store, IStreamSecurity security, IMes
 
         // Wait for acknowledgment
         var pipe = new Pipe();
-        var receiveTask = ReceiveIntoBuffer(pipe.Writer, stream, token);
-        await ReadReceived(pipe.Reader, token).ConfigureAwait(false);
+        var receiveTask = ReceiveIntoBufferAsync(pipe.Writer, stream, token);
+        await ReadReceivedAsync(pipe.Reader, token).ConfigureAwait(false);
         Logger.SenderSuccessfullyReadReceived();
 
-        var acknowledgeTask = WriteAcknowledgement(stream, token);
+        var acknowledgeTask = WriteAcknowledgementAsync(stream, token);
         await Task.WhenAny(acknowledgeTask.AsTask(), receiveTask.AsTask()).ConfigureAwait(false);
         Logger.SenderSuccessfullyWroteAcknowledgement();
 
         // Delete from storage using raw MessageIds
-        _store.SuccessfullySentByIds(rawMessages.Select(m => m.MessageId));
+        store.SuccessfullySentByIds(rawMessages.Select(m => m.MessageId));
         Logger.SenderStorageSuccessfullySent();
     }
 }

@@ -4,15 +4,9 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests;
 
-public class TestOutputHelperWriter : TextWriter
+public class TestOutputHelperWriter(ITestOutputHelper output) : TextWriter
 {
-    private readonly ITestOutputHelper _output;
     private readonly StringBuilder _buffer = new();
-
-    public TestOutputHelperWriter(ITestOutputHelper output)
-    {
-        _output = output;
-    }
 
     public override Encoding Encoding => Encoding.UTF8;
 
@@ -20,7 +14,7 @@ public class TestOutputHelperWriter : TextWriter
     {
         if (value == '\n')
         {
-            _output.WriteLine(_buffer.ToString());
+            output.WriteLine(_buffer.ToString());
             _buffer.Clear();
         }
         else if (value != '\r')
@@ -42,7 +36,7 @@ public class TestOutputHelperWriter : TextWriter
     public override void WriteLine(string? value)
     {
         Write(value);
-        _output.WriteLine(_buffer.ToString());
+        output.WriteLine(_buffer.ToString());
         _buffer.Clear();
     }
 
@@ -50,7 +44,7 @@ public class TestOutputHelperWriter : TextWriter
     {
         if (disposing && _buffer.Length > 0)
         {
-            _output.WriteLine(_buffer.ToString());
+            output.WriteLine(_buffer.ToString());
             _buffer.Clear();
         }
         base.Dispose(disposing);

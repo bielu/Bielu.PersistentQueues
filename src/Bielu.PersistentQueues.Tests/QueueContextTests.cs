@@ -9,17 +9,13 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests;
 
-public class QueueContextTests : TestBase
+public class QueueContextTests(ITestOutputHelper output) : TestBase(output)
 {
-    public QueueContextTests(ITestOutputHelper output)
-    {
-        Output = output;
-    }
 
     [Fact]
     public async Task SuccessfullyReceived_RemovesMessageFromQueue()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var message = NewMessage("test");
             queue.Enqueue(message);
@@ -40,7 +36,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task MoveTo_MovesMessageToAnotherQueue()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.CreateQueue("another");
             var message = NewMessage("test");
@@ -62,7 +58,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task Send_EnqueuesOutgoingMessage()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.CreateQueue("response");
             
@@ -88,7 +84,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task ReceiveLater_WithTimeSpan_DelaysProcessing()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var message = NewMessage("test");
             queue.Enqueue(message);
@@ -103,7 +99,7 @@ public class QueueContextTests : TestBase
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").Any().ShouldBeFalse();
             
-            await DeterministicDelay(1000, token);
+            await DeterministicDelayAsync(1000, token);
             
             var delayedMessage = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             delayedMessage.Message.Id.ShouldBe(messageId);
@@ -113,7 +109,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task MessageId_RemainsConstant_AcrossMultipleReads()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             // Create a message with a specific ID
             var originalMessage = Message.Create(
@@ -133,7 +129,7 @@ public class QueueContextTests : TestBase
             ctx1.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(100));
             ctx1.QueueContext.CommitChanges();
 
-            await DeterministicDelay(200, token);
+            await DeterministicDelayAsync(200, token);
 
             // Second read - should have exact same ID
             var ctx2 = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
@@ -145,7 +141,7 @@ public class QueueContextTests : TestBase
             ctx2.QueueContext.ReceiveLater(TimeSpan.FromMilliseconds(100));
             ctx2.QueueContext.CommitChanges();
 
-            await DeterministicDelay(200, token);
+            await DeterministicDelayAsync(200, token);
 
             // Third read - should still have exact same ID
             var ctx3 = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
@@ -161,7 +157,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task ReceiveLater_WithDateTimeOffset_DelaysProcessing()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var message = NewMessage("test");
             queue.Enqueue(message);
@@ -177,7 +173,7 @@ public class QueueContextTests : TestBase
             var store = (LmdbMessageStore)queue.Store;
             store.PersistedIncoming("test").Any().ShouldBeFalse();
             
-            await DeterministicDelay(1000, token);
+            await DeterministicDelayAsync(1000, token);
             
             var delayedMessage = await queue.Receive("test", cancellationToken: token).FirstAsync(token);
             delayedMessage.Message.Id.ShouldBe(messageId);
@@ -187,7 +183,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task Enqueue_AddsMessageToQueue()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var receivedMessage = NewMessage("test");
             queue.Enqueue(receivedMessage);
@@ -211,7 +207,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task CommitChanges_ExecutesAllPendingActions()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.CreateQueue("response");
             
@@ -264,7 +260,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task BatchContext_RemovesAllMessagesFromQueue()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var msg1 = NewMessage("test", "msg1");
             var msg2 = NewMessage("test", "msg2");
@@ -292,7 +288,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task BatchContext_MovesAllMessagesToAnotherQueue()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.CreateQueue("other");
             queue.Enqueue(NewMessage("test", "msg1"));
@@ -318,7 +314,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task BatchContext_ExposesAllMessages()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.Enqueue(NewMessage("test", "msg1"));
             queue.Enqueue(NewMessage("test", "msg2"));
@@ -339,7 +335,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task BatchContext_SingleMessageBatch()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.Enqueue(NewMessage("test", "msg1"));
             
@@ -357,7 +353,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task SingleReceive_StillUsesPerMessageContext()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var message = NewMessage("test");
             queue.Enqueue(message);
@@ -376,7 +372,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task BatchContext_MovesSubsetOfMessagesToAnotherQueue()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.CreateQueue("moved");
             
@@ -424,7 +420,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task BatchContext_ReceiveLaterSubsetOfMessages()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var msg1 = NewMessage("test", "msg1");
             var msg2 = NewMessage("test", "msg2");
@@ -456,7 +452,7 @@ public class QueueContextTests : TestBase
             store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg4.Id.MessageIdentifier).ShouldBeFalse();
             
             // Wait for delayed messages to be re-enqueued
-            await DeterministicDelay(1000, token);
+            await DeterministicDelayAsync(1000, token);
             
             // Verify delayed messages reappear
             var delayedMessages = await queue.Receive("test", cancellationToken: token)
@@ -478,7 +474,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task BatchContext_MixMoveToAndReceiveLaterOnDifferentMessages()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             queue.CreateQueue("moved");
             
@@ -527,7 +523,7 @@ public class QueueContextTests : TestBase
             store.PersistedIncoming("test").Any(m => m.Id.MessageIdentifier == msg5.Id.MessageIdentifier).ShouldBeFalse();
             
             // Wait for delayed messages to be re-enqueued
-            await DeterministicDelay(1000, token);
+            await DeterministicDelayAsync(1000, token);
             
             // Verify delayed messages reappear in original queue
             var delayedMessages = await queue.Receive("test", cancellationToken: token)
@@ -550,7 +546,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task BatchContext_ReceiveLaterSubsetThenSuccessfullyReceivedBatch()
     {
-        await QueueScenario(async (queue, token) =>
+        await QueueScenarioAsync(async (queue, token) =>
         {
             var msg1 = NewMessage("test", "msg1");
             var msg2 = NewMessage("test", "msg2");
@@ -576,7 +572,7 @@ public class QueueContextTests : TestBase
             store.PersistedIncoming("test").Any().ShouldBeFalse();
 
             // Wait for delayed message to be re-enqueued
-            await DeterministicDelay(1000, token);
+            await DeterministicDelayAsync(1000, token);
 
             // Only msg1 should reappear
             var delayedMessages = await queue.Receive("test", cancellationToken: token)
@@ -595,7 +591,7 @@ public class QueueContextTests : TestBase
     [Fact]
     public async Task BatchContext_MoveToDeadLetterSubsetThenSuccessfullyReceivedBatch()
     {
-        await QueueScenario(config =>config.WithDeadLetterQueue(),async (queue, token) =>
+        await QueueScenarioAsync(config =>config.WithDeadLetterQueue(),async (queue, token) =>
         {
 
             var msg1 = NewMessage("test", "msg1");

@@ -262,14 +262,9 @@ public class QueueConfiguration
     /// </remarks>
     public IQueue BuildQueue()
     {
-        if (_store == null)
-            throw new ArgumentNullException(nameof(_store), "Storage has not been configured. Are you missing a call to StoreMessagesWith?");
-
-        if (_endpoint == null)
-            throw new ArgumentNullException(nameof(_endpoint), "Endpoint has not been configured. Are you missing a call to ReceiveMessageAt?");
-
-        if (_logger == null)
-            throw new ArgumentNullException(nameof(_logger), "Logger has not been configured. Are you missing a call to LogWith or WithDefaults?");
+        ArgumentNullException.ThrowIfNull(_store, nameof(_store));
+        ArgumentNullException.ThrowIfNull(_endpoint, nameof(_endpoint));
+        ArgumentNullException.ThrowIfNull(_logger, nameof(_logger));
 
         if (_sendingSecurity == null || _receivingSecurity == null)
             throw new ArgumentNullException(nameof(_sendingSecurity), "Security has not been configured. Are you missing a call to SecureTransportWith or WithDefaults?");

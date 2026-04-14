@@ -9,7 +9,9 @@ using Bielu.PersistentQueues.Serialization;
 
 namespace Bielu.PersistentQueues.Storage.LMDB;
 
+#pragma warning disable BIELU010 // LmdbMessageStore is not a wrapper - it's a full IMessageStore implementation using LightningDB
 public class LmdbMessageStore : IMessageStore
+#pragma warning restore BIELU010
 {
     private const string OutgoingQueue = "outgoing";
     private readonly ReaderWriterLockSlim _lock;
@@ -489,20 +491,11 @@ public class LmdbMessageStore : IMessageStore
     }
 
     // Streaming enumeration that yields messages one at a time for better memory efficiency
-    private class MessageEnumerable : IEnumerable<Message>
+    private class MessageEnumerable(LmdbMessageStore store, string queueName) : IEnumerable<Message>
     {
-        private readonly LmdbMessageStore _store;
-        private readonly string _queueName;
-
-        public MessageEnumerable(LmdbMessageStore store, string queueName)
-        {
-            _store = store;
-            _queueName = queueName;
-        }
-
         public IEnumerator<Message> GetEnumerator()
         {
-            return new MessageEnumerator(_store, _queueName);
+            return new MessageEnumerator(store, queueName);
         }
 
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
@@ -604,18 +597,9 @@ public class LmdbMessageStore : IMessageStore
         }
     }
 
-    private class RawOutgoingMessageEnumerable : IEnumerable<RawOutgoingMessage>
+    private class RawOutgoingMessageEnumerable(LmdbMessageStore store, string queueName) : IEnumerable<RawOutgoingMessage>
     {
-        private readonly LmdbMessageStore _store;
-        private readonly string _queueName;
-
-        public RawOutgoingMessageEnumerable(LmdbMessageStore store, string queueName)
-        {
-            _store = store;
-            _queueName = queueName;
-        }
-
-        public IEnumerator<RawOutgoingMessage> GetEnumerator() => new RawOutgoingMessageEnumerator(_store, _queueName);
+        public IEnumerator<RawOutgoingMessage> GetEnumerator() => new RawOutgoingMessageEnumerator(store, queueName);
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
 

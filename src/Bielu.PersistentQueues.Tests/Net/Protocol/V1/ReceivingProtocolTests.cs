@@ -17,17 +17,13 @@ using Xunit.Abstractions;
 
 namespace Bielu.PersistentQueues.Tests.Net.Protocol.V1;
 
-public class ReceivingProtocolTests : TestBase
+public class ReceivingProtocolTests(ITestOutputHelper output) : TestBase(output)
 {
-    public ReceivingProtocolTests(ITestOutputHelper output)
-    {
-        Output = output;
-    }
 
     [Fact]
     public async Task client_sending_negative_length_is_ignored()
     {
-        await ReceivingScenario(async (protocol, _, token) =>
+        await ReceivingScenarioAsync(async (protocol, _, token) =>
         {
             using var ms = new MemoryStream();
             ms.Write(BitConverter.GetBytes(-2), 0, 4);
@@ -39,7 +35,7 @@ public class ReceivingProtocolTests : TestBase
     [Fact]
     public async Task handling_disconnects_mid_protocol_gracefully()
     {
-        await ReceivingScenario(async (protocol, _, token) =>
+        await ReceivingScenarioAsync(async (protocol, _, token) =>
         {
             using var ms = new MemoryStream();
             ms.Write(BitConverter.GetBytes(29));
@@ -54,9 +50,9 @@ public class ReceivingProtocolTests : TestBase
     [Fact]
     public async Task handling_valid_length()
     {
-        await ReceivingScenario(async (protocol, logger, token) =>
+        await ReceivingScenarioAsync(async (protocol, logger, token) =>
         {
-            await RunLengthTest(protocol, 0, token);
+            await RunLengthTestAsync(protocol, 0, token);
             logger.DebugMessages.Any(x => x.StartsWith("Received length")).ShouldBeTrue();
         });
     }
@@ -64,10 +60,10 @@ public class ReceivingProtocolTests : TestBase
     [Fact]
     public async Task sending_shorter_length_than_payload_length()
     {
-        await ReceivingScenario(async (protocol, _, token) =>
+        await ReceivingScenarioAsync(async (protocol, _, token) =>
         {
             var ex = await Should.ThrowAsync<ProtocolViolationException>(async () =>
-                await RunLengthTest(protocol, -2, token));
+                await RunLengthTestAsync(protocol, -2, token));
             ex.Message.ShouldBe("Protocol violation: received length of 70 bytes, but 72 bytes were available");
         });
     }
@@ -75,15 +71,15 @@ public class ReceivingProtocolTests : TestBase
     [Fact]
     public async Task sending_longer_length_than_payload_length()
     {
-        await ReceivingScenario(async (protocol, _, token) =>
+        await ReceivingScenarioAsync(async (protocol, _, token) =>
         {
             var ex = await Should.ThrowAsync<ProtocolViolationException>(async () =>
-                await RunLengthTest(protocol, 5, token));
+                await RunLengthTestAsync(protocol, 5, token));
             ex.Message.ShouldBe("Protocol violation: received length of 77 bytes, but 72 bytes were available");
         });
     }
 
-    private async Task RunLengthTest(IReceivingProtocol protocol, int differenceFromActualLength, CancellationToken token)
+    private async Task RunLengthTestAsync(IReceivingProtocol protocol, int differenceFromActualLength, CancellationToken token)
     {
         var message = Message.Create(
             data: "hello"u8.ToArray(),
@@ -101,7 +97,7 @@ public class ReceivingProtocolTests : TestBase
     [Fact]
     public async Task sending_to_a_queue_that_doesnt_exist()
     {
-        await ReceivingScenario(async (protocol, _, token) =>
+        await ReceivingScenarioAsync(async (protocol, _, token) =>
         {
             var message = Message.Create(
                 data: "hello"u8.ToArray(),
@@ -123,7 +119,7 @@ public class ReceivingProtocolTests : TestBase
     [Fact]
     public async Task sending_data_that_is_cannot_be_deserialized()
     {
-        await ReceivingScenario(async (protocol, _, token) =>
+        await ReceivingScenarioAsync(async (protocol, _, token) =>
         {
             using var ms = new MemoryStream();
             ms.Write(BitConverter.GetBytes(215), 0, 4);
@@ -146,19 +142,19 @@ public class ReceivingProtocolTests : TestBase
     [Fact]
     public async Task supports_ability_to_cancel_for_slow_clients()
     {
-        await ReceivingScenario(async (protocol, logger, _) =>
+        await ReceivingScenarioAsync(async (protocol, logger, _) =>
         {
             var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
             using var ms = new MemoryStream();
             var msgs = protocol.ReceiveMessagesAsync(ms, cts.Token);
-            await DeterministicDelay(TimeSpan.FromMilliseconds(200), CancellationToken.None);
+            await DeterministicDelayAsync(TimeSpan.FromMilliseconds(200), CancellationToken.None);
             ms.Write(BitConverter.GetBytes(5));
             cts.Token.IsCancellationRequested.ShouldBe(true);
             logger.DebugMessages.ShouldBeEmpty();
         });
     }
 
-    private async Task ReceivingScenario(Func<ReceivingProtocol, RecordingLogger, CancellationToken, Task> scenario)
+    private async Task ReceivingScenarioAsync(Func<ReceivingProtocol, RecordingLogger, CancellationToken, Task> scenario)
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(1));
         var logger = new RecordingLogger(OutputWriter);
