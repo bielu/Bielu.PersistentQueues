@@ -43,7 +43,10 @@ public class ZoneTreeTransaction(ReaderWriterLockSlim storeLock, object owner) :
             throw new InvalidOperationException("Cannot add operations to a committed transaction.");
         if (_disposed)
             throw new ObjectDisposedException(nameof(ZoneTreeTransaction));
-        _pendingOperations.Add(operation);
+        lock (_pendingOperations)
+        {
+            _pendingOperations.Add(operation);
+        }
     }
 
     /// <summary>
@@ -68,10 +71,25 @@ public class ZoneTreeTransaction(ReaderWriterLockSlim storeLock, object owner) :
         {
             // Process operations one at a time, removing each after successful execution
             // so that a retry after partial failure does not replay already-applied operations.
-            while (_pendingOperations.Count > 0)
+            // Access to _pendingOperations is locked since AddOperation/Commit/Dispose can race
+            // if the transaction is (mis)used from more than one thread.
+            while (true)
             {
-                _pendingOperations[0]();
-                _pendingOperations.RemoveAt(0);
+                Action operation;
+                lock (_pendingOperations)
+                {
+                    if (_pendingOperations.Count == 0)
+                        break;
+                    operation = _pendingOperations[0];
+                }
+
+                operation();
+
+                lock (_pendingOperations)
+                {
+                    if (_pendingOperations.Count > 0)
+                        _pendingOperations.RemoveAt(0);
+                }
             }
         }
         finally
@@ -96,6 +114,9 @@ public class ZoneTreeTransaction(ReaderWriterLockSlim storeLock, object owner) :
             return;
 
         _disposed = true;
-        _pendingOperations.Clear();
+        lock (_pendingOperations)
+        {
+            _pendingOperations.Clear();
+        }
     }
 }

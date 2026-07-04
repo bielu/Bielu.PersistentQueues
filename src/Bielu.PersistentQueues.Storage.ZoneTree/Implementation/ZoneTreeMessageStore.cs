@@ -240,24 +240,17 @@ public class ZoneTreeMessageStore : IMessageStore
     {
         CheckDisposed();
 
-        // The read lock is held only long enough to resolve the tree and create the iterator,
-        // coordinating with queue creation/deletion; it is not held across the full enumeration
-        // (this is a yield-return iterator method, so a lock acquired in a try/finally around the
-        // loop would otherwise stay held for the entire consumption of the sequence).
-        IZoneTreeIterator<Guid, Memory<byte>> iterator;
+        // The read lock is held for the full enumeration, not just iterator creation, so the
+        // tree cannot be dropped/disposed (which requires the write lock) while a caller is
+        // still iterating it. This is safe to hold for the whole sequence because data
+        // operations (Upsert/ForceDelete/TryGet) also take the read lock and can run
+        // concurrently with any number of other read-lock holders; only queue lifecycle
+        // operations (CreateQueue/DeleteQueue/Dispose) are blocked until enumeration completes.
         _lock.EnterReadLock();
         try
         {
             var tree = GetTree(OutgoingQueue);
-            iterator = tree.CreateIterator();
-        }
-        finally
-        {
-            _lock.ExitReadLock();
-        }
-
-        using (iterator)
-        {
+            using var iterator = tree.CreateIterator();
             while (iterator.Next())
             {
                 var value = iterator.CurrentValue;
@@ -280,6 +273,10 @@ public class ZoneTreeMessageStore : IMessageStore
                     FullMessage = messageBytes
                 };
             }
+        }
+        finally
+        {
+            _lock.ExitReadLock();
         }
     }
 
@@ -998,6 +995,7 @@ public class ZoneTreeMessageStore : IMessageStore
         private readonly ZoneTreeMessageStore _store;
         private readonly string _queueName;
         private IZoneTreeIterator<Guid, Memory<byte>>? _iterator;
+        private bool _lockHeld;
         private bool _disposed;
 
         /// <summary>
@@ -1013,19 +1011,24 @@ public class ZoneTreeMessageStore : IMessageStore
         }
 
         /// <summary>
-        /// Resolves the tree for the enumerator's queue and creates its iterator.
+        /// Resolves the tree for the enumerator's queue and creates its iterator, holding the
+        /// store's read lock for the enumerator's full lifetime.
         /// </summary>
         /// <remarks>
-        /// The store's read lock is held only long enough to resolve the tree and create the
-        /// iterator, coordinating with queue creation/deletion; it is not held for the
-        /// enumerator's full lifetime. ZoneTree's iterator manages its own segment attachment
-        /// once created. On failure the method will clean up any partial state and rethrow the
-        /// original exception.
+        /// The read lock is held from here until <see cref="Cleanup"/> runs (via Dispose or
+        /// Reset), not just while creating the iterator, so the tree cannot be dropped or
+        /// disposed (which requires the write lock) while this enumerator is still active. This
+        /// is cheap because data operations (Upsert/ForceDelete/TryGet) also take the read lock
+        /// and run concurrently with any number of read-lock holders; only queue lifecycle
+        /// operations (CreateQueue/DeleteQueue/Dispose) are blocked until enumeration completes.
+        /// On failure the method will clean up any partial state (including releasing the lock)
+        /// and rethrow the original exception.
         /// </remarks>
         /// <exception cref="Exception">Propagates any exception thrown while retrieving the tree or creating the iterator.</exception>
         private void Initialize()
         {
             _store._lock.EnterReadLock();
+            _lockHeld = true;
             try
             {
                 var tree = _store.GetTree(_queueName);
@@ -1035,10 +1038,6 @@ public class ZoneTreeMessageStore : IMessageStore
             {
                 Cleanup();
                 throw;
-            }
-            finally
-            {
-                _store._lock.ExitReadLock();
             }
         }
 
@@ -1086,7 +1085,7 @@ public class ZoneTreeMessageStore : IMessageStore
         }
 
         /// <summary>
-        /// Disposes the current zone-tree iterator and clears the iterator reference.
+        /// Disposes the current zone-tree iterator, releases the store's read lock if held, and clears the iterator reference.
         /// </summary>
         private void Cleanup()
         {
@@ -1097,6 +1096,11 @@ public class ZoneTreeMessageStore : IMessageStore
             finally
             {
                 _iterator = null;
+                if (_lockHeld)
+                {
+                    _lockHeld = false;
+                    _store._lock.ExitReadLock();
+                }
             }
         }
 
