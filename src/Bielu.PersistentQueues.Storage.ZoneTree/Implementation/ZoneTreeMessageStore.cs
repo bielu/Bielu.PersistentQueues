@@ -5,9 +5,9 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using Tenray.ZoneTree;
-using Tenray.ZoneTree.Comparers;
-using Tenray.ZoneTree.Serializers;
+using ZoneTree;
+using ZoneTree.Comparers;
+using ZoneTree.Serializers;
 using Bielu.PersistentQueues.Serialization;
 
 namespace Bielu.PersistentQueues.Storage.ZoneTree;

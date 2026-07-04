@@ -2,8 +2,8 @@ using System.Diagnostics;
 using BenchmarkDotNet.Attributes;
 using FASTER.core;
 using LightningDB;
-using Tenray.ZoneTree;
-using Tenray.ZoneTree.Serializers;
+using ZoneTree;
+using ZoneTree.Serializers;
 
 namespace Bielu.PersistentQueues.Benchmarks;
 
