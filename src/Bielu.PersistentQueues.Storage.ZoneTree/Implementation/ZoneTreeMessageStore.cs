@@ -17,6 +17,16 @@ namespace Bielu.PersistentQueues.Storage.ZoneTree;
 /// Uses a separate ZoneTree instance per queue, with Guid keys and Memory&lt;byte&gt; values.
 /// Uses ZoneTree's built-in ByteArraySerializer for value serialization.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <see cref="_lock"/> coordinates tree lifecycle only (creation, deletion, and disposal of
+/// per-queue trees), not data access. ZoneTree's own read/write APIs (Upsert, ForceDelete,
+/// TryGet, iteration) are already safe for concurrent use, so data operations take a shared
+/// read lock purely to ensure the tree they operate on isn't dropped mid-call; only
+/// <see cref="CreateQueue"/>, <see cref="DeleteQueue"/>, and <see cref="Dispose()"/> take the
+/// exclusive write lock, since those mutate the set of trees itself.
+/// </para>
+/// </remarks>
 public class ZoneTreeMessageStore : IMessageStore
 {
     private const string OutgoingQueue = "outgoing";
@@ -54,7 +64,7 @@ public class ZoneTreeMessageStore : IMessageStore
     public ZoneTreeMessageStore(string dataDirectory, IMessageSerializer serializer,
         ZoneTreeStorageOptions? options)
     {
-        _lock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
+        _lock = new ReaderWriterLockSlim();
         _dataDirectory = dataDirectory;
         _serializer = serializer;
         _options = options ?? new ZoneTreeStorageOptions();
@@ -76,23 +86,14 @@ public class ZoneTreeMessageStore : IMessageStore
     public string Path => _dataDirectory;
 
     /// <summary>
-    /// Begins a new store transaction while acquiring the store's write lock for exclusive access.
+    /// Begins a new store transaction that buffers operations until <see cref="IStoreTransaction.Commit"/> is called.
     /// </summary>
-    /// <returns>An <see cref="IStoreTransaction"/> representing the transaction; the store's write lock is held for the transaction's lifetime.</returns>
+    /// <returns>An <see cref="IStoreTransaction"/> representing the transaction.</returns>
     public IStoreTransaction BeginTransaction()
     {
         CheckDisposed();
 
-        _lock.EnterWriteLock();
-        try
-        {
-            return new ZoneTreeTransaction(_lock, this);
-        }
-        catch
-        {
-            _lock.ExitWriteLock();
-            throw;
-        }
+        return new ZoneTreeTransaction(_lock, this);
     }
 
     /// <summary>
@@ -134,7 +135,7 @@ public class ZoneTreeMessageStore : IMessageStore
     {
         CheckDisposed();
 
-        _lock.EnterWriteLock();
+        _lock.EnterReadLock();
         try
         {
             foreach (var group in messages.GroupBy(m => m.QueueString))
@@ -151,7 +152,7 @@ public class ZoneTreeMessageStore : IMessageStore
         }
         finally
         {
-            _lock.ExitWriteLock();
+            _lock.ExitReadLock();
         }
     }
 
@@ -190,7 +191,7 @@ public class ZoneTreeMessageStore : IMessageStore
     {
         CheckDisposed();
 
-        _lock.EnterWriteLock();
+        _lock.EnterReadLock();
         try
         {
             foreach (var group in messages.GroupBy(m => m.QueueString))
@@ -205,7 +206,7 @@ public class ZoneTreeMessageStore : IMessageStore
         }
         finally
         {
-            _lock.ExitWriteLock();
+            _lock.ExitReadLock();
         }
     }
 
@@ -239,11 +240,24 @@ public class ZoneTreeMessageStore : IMessageStore
     {
         CheckDisposed();
 
+        // The read lock is held only long enough to resolve the tree and create the iterator,
+        // coordinating with queue creation/deletion; it is not held across the full enumeration
+        // (this is a yield-return iterator method, so a lock acquired in a try/finally around the
+        // loop would otherwise stay held for the entire consumption of the sequence).
+        IZoneTreeIterator<Guid, Memory<byte>> iterator;
         _lock.EnterReadLock();
         try
         {
             var tree = GetTree(OutgoingQueue);
-            using var iterator = tree.CreateIterator();
+            iterator = tree.CreateIterator();
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+
+        using (iterator)
+        {
             while (iterator.Next())
             {
                 var value = iterator.CurrentValue;
@@ -267,10 +281,6 @@ public class ZoneTreeMessageStore : IMessageStore
                 };
             }
         }
-        finally
-        {
-            _lock.ExitReadLock();
-        }
     }
 
     /// <summary>
@@ -281,7 +291,7 @@ public class ZoneTreeMessageStore : IMessageStore
     {
         CheckDisposed();
 
-        _lock.EnterWriteLock();
+        _lock.EnterReadLock();
         try
         {
             var tree = GetTree(OutgoingQueue);
@@ -293,7 +303,7 @@ public class ZoneTreeMessageStore : IMessageStore
         }
         finally
         {
-            _lock.ExitWriteLock();
+            _lock.ExitReadLock();
         }
     }
 
@@ -411,7 +421,7 @@ public class ZoneTreeMessageStore : IMessageStore
     {
         CheckDisposed();
 
-        _lock.EnterWriteLock();
+        _lock.EnterReadLock();
         try
         {
             var tree = GetTree(OutgoingQueue);
@@ -421,7 +431,7 @@ public class ZoneTreeMessageStore : IMessageStore
         }
         finally
         {
-            _lock.ExitWriteLock();
+            _lock.ExitReadLock();
         }
     }
 
@@ -433,7 +443,7 @@ public class ZoneTreeMessageStore : IMessageStore
     {
         CheckDisposed();
 
-        _lock.EnterWriteLock();
+        _lock.EnterReadLock();
         try
         {
             var tree = GetTree(OutgoingQueue);
@@ -446,7 +456,7 @@ public class ZoneTreeMessageStore : IMessageStore
         }
         finally
         {
-            _lock.ExitWriteLock();
+            _lock.ExitReadLock();
         }
     }
 
@@ -458,7 +468,7 @@ public class ZoneTreeMessageStore : IMessageStore
     {
         CheckDisposed();
 
-        _lock.EnterWriteLock();
+        _lock.EnterReadLock();
         try
         {
             var tree = GetTree(OutgoingQueue);
@@ -471,7 +481,7 @@ public class ZoneTreeMessageStore : IMessageStore
         }
         finally
         {
-            _lock.ExitWriteLock();
+            _lock.ExitReadLock();
         }
     }
 
@@ -491,7 +501,7 @@ public class ZoneTreeMessageStore : IMessageStore
     {
         CheckDisposed();
 
-        _lock.EnterWriteLock();
+        _lock.EnterReadLock();
         try
         {
             var tree = GetTree(OutgoingQueue);
@@ -507,33 +517,39 @@ public class ZoneTreeMessageStore : IMessageStore
                     continue;
                 }
 
-                if (!tree.TryGet(key, out var storedValue))
-                    continue;
+                var capturedMessage = message;
+                var serializer = _serializer;
+                tree.TryAtomicGetAndUpdate(key, out _, (ref Memory<byte> value) =>
+                {
+                    if (value.Length == 0) // Already deleted; nothing to update
+                        return false;
 
-                var msg = _serializer.ToMessage(storedValue.Span);
-                var attempts = message.SentAttempts;
-                if (attempts >= message.MaxAttempts)
-                {
-                    tree.ForceDelete(key);
-                }
-                else if (msg.DeliverBy.HasValue)
-                {
-                    var expire = msg.DeliverBy.Value;
-                    if (expire != DateTime.MinValue && DateTime.Now >= expire)
+                    var msg = serializer.ToMessage(value.Span);
+                    var attempts = capturedMessage.SentAttempts;
+                    if (attempts >= capturedMessage.MaxAttempts)
                     {
-                        tree.ForceDelete(key);
+                        value = Memory<byte>.Empty;
+                        return true;
                     }
-                }
-                else
-                {
-                    Memory<byte> value = _serializer.AsSpan(msg).ToArray();
-                    tree.Upsert(key, value);
-                }
+
+                    if (msg.DeliverBy.HasValue)
+                    {
+                        var expire = msg.DeliverBy.Value;
+                        if (expire != DateTime.MinValue && DateTime.Now >= expire)
+                        {
+                            value = Memory<byte>.Empty;
+                            return true;
+                        }
+                    }
+
+                    value = serializer.AsSpan(msg).ToArray();
+                    return true;
+                });
             }
         }
         finally
         {
-            _lock.ExitWriteLock();
+            _lock.ExitReadLock();
         }
     }
 
@@ -545,7 +561,7 @@ public class ZoneTreeMessageStore : IMessageStore
     {
         CheckDisposed();
 
-        _lock.EnterWriteLock();
+        _lock.EnterReadLock();
         try
         {
             var tree = GetTree(OutgoingQueue);
@@ -556,7 +572,7 @@ public class ZoneTreeMessageStore : IMessageStore
         }
         finally
         {
-            _lock.ExitWriteLock();
+            _lock.ExitReadLock();
         }
     }
 
@@ -608,7 +624,7 @@ public class ZoneTreeMessageStore : IMessageStore
     {
         CheckDisposed();
 
-        _lock.EnterWriteLock();
+        _lock.EnterReadLock();
         try
         {
             foreach (var kvp in _trees)
@@ -631,7 +647,7 @@ public class ZoneTreeMessageStore : IMessageStore
         }
         finally
         {
-            _lock.ExitWriteLock();
+            _lock.ExitReadLock();
         }
     }
 
@@ -997,10 +1013,14 @@ public class ZoneTreeMessageStore : IMessageStore
         }
 
         /// <summary>
-        /// Acquires the store read lock and initializes the zone-tree iterator for the enumerator's queue.
+        /// Resolves the tree for the enumerator's queue and creates its iterator.
         /// </summary>
         /// <remarks>
-        /// On failure the method will clean up any partial state and rethrow the original exception.
+        /// The store's read lock is held only long enough to resolve the tree and create the
+        /// iterator, coordinating with queue creation/deletion; it is not held for the
+        /// enumerator's full lifetime. ZoneTree's iterator manages its own segment attachment
+        /// once created. On failure the method will clean up any partial state and rethrow the
+        /// original exception.
         /// </remarks>
         /// <exception cref="Exception">Propagates any exception thrown while retrieving the tree or creating the iterator.</exception>
         private void Initialize()
@@ -1015,6 +1035,10 @@ public class ZoneTreeMessageStore : IMessageStore
             {
                 Cleanup();
                 throw;
+            }
+            finally
+            {
+                _store._lock.ExitReadLock();
             }
         }
 
@@ -1062,11 +1086,8 @@ public class ZoneTreeMessageStore : IMessageStore
         }
 
         /// <summary>
-        /// Disposes the current zone-tree iterator, releases the store's read lock if held, and clears the iterator reference.
+        /// Disposes the current zone-tree iterator and clears the iterator reference.
         /// </summary>
-        /// <remarks>
-        /// Any <see cref="SynchronizationLockException"/> raised when releasing the lock is ignored.
-        /// </remarks>
         private void Cleanup()
         {
             try
@@ -1075,18 +1096,6 @@ public class ZoneTreeMessageStore : IMessageStore
             }
             finally
             {
-                try
-                {
-                    if (_store._lock.IsReadLockHeld)
-                    {
-                        _store._lock.ExitReadLock();
-                    }
-                }
-                catch (SynchronizationLockException)
-                {
-                    // Lock was already released
-                }
-
                 _iterator = null;
             }
         }

@@ -9,37 +9,27 @@ namespace Bielu.PersistentQueues.Storage.ZoneTree;
 /// and applies them on commit.
 /// </summary>
 /// <remarks>
-/// ZoneTree does not support native multi-tree transactions, so this implementation
-/// buffers operations and executes them sequentially on <see cref="Commit"/>.
-/// If an operation fails mid-commit, earlier operations will have already been applied.
-/// For most queue workloads (single-tree inserts/deletes) this is safe, but cross-tree
-/// moves are handled with a write-first-then-delete strategy to prevent data loss.
+/// ZoneTree's native transactions are scoped to a single tree, while this store uses one
+/// tree per queue, so cross-queue operations like <c>MoveToQueue</c> could never be made
+/// atomic by a native ZoneTree transaction anyway. This type is therefore an ordered,
+/// best-effort batch, not an atomic transaction: operations are applied in order on
+/// <see cref="Commit"/>, and if one fails, earlier operations remain applied. Cross-tree
+/// moves use a write-first-then-delete strategy so the worst case on partial failure is a
+/// duplicate message, never a lost one. On partial failure, successfully-applied operations
+/// are removed from the buffer so a retry will not replay them.
 /// </remarks>
-public class ZoneTreeTransaction : IStoreTransaction
+/// <param name="storeLock">The store's <see cref="ReaderWriterLockSlim"/>, taken as a read lock during Commit so replay cannot race a queue being dropped.</param>
+/// <param name="owner">The store instance that owns this transaction, used for ownership validation.</param>
+public class ZoneTreeTransaction(ReaderWriterLockSlim storeLock, object owner) : IStoreTransaction
 {
-    private readonly ReaderWriterLockSlim _lock;
-    private readonly object _owner;
-    private readonly int _creatingThreadId;
     private readonly List<Action> _pendingOperations = new();
     private volatile bool _committed;
     private volatile bool _disposed;
 
     /// <summary>
-    /// Creates a ZoneTreeTransaction that will buffer operations and coordinate write access using the provided lock.
-    /// </summary>
-    /// <param name="transactionLock">The ReaderWriterLockSlim instance used to coordinate and release write access during the transaction's lifetime.</param>
-    /// <param name="owner">The store instance that owns this transaction, used for ownership validation.</param>
-    internal ZoneTreeTransaction(ReaderWriterLockSlim transactionLock, object owner)
-    {
-        _lock = transactionLock;
-        _owner = owner;
-        _creatingThreadId = Environment.CurrentManagedThreadId;
-    }
-
-    /// <summary>
     /// Gets the owner store instance that created this transaction.
     /// </summary>
-    internal object Owner => _owner;
+    internal object Owner => owner;
 
     /// <summary>
     /// Buffers an operation to be executed when the transaction is committed.
@@ -60,11 +50,10 @@ public class ZoneTreeTransaction : IStoreTransaction
     /// Executes all buffered operations for the transaction and marks the transaction as committed.
     /// </summary>
     /// <remarks>
-    /// ZoneTree does not support native multi-tree transactions. Operations are applied
-    /// in order; if one fails, earlier operations remain applied. Cross-tree moves use
-    /// a write-first-then-delete strategy so the worst case is a duplicate, not data loss.
-    /// On partial failure, successfully-applied operations are removed from the buffer so
-    /// a retry will not replay them.
+    /// Operations are applied in order under the store's read lock, so they run concurrently with
+    /// other readers and writers but cannot race a queue being created or dropped. If one operation
+    /// fails, earlier operations remain applied; successfully-applied operations are removed from the
+    /// buffer so a retry will not replay them.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the transaction has been disposed.</exception>
     public void Commit()
@@ -74,44 +63,39 @@ public class ZoneTreeTransaction : IStoreTransaction
         if (_committed)
             return;
 
-        // Process operations one at a time, removing each after successful execution
-        // so that a retry after partial failure does not replay already-applied operations.
-        while (_pendingOperations.Count > 0)
+        storeLock.EnterReadLock();
+        try
         {
-            _pendingOperations[0]();
-            _pendingOperations.RemoveAt(0);
+            // Process operations one at a time, removing each after successful execution
+            // so that a retry after partial failure does not replay already-applied operations.
+            while (_pendingOperations.Count > 0)
+            {
+                _pendingOperations[0]();
+                _pendingOperations.RemoveAt(0);
+            }
+        }
+        finally
+        {
+            storeLock.ExitReadLock();
         }
 
         _committed = true;
     }
 
     /// <summary>
-    /// Releases transaction resources, clears buffered operations, and releases the associated write lock if held.
+    /// Releases transaction resources and clears any buffered but uncommitted operations.
     /// </summary>
     /// <remarks>
-    /// Suppresses finalization, marks the transaction as disposed, clears the pending operations buffer, and exits the write lock on the associated <see cref="ReaderWriterLockSlim"/> if it is currently held.
-    /// Must be called from the same thread that created the transaction, since <see cref="ReaderWriterLockSlim"/> locks are thread-affine.
+    /// Suppresses finalization, marks the transaction as disposed, and clears the pending operations buffer.
     /// Calling this method multiple times has no additional effect after the first call.
     /// </remarks>
-    /// <exception cref="InvalidOperationException">Thrown if Dispose is called from a different thread than the one that created the transaction.</exception>
     public void Dispose()
     {
         GC.SuppressFinalize(this);
         if (_disposed)
             return;
 
-        if (Environment.CurrentManagedThreadId != _creatingThreadId)
-            throw new InvalidOperationException(
-                $"ZoneTreeTransaction must be disposed on the same thread that created it " +
-                $"(created on thread {_creatingThreadId}, disposing on thread {Environment.CurrentManagedThreadId}). " +
-                $"ReaderWriterLockSlim is thread-affine.");
-
         _disposed = true;
         _pendingOperations.Clear();
-
-        if (_lock.IsWriteLockHeld)
-        {
-            _lock.ExitWriteLock();
-        }
     }
 }
