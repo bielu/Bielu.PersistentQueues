@@ -3,9 +3,9 @@ using FASTER.core;
 using LightningDB;
 using Bielu.PersistentQueues.Serialization;
 using Bielu.PersistentQueues.Storage.LMDB;
-using Tenray.ZoneTree;
-using Tenray.ZoneTree.Comparers;
-using Tenray.ZoneTree.Serializers;
+using ZoneTree;
+using ZoneTree.Comparers;
+using ZoneTree.Serializers;
 
 namespace Bielu.PersistentQueues.Benchmarks;
 
