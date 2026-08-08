@@ -1,0 +1,6 @@
+{
+  "name": "bielu-persistentqueues",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Placeholder package representing the shared version of every Bielu.PersistentQueues NuGet package. Bump this in a changeset for any NuGet change; scripts/apply-nuget-version.mjs projects its version onto version.props. Not published anywhere. Held at 0.0.0 until the first stable release: nothing stable has shipped, every published package so far is a 0.6.0-beta.* prerelease, and the bootstrap `major` changeset takes it 0.0.0 -> 1.0.0 so the first stable version lands on 1.0.0 rather than skipping ahead of it. After that it tracks version.props normally."
+}
