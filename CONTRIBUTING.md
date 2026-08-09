@@ -108,6 +108,10 @@ dotnet test --collect:"XPlat Code Coverage"
    A NuGet package dependency bump (or any dependency change that affects runtime behavior) ships in
    the published packages, so it needs a normal changeset — not an empty one.
 
+   The one exception is the automated **"Version Packages"** PR itself (see
+   [Release Process](#release-process)): it only consumes pending changesets, so it never carries one
+   and is exempt from this check. Every other PR without a changeset fails CI.
+
 5. **Commit your changes** with a clear, descriptive commit message
 
 6. **Push to your fork** and create a pull request against the `main` branch
