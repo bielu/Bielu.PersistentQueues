@@ -28,9 +28,12 @@ jobs:
     with:
       suffix: "pr"
 
-  # Pull request: require a changeset so the version bump + changelog are recorded.
+  # Pull request: require a changeset so the version bump + changelog are recorded. Skipped for the
+  # "Version Packages" PR that changesets/action itself opens (branch changeset-release/main,
+  # configured by versionChangeset.yml's default) — that PR only consumes changesets, it never adds
+  # one, so this check could never pass on it.
   changeset-check:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -154,8 +157,10 @@ jobs:
   # the version's section of CHANGELOG.md (written by the changeset adapter in the Version Packages
   # PR). Created with GITHUB_TOKEN, so it does not itself trigger this workflow again.
   tagRelease:
-    needs: version
-    if: github.event_name == 'push' && needs.version.outputs.hasChangesets == 'false'
+    needs: [ version, releaseStable ]
+    if: >-
+      github.event_name == 'push' && needs.version.outputs.hasChangesets == 'false'
+      && needs.releaseStable.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

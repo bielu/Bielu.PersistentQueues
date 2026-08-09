@@ -100,10 +100,13 @@ dotnet test --collect:"XPlat Code Coverage"
    ```bash
    npx changeset
    ```
-   For CI-only, dependency-only, or documentation-only changes, record an empty changeset instead:
+   For CI-only, development-tooling-dependency, or documentation-only changes, record an empty
+   changeset instead:
    ```bash
    npx changeset add --empty
    ```
+   A NuGet package dependency bump (or any dependency change that affects runtime behavior) ships in
+   the published packages, so it needs a normal changeset — not an empty one.
 
 5. **Commit your changes** with a clear, descriptive commit message
 
@@ -169,9 +172,9 @@ Releases are cut by merging the automated **"Version Packages"** PR that the cha
 open on `main` while unreleased changesets exist:
 
 1. PRs merge to `main`, each carrying a changeset. The bot PR accumulates them into a version bump
-   and changelog entries. Meanwhile every push to `main` also publishes an interim beta prerelease
-   numbered from the version the pending changesets are heading for — not the version already
-   released, so it never sorts below the last stable release.
+   and changelog entries. Meanwhile, each push to `main` while changesets remain pending also
+   publishes an interim beta prerelease, numbered from the version the pending changesets are
+   heading for — not the version already released, so it never sorts below the last stable release.
 2. A maintainer reviews and merges the Version Packages PR.
 3. The workflow then publishes the committed version to NuGet.org and creates the matching
    `vX.Y.Z` GitHub Release.

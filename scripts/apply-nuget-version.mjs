@@ -47,12 +47,20 @@ if (!existsSync(nugetChangelogPath)) {
   process.exit(0);
 }
 
+const escapedVersion = newVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const rootChangelog = readFileSync(rootChangelogPath, "utf8");
+// Re-running against unchanged state (a retried job, or a forgotten second local `npm run
+// version`) must not duplicate the section it already wrote.
+if (new RegExp(`^##\\s+\\[${escapedVersion}\\]`, "m").test(rootChangelog)) {
+  console.log(`CHANGELOG.md already has a section for ${newVersion}; skipping changelog fold.`);
+  process.exit(0);
+}
+
 const nugetChangelog = readFileSync(nugetChangelogPath, "utf8");
 // The generated file looks like:  # bielu-persistentqueues\n\n## X.Y.Z\n\n### Minor Changes\n...
 // Grab the body of the top-most "## X.Y.Z" section for the version we just wrote.
-const sectionRe = new RegExp(
-  `##\\s+${newVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\n([\\s\\S]*?)(?=\\n##\\s+\\d|$)`,
-);
+const sectionRe = new RegExp(`##\\s+${escapedVersion}\\s*\\n([\\s\\S]*?)(?=\\n##\\s+\\d|$)`);
 const match = nugetChangelog.match(sectionRe);
 const body = (match ? match[1] : "").trim();
 if (!body) {
@@ -63,7 +71,6 @@ if (!body) {
 const today = new Date().toISOString().slice(0, 10);
 const entry = `## [${newVersion}] - ${today}\n\n${body}\n`;
 
-const rootChangelog = readFileSync(rootChangelogPath, "utf8");
 const anchor = "## [Unreleased]";
 const idx = rootChangelog.indexOf(anchor);
 if (idx === -1) {
