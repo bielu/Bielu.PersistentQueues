@@ -7,7 +7,7 @@
     <!-- Core dependencies -->
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.10" />
     <PackageVersion Include="LightningDB" Version="0.22.0" />
     <!-- Test frameworks -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
