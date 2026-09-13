@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789215283375,
+  "lastUpdate": 1789283626460,
   "repoUrl": "https://github.com/bielu/Bielu.PersistentQueues",
   "entries": {
     "Regression Benchmarks": [
@@ -4156,6 +4156,172 @@ window.BENCHMARK_DATA = {
             "value": 80384270,
             "unit": "ns",
             "range": "± 1364933.8235111132"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Arkadiusz Biel",
+            "username": "bielu",
+            "email": "2244074+bielu@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "e3da3e517c06524fa70517a8f53cb3cb97b80238",
+          "message": "Merge pull request #72 from bielu/changeset-release/main\n\nchore: version packages",
+          "timestamp": "2026-09-12T12:28:16Z",
+          "url": "https://github.com/bielu/Bielu.PersistentQueues/commit/e3da3e517c06524fa70517a8f53cb3cb97b80238"
+        },
+        "date": 1789283623684,
+        "tool": "benchmarkdotnet",
+        "benches": [
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.Enqueue(MessageCount: 100, MessageDataSize: 64)",
+            "value": 22396031.2,
+            "unit": "ns",
+            "range": "± 1315778.9189870385"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.ReceiveAndAcknowledgeAsync(MessageCount: 100, MessageDataSize: 64)",
+            "value": 26044241.75,
+            "unit": "ns",
+            "range": "± 2114174.9857791453"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.BatchReceiveAndAcknowledgeAsync(MessageCount: 100, MessageDataSize: 64)",
+            "value": 4149863.3,
+            "unit": "ns",
+            "range": "± 676869.205340441"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.ReceiveLaterAsync(MessageCount: 100, MessageDataSize: 64)",
+            "value": 26643692,
+            "unit": "ns",
+            "range": "± 1660191.008847978"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.MoveToAsync(MessageCount: 100, MessageDataSize: 64)",
+            "value": 28789937,
+            "unit": "ns",
+            "range": "± 7014241.539820824"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.BatchMixedOperationsAsync(MessageCount: 100, MessageDataSize: 64)",
+            "value": 4109570.5,
+            "unit": "ns",
+            "range": "± 482041.48776289646"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.Enqueue(MessageCount: 100, MessageDataSize: 512)",
+            "value": 26553444.75,
+            "unit": "ns",
+            "range": "± 694494.7789155198"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.ReceiveAndAcknowledgeAsync(MessageCount: 100, MessageDataSize: 512)",
+            "value": 24178153.5,
+            "unit": "ns",
+            "range": "± 339945.3562701904"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.BatchReceiveAndAcknowledgeAsync(MessageCount: 100, MessageDataSize: 512)",
+            "value": 4246045.75,
+            "unit": "ns",
+            "range": "± 853434.0915475449"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.ReceiveLaterAsync(MessageCount: 100, MessageDataSize: 512)",
+            "value": 27213832.75,
+            "unit": "ns",
+            "range": "± 1268812.4813854818"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.MoveToAsync(MessageCount: 100, MessageDataSize: 512)",
+            "value": 26776766.3,
+            "unit": "ns",
+            "range": "± 1689190.9146815527"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.BatchMixedOperationsAsync(MessageCount: 100, MessageDataSize: 512)",
+            "value": 4467327.5,
+            "unit": "ns",
+            "range": "± 566578.4552636995"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.Enqueue(MessageCount: 1000, MessageDataSize: 64)",
+            "value": 294549723.25,
+            "unit": "ns",
+            "range": "± 30481775.145844687"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.ReceiveAndAcknowledgeAsync(MessageCount: 1000, MessageDataSize: 64)",
+            "value": 281968962.1,
+            "unit": "ns",
+            "range": "± 15565399.869148375"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.BatchReceiveAndAcknowledgeAsync(MessageCount: 1000, MessageDataSize: 64)",
+            "value": 77599150.5,
+            "unit": "ns",
+            "range": "± 1854723.6786445216"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.ReceiveLaterAsync(MessageCount: 1000, MessageDataSize: 64)",
+            "value": 448735248.8,
+            "unit": "ns",
+            "range": "± 104086862.70125145"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.MoveToAsync(MessageCount: 1000, MessageDataSize: 64)",
+            "value": 361316432,
+            "unit": "ns",
+            "range": "± 5087617.382064221"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.BatchMixedOperationsAsync(MessageCount: 1000, MessageDataSize: 64)",
+            "value": 82801310.5,
+            "unit": "ns",
+            "range": "± 1993984.9880251521"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.Enqueue(MessageCount: 1000, MessageDataSize: 512)",
+            "value": 296312324.75,
+            "unit": "ns",
+            "range": "± 6865294.953475408"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.ReceiveAndAcknowledgeAsync(MessageCount: 1000, MessageDataSize: 512)",
+            "value": 342550406.6,
+            "unit": "ns",
+            "range": "± 12206392.811768094"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.BatchReceiveAndAcknowledgeAsync(MessageCount: 1000, MessageDataSize: 512)",
+            "value": 93404214.6,
+            "unit": "ns",
+            "range": "± 7206029.15768482"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.ReceiveLaterAsync(MessageCount: 1000, MessageDataSize: 512)",
+            "value": 534457980.4,
+            "unit": "ns",
+            "range": "± 109950879.18717073"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.MoveToAsync(MessageCount: 1000, MessageDataSize: 512)",
+            "value": 483193846.4,
+            "unit": "ns",
+            "range": "± 9418861.168765936"
+          },
+          {
+            "name": "Bielu.PersistentQueues.Benchmarks.RegressionBenchmark.BatchMixedOperationsAsync(MessageCount: 1000, MessageDataSize: 512)",
+            "value": 99383643.25,
+            "unit": "ns",
+            "range": "± 8942747.491666768"
           }
         ]
       }
