@@ -19,7 +19,7 @@ permissions:
 # rather than @main, so this workflow cannot change behavior out from under a merged PR. Verified
 # revision (2026-08-08): contains versionChangeset.yml, nextVersion.yml, explicit NuGet version
 # overrides, and release workflow outputs.
-# https://github.com/bielu/bielu.GithubActions.Templates/commit/8143c5eb093e33c85bc8982813841a947596c7f9
+# https://github.com/bielu/bielu.GithubActions.Templates/commit/3af716c7a02c7e3ee980329d7a6391adf19b653f
 jobs:
   # Pull request: build/test/pack validation, publish nothing.
   buildPr:
@@ -31,7 +31,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: bielu/bielu.GithubActions.Templates/.github/workflows/ciNoSchema.yml@8143c5eb093e33c85bc8982813841a947596c7f9
+    uses: bielu/bielu.GithubActions.Templates/.github/workflows/ciNoSchema.yml@3af716c7a02c7e3ee980329d7a6391adf19b653f
     with:
       suffix: "pr"
 
@@ -74,7 +74,7 @@ jobs:
     concurrency:
       group: release-main
       cancel-in-progress: false
-    uses: bielu/bielu.GithubActions.Templates/.github/workflows/versionChangeset.yml@8143c5eb093e33c85bc8982813841a947596c7f9
+    uses: bielu/bielu.GithubActions.Templates/.github/workflows/versionChangeset.yml@3af716c7a02c7e3ee980329d7a6391adf19b653f
     with:
       working-directory: .
 
@@ -88,7 +88,7 @@ jobs:
       always() && !cancelled()
       && (github.event_name == 'workflow_dispatch'
           || (github.event_name == 'push' && needs.version.outputs.hasChangesets == 'true'))
-    uses: bielu/bielu.GithubActions.Templates/.github/workflows/nextVersion.yml@8143c5eb093e33c85bc8982813841a947596c7f9
+    uses: bielu/bielu.GithubActions.Templates/.github/workflows/nextVersion.yml@3af716c7a02c7e3ee980329d7a6391adf19b653f
     with:
       nuget-package: bielu-persistentqueues
 
@@ -112,7 +112,7 @@ jobs:
     concurrency:
       group: release-main
       cancel-in-progress: false
-    uses: bielu/bielu.GithubActions.Templates/.github/workflows/release.yml@8143c5eb093e33c85bc8982813841a947596c7f9
+    uses: bielu/bielu.GithubActions.Templates/.github/workflows/release.yml@3af716c7a02c7e3ee980329d7a6391adf19b653f
     with:
       publish-npm: false
       generate-schema: false
@@ -165,7 +165,7 @@ jobs:
     concurrency:
       group: release-main
       cancel-in-progress: false
-    uses: bielu/bielu.GithubActions.Templates/.github/workflows/release.yml@8143c5eb093e33c85bc8982813841a947596c7f9
+    uses: bielu/bielu.GithubActions.Templates/.github/workflows/release.yml@3af716c7a02c7e3ee980329d7a6391adf19b653f
     with:
       publish-npm: false
       generate-schema: false
