@@ -117,7 +117,7 @@ public class BatchQueueContext : IBatchQueueContext
         var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
         if (dlqMessages.Length > 0)
         {
-            EnsureDeadLetterQueues(dlqMessages);
+            EnsureDeadLetterQueues();
             _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
         }
         if (retryMessages.Length > 0)
@@ -133,7 +133,7 @@ public class BatchQueueContext : IBatchQueueContext
         var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
         if (dlqMessages.Length > 0)
         {
-            EnsureDeadLetterQueues(dlqMessages);
+            EnsureDeadLetterQueues();
             _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
         }
         if (retryMessages.Length > 0)
@@ -164,7 +164,7 @@ public class BatchQueueContext : IBatchQueueContext
         var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
         if (dlqMessages.Length > 0)
         {
-            EnsureDeadLetterQueues(dlqMessages);
+            EnsureDeadLetterQueues();
             _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
         }
         if (retryMessages.Length > 0)
@@ -179,7 +179,7 @@ public class BatchQueueContext : IBatchQueueContext
         var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
         if (dlqMessages.Length > 0)
         {
-            EnsureDeadLetterQueues(dlqMessages);
+            EnsureDeadLetterQueues();
             _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
         }
         if (retryMessages.Length > 0)
@@ -194,7 +194,7 @@ public class BatchQueueContext : IBatchQueueContext
         var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
         if (dlqMessages.Length > 0)
         {
-            EnsureDeadLetterQueues(dlqMessages);
+            EnsureDeadLetterQueues();
             _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
         }
         if (retryMessages.Length > 0)
@@ -209,7 +209,7 @@ public class BatchQueueContext : IBatchQueueContext
         var (dlqMessages, retryMessages) = SplitByMaxAttempts(updatedMessages, _queue._deadLetterOptions.Enabled);
         if (dlqMessages.Length > 0)
         {
-            EnsureDeadLetterQueues(dlqMessages);
+            EnsureDeadLetterQueues();
             _actions.Add(new DeadLetterAllAction(_queue, dlqMessages, DeadLetterDiagnostics.Reasons.MaxProcessingAttempts));
         }
         if (retryMessages.Length > 0)
@@ -243,7 +243,7 @@ public class BatchQueueContext : IBatchQueueContext
             throw new InvalidOperationException("Dead letter queue is disabled. Enable it via WithDeadLetterQueue() in the queue configuration.");
         var unprocessedMessages = Messages.Where(m => !_disposedMessageIds.Contains(m.Id.MessageIdentifier)).ToArray();
         ValidateAndMarkMessages(unprocessedMessages, "MoveToDeadLetter");
-        EnsureDeadLetterQueues(unprocessedMessages);
+        EnsureDeadLetterQueues();
         _actions.Add(new DeadLetterAllAction(_queue, unprocessedMessages, DeadLetterDiagnostics.Reasons.Manual));
     }
 
@@ -253,7 +253,7 @@ public class BatchQueueContext : IBatchQueueContext
         if (!_queue._deadLetterOptions.Enabled)
             throw new InvalidOperationException("Dead letter queue is disabled. Enable it via WithDeadLetterQueue() in the queue configuration.");
         ValidateAndMarkMessages(messages, "MoveToDeadLetter");
-        EnsureDeadLetterQueues(messages);
+        EnsureDeadLetterQueues();
         _actions.Add(new DeadLetterAllAction(_queue, messages, DeadLetterDiagnostics.Reasons.Manual));
     }
 
@@ -264,7 +264,7 @@ public class BatchQueueContext : IBatchQueueContext
             throw new InvalidOperationException("Dead letter queue is disabled. Enable it via WithDeadLetterQueue() in the queue configuration.");
         var messages = Messages.Where(x => messageIds.Contains(x.Id.MessageIdentifier)).ToArray();
         ValidateAndMarkMessages(messages, "MoveToDeadLetter");
-        EnsureDeadLetterQueues(messages);
+        EnsureDeadLetterQueues();
         _actions.Add(new DeadLetterAllAction(_queue, messages, DeadLetterDiagnostics.Reasons.Manual));
     }
 
@@ -297,7 +297,7 @@ public class BatchQueueContext : IBatchQueueContext
         return (dlq, retry);
     }
 
-    private void EnsureDeadLetterQueues(Message[] messages)
+    private void EnsureDeadLetterQueues()
     {
         _queue.Store.CreateQueue(DeadLetterConstants.QueueName);
     }

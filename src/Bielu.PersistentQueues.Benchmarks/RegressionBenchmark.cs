@@ -20,7 +20,7 @@ public class RegressionBenchmark
     private CancellationTokenSource? _cts;
 
     /// <summary>
-    /// Small message count for fast CI/CD execution (< 30 seconds)
+    /// Small message count for fast CI/CD execution (&lt; 30 seconds)
     /// </summary>
     [Params(100, 1_000)]
     public int MessageCount { get; set; }
