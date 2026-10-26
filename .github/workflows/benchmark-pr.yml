@@ -8,10 +8,10 @@ on:
       - 'src/Bielu.PersistentQueues.Storage.*/**'
       - 'src/Bielu.PersistentQueues.Benchmarks/**'
       - '.github/workflows/benchmark-pr.yml'
+      - 'scripts/compare-benchmarks.mjs'
 
 permissions:
   contents: read
-  pull-requests: write
 
 # The PR is compared against its own base commit, benchmarked back to back on the same runner.
 # Comparing against the gh-pages history instead meant comparing against whatever hardware an
@@ -59,30 +59,15 @@ jobs:
           --exporters json \
           --artifacts ../artifacts/head
 
-    # Seeds a local data file with the base results; nothing to compare against yet, so no alert.
-    - name: Record base results
-      uses: benchmark-action/github-action-benchmark@v1
-      with:
-        name: Regression Benchmarks
-        tool: 'benchmarkdotnet'
-        output-file-path: artifacts/base/results/Bielu.PersistentQueues.Benchmarks.RegressionBenchmark-report-full-compressed.json
-        external-data-json-path: ./benchmark-data.json
-        fail-on-alert: false
-
-    # Compares head against the base results recorded in the previous step.
+    # A script rather than github-action-benchmark: that action only compares against an entry
+    # recorded for a *different* commit, and both runs here belong to the same workflow commit, so it
+    # silently compared nothing. The table lands in the job summary.
     - name: Compare head against base
-      uses: benchmark-action/github-action-benchmark@v1
-      with:
-        name: Regression Benchmarks
-        tool: 'benchmarkdotnet'
-        output-file-path: artifacts/head/results/Bielu.PersistentQueues.Benchmarks.RegressionBenchmark-report-full-compressed.json
-        external-data-json-path: ./benchmark-data.json
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        comment-on-alert: true
-        comment-always: true
-        summary-always: true
-        alert-threshold: '125%'
-        fail-on-alert: true
+      run: |
+        node head/scripts/compare-benchmarks.mjs \
+          artifacts/base/results/Bielu.PersistentQueues.Benchmarks.RegressionBenchmark-report-full-compressed.json \
+          artifacts/head/results/Bielu.PersistentQueues.Benchmarks.RegressionBenchmark-report-full-compressed.json \
+          125
 
     - name: Upload benchmark results
       if: always()
