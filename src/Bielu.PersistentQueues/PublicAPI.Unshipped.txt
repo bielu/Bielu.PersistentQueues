@@ -1,1 +1,2 @@
 #nullable enable
+Bielu.PersistentQueues.Storage.IMessageStore.GetMessagesAfter(string! queueName, Bielu.PersistentQueues.MessageId? afterMessageId) -> System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>!
