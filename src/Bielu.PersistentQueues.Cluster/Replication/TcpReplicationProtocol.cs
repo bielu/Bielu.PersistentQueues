@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -7,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Bielu.PersistentQueues.Partitioning;
 using Bielu.PersistentQueues.Storage;
 using Microsoft.Extensions.Logging;
 
@@ -31,7 +33,10 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
 {
     private readonly IMessageStore _store;
     private readonly IPEndPoint _replicationEndpoint;
+    private static readonly TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(30);
+
     private readonly ILogger _logger;
+    private readonly int _maxPayloadBytes;
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
     private bool _disposed;
@@ -42,11 +47,20 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
     /// <param name="store">The local message store for persisting replicated messages.</param>
     /// <param name="replicationEndpoint">The local endpoint to listen on for replication.</param>
     /// <param name="logger">The logger instance.</param>
-    public TcpReplicationProtocol(IMessageStore store, IPEndPoint replicationEndpoint, ILogger<TcpReplicationProtocol> logger)
+    /// <param name="maxPayloadBytes">The maximum size of a single request or response frame.</param>
+    /// <remarks>
+    /// The listener does not authenticate peers and only accepts writes and reads for partition
+    /// sub-queues. Expose the replication port only to other cluster nodes.
+    /// </remarks>
+    public TcpReplicationProtocol(IMessageStore store, IPEndPoint replicationEndpoint, ILogger<TcpReplicationProtocol> logger,
+        int maxPayloadBytes = ClusterConfiguration.DefaultMaxPayloadBytes)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _replicationEndpoint = replicationEndpoint ?? throw new ArgumentNullException(nameof(replicationEndpoint));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        if (maxPayloadBytes <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxPayloadBytes), maxPayloadBytes, "Maximum payload size must be positive.");
+        _maxPayloadBytes = maxPayloadBytes;
     }
 
     /// <inheritdoc />
@@ -140,17 +154,8 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
             await stream.WriteAsync(requestBytes, timeoutCts.Token).ConfigureAwait(false);
             await stream.FlushAsync(timeoutCts.Token).ConfigureAwait(false);
 
-            // Read response length
-            var responseLengthBuffer = new byte[4];
-            await stream.ReadExactlyAsync(responseLengthBuffer, timeoutCts.Token).ConfigureAwait(false);
-            var responseLength = BitConverter.ToInt32(responseLengthBuffer);
-
-            // Read response body
-            var responseBuffer = new byte[responseLength];
-            await stream.ReadExactlyAsync(responseBuffer, timeoutCts.Token).ConfigureAwait(false);
-
-            var responseJson = Encoding.UTF8.GetString(responseBuffer);
-            var response = JsonSerializer.Deserialize<SyncResponse>(responseJson);
+            var responseBuffer = await ReadFrameAsync(stream, timeoutCts.Token).ConfigureAwait(false);
+            var response = JsonSerializer.Deserialize<SyncResponse>(responseBuffer);
 
             if (response?.Messages == null)
                 return Array.Empty<Message>();
@@ -195,38 +200,38 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
 
     private async Task HandleReplicationConnectionAsync(Socket socket, CancellationToken cancellationToken)
     {
+        // Bound the lifetime of every connection so idle or slow peers cannot pin handlers.
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(ConnectionTimeout);
+        var token = timeoutCts.Token;
+
         try
         {
             await using var stream = new NetworkStream(socket, ownsSocket: true);
 
-            // Read length prefix
-            var lengthBuffer = new byte[4];
-            await stream.ReadExactlyAsync(lengthBuffer, cancellationToken).ConfigureAwait(false);
-            var length = BitConverter.ToInt32(lengthBuffer);
-
-            // Read request body
-            var requestBuffer = new byte[length];
-            await stream.ReadExactlyAsync(requestBuffer, cancellationToken).ConfigureAwait(false);
-
-            var json = Encoding.UTF8.GetString(requestBuffer);
-            var request = JsonSerializer.Deserialize<ReplicationRequest>(json);
+            var requestBuffer = await ReadFrameAsync(stream, token).ConfigureAwait(false);
+            var request = JsonSerializer.Deserialize<ReplicationRequest>(requestBuffer);
 
             if (request == null) return;
 
             switch (request.Type)
             {
                 case ReplicationMessageType.Replicate:
-                    await HandleReplicateAsync(request, stream, cancellationToken).ConfigureAwait(false);
+                    await HandleReplicateAsync(request, stream, token).ConfigureAwait(false);
                     break;
 
                 case ReplicationMessageType.SyncPartition:
-                    await HandleSyncPartitionAsync(request, stream, cancellationToken).ConfigureAwait(false);
+                    await HandleSyncPartitionAsync(request, stream, token).ConfigureAwait(false);
                     break;
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // Expected during shutdown
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("Replication connection timed out after {Timeout}", ConnectionTimeout);
         }
         catch (Exception ex)
         {
@@ -240,6 +245,19 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
         {
             if (request.Messages == null || request.Messages.Count == 0)
             {
+                await stream.WriteAsync(new byte[] { 0 }, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            // Only accept writes into the partition sub-queue named by the request, so a peer
+            // cannot inject messages into arbitrary local queues.
+            // Note: the epoch is carried on the wire but not enforced, because assignment epochs
+            // are tracked per node and are not agreed on cluster-wide.
+            if (!IsPartitionQueue(request.QueueName) ||
+                request.Messages.Any(m => !string.Equals(m.Queue, request.QueueName, StringComparison.Ordinal)))
+            {
+                _logger.LogWarning("Rejected replication request for non-partition or mismatched queue {QueueName}",
+                    request.QueueName);
                 await stream.WriteAsync(new byte[] { 0 }, cancellationToken).ConfigureAwait(false);
                 return;
             }
@@ -273,9 +291,10 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
                 }
                 : null;
 
-            var replicatedMessages = _store.GetMessagesAfter(queueName, afterMessageId)
-                .Select(ToReplicatedMessage)
-                .ToList();
+            // Only partition sub-queues are replicated, so only those can be read back.
+            var replicatedMessages = IsPartitionQueue(queueName)
+                ? _store.GetMessagesAfter(queueName, afterMessageId).Select(ToReplicatedMessage).ToList()
+                : [];
 
             var response = new SyncResponse { Messages = replicatedMessages };
             var responseJson = JsonSerializer.Serialize(response);
@@ -291,6 +310,23 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
             _logger.LogWarning(ex, "Error handling sync partition request for {QueueName}", request.QueueName);
         }
     }
+
+    private async Task<byte[]> ReadFrameAsync(NetworkStream stream, CancellationToken cancellationToken)
+    {
+        var lengthBuffer = new byte[4];
+        await stream.ReadExactlyAsync(lengthBuffer, cancellationToken).ConfigureAwait(false);
+        var length = BitConverter.ToInt32(lengthBuffer);
+
+        if (length <= 0 || length > _maxPayloadBytes)
+            throw new InvalidDataException($"Replication frame length {length} is outside the allowed range 1..{_maxPayloadBytes}.");
+
+        var buffer = new byte[length];
+        await stream.ReadExactlyAsync(buffer, cancellationToken).ConfigureAwait(false);
+        return buffer;
+    }
+
+    private static bool IsPartitionQueue(string? queueName) =>
+        queueName != null && PartitionConstants.TryParsePartitionQueueName(queueName, out _, out _);
 
     private static ReplicatedMessage ToReplicatedMessage(Message m) => new()
     {

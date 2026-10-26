@@ -29,6 +29,13 @@ public static class ClusterServiceCollectionExtensions
     ///   <item>Automatic failover when a node dies</item>
     /// </list>
     /// <para>
+    /// When the application runs under a .NET generic host, the cluster (gossip, replication and
+    /// partition assignment) is started automatically by a hosted service. Combine it with
+    /// <c>AutoStart()</c> so the underlying queue transport is started as well. Without a host, call
+    /// <see cref="ClusteredPartitionedQueueDecorator.Start"/> (or <see cref="ClusteredPartitionedQueueDecorator.StartCluster"/>
+    /// when the queue is already started) on the resolved <see cref="IPartitionedQueue"/>.
+    /// </para>
+    /// <para>
     /// Requires <see cref="PartitionedQueueBuilderExtensions.UsePartitioning(PersistentQueuesBuilder, IPartitionStrategy?)"/> to be called first.
     /// </para>
     /// </remarks>
@@ -41,6 +48,7 @@ public static class ClusterServiceCollectionExtensions
     {
         var config = new ClusterConfiguration();
         configure(config);
+        config.Validate();
 
         builder.Services.TryAddSingleton(config);
 
@@ -54,7 +62,7 @@ public static class ClusterServiceCollectionExtensions
         builder.Services.TryAddSingleton<IPartitionAssignment>(sp =>
         {
             var logger = sp.GetRequiredService<ILogger<PartitionAssignmentTable>>();
-            return new PartitionAssignmentTable(logger);
+            return new PartitionAssignmentTable(logger, config.ReplicationFactor);
         });
 
         builder.Services.TryAddSingleton<IReplicationProtocol>(sp =>
@@ -66,7 +74,7 @@ public static class ClusterServiceCollectionExtensions
             var replicationEndpoint = new IPEndPoint(
                 queue.Endpoint.Address,
                 queue.Endpoint.Port + config.GossipPortOffset + 1);
-            return new TcpReplicationProtocol(store, replicationEndpoint, logger);
+            return new TcpReplicationProtocol(store, replicationEndpoint, logger, config.MaxPayloadBytes);
         });
 
         // Decorate IPartitionedQueue with ClusteredPartitionedQueueDecorator
@@ -87,6 +95,9 @@ public static class ClusterServiceCollectionExtensions
 
             return new ClusteredPartitionedQueueDecorator(innerPartitioned, coordinator, assignment, replication, config, logger, contentSerializer);
         });
+
+        // Start gossip and replication with the host; the inner queue itself is started by AutoStart().
+        builder.Services.AddHostedService<ClusterStartupService>();
 
         return builder;
     }

@@ -8,23 +8,26 @@ namespace Bielu.PersistentQueues.Cluster;
 
 /// <summary>
 /// In-memory partition assignment table that distributes partitions evenly
-/// across cluster nodes using a round-robin approach with minimal movement on rebalance.
+/// across cluster nodes using a deterministic round-robin approach.
 /// </summary>
 /// <remarks>
 /// <para>
-/// On initial assignment, partitions are distributed evenly: for each partition,
-/// the primary is chosen round-robin across active nodes, and the replica is
-/// assigned to a different node.
+/// Assignments are a pure function of the active node set: nodes are ordered by
+/// <see cref="NodeInfo.NodeId"/>, partition <c>i</c> gets the node at <c>i % n</c> as primary
+/// and the node at <c>(i + 1) % n</c> as replica. Every node that sees the same membership
+/// therefore computes the same table, without any extra coordination.
 /// </para>
 /// <para>
-/// On rebalance (node join/leave), only partitions that were on a failed node are moved.
-/// This minimizes data movement — existing healthy assignments are preserved.
+/// <see cref="Rebalance"/> recomputes the table for the given active nodes and increments the
+/// epoch of every partition whose primary changed. Callers are responsible for moving data
+/// to the new owners (see <see cref="ClusteredPartitionedQueueDecorator"/>).
 /// </para>
 /// </remarks>
 public sealed class PartitionAssignmentTable : IPartitionAssignment
 {
     private readonly ConcurrentDictionary<string, List<PartitionReplica>> _assignments = new();
     private readonly ILogger _logger;
+    private readonly int _replicationFactor;
     private readonly object _rebalanceLock = new();
 
     /// <inheritdoc />
@@ -34,9 +37,14 @@ public sealed class PartitionAssignmentTable : IPartitionAssignment
     /// Initializes a new instance of the <see cref="PartitionAssignmentTable"/> class.
     /// </summary>
     /// <param name="logger">The logger instance.</param>
-    public PartitionAssignmentTable(ILogger<PartitionAssignmentTable> logger)
+    /// <param name="replicationFactor">
+    /// The number of copies of each partition: <c>1</c> (primary only) or <c>2</c> (primary and replica).
+    /// </param>
+    public PartitionAssignmentTable(ILogger<PartitionAssignmentTable> logger, int replicationFactor = 2)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        ClusterConfiguration.ValidateReplicationFactor(replicationFactor);
+        _replicationFactor = replicationFactor;
     }
 
     /// <inheritdoc />
@@ -85,24 +93,20 @@ public sealed class PartitionAssignmentTable : IPartitionAssignment
 
         lock (_rebalanceLock)
         {
+            var orderedNodes = OrderNodes(activeNodes);
             var partitions = new List<PartitionReplica>(partitionCount);
 
             for (var i = 0; i < partitionCount; i++)
             {
-                var primaryIdx = i % activeNodes.Count;
-                var replicaIdx = activeNodes.Count > 1
-                    ? (i + 1) % activeNodes.Count
-                    : -1; // No replica possible with single node
-
-                var partition = new PartitionReplica
+                var (primary, replica) = ComputeOwners(i, orderedNodes);
+                partitions.Add(new PartitionReplica
                 {
                     QueueName = queueName,
                     PartitionIndex = i,
-                    PrimaryNodeId = activeNodes[primaryIdx].NodeId,
-                    ReplicaNodeId = replicaIdx >= 0 ? activeNodes[replicaIdx].NodeId : Guid.Empty,
+                    PrimaryNodeId = primary,
+                    ReplicaNodeId = replica,
                     Epoch = 1
-                };
-                partitions.Add(partition);
+                });
             }
 
             _assignments[queueName] = partitions;
@@ -124,63 +128,27 @@ public sealed class PartitionAssignmentTable : IPartitionAssignment
 
         lock (_rebalanceLock)
         {
-            var activeNodeIds = new HashSet<Guid>(activeNodes.Select(n => n.NodeId));
+            var orderedNodes = OrderNodes(activeNodes);
             var changed = new List<PartitionReplica>();
 
-            foreach (var (queueName, partitions) in _assignments)
+            foreach (var partitions in _assignments.Values)
             {
-                for (var i = 0; i < partitions.Count; i++)
+                foreach (var partition in partitions)
                 {
-                    var partition = partitions[i];
-                    var modified = false;
+                    var (primary, replica) = ComputeOwners(partition.PartitionIndex, orderedNodes);
+                    if (primary == partition.PrimaryNodeId && replica == partition.ReplicaNodeId)
+                        continue;
 
-                    // Check if primary node is still active
-                    if (!activeNodeIds.Contains(partition.PrimaryNodeId))
+                    if (primary != partition.PrimaryNodeId)
                     {
-                        if (partition.ReplicaNodeId != Guid.Empty &&
-                            activeNodeIds.Contains(partition.ReplicaNodeId))
-                        {
-                            // Promote replica to primary
-                            _logger.LogInformation(
-                                "Promoting replica {ReplicaNodeId} to primary for {Partition}",
-                                partition.ReplicaNodeId, partition.PartitionKey);
-
-                            partition.PrimaryNodeId = partition.ReplicaNodeId;
-                            partition.ReplicaNodeId = Guid.Empty;
-                        }
-                        else
-                        {
-                            // Assign new primary from active nodes (least loaded)
-                            var newPrimary = GetLeastLoadedNode(activeNodes, activeNodeIds, partition.ReplicaNodeId);
-                            partition.PrimaryNodeId = newPrimary;
-                        }
+                        _logger.LogInformation("Moving primary for {Partition}: {OldPrimary} → {NewPrimary}",
+                            partition.PartitionKey, partition.PrimaryNodeId, primary);
                         partition.Epoch++;
-                        modified = true;
                     }
 
-                    // Check if replica node is still active or is unassigned
-                    if (partition.ReplicaNodeId == Guid.Empty ||
-                        !activeNodeIds.Contains(partition.ReplicaNodeId))
-                    {
-                        if (activeNodes.Count > 1)
-                        {
-                            // Assign a new replica (different from primary, least loaded)
-                            var newReplica = GetLeastLoadedNode(activeNodes, activeNodeIds, partition.PrimaryNodeId);
-                            if (newReplica != partition.PrimaryNodeId)
-                            {
-                                partition.ReplicaNodeId = newReplica;
-                                modified = true;
-                            }
-                        }
-                        else
-                        {
-                            partition.ReplicaNodeId = Guid.Empty;
-                            modified = true;
-                        }
-                    }
-
-                    if (modified)
-                        changed.Add(partition);
+                    partition.PrimaryNodeId = primary;
+                    partition.ReplicaNodeId = replica;
+                    changed.Add(partition);
                 }
             }
 
@@ -227,33 +195,15 @@ public sealed class PartitionAssignmentTable : IPartitionAssignment
         }
     }
 
-    /// <summary>
-    /// Selects the active node with the fewest assigned partitions (primary + replica),
-    /// excluding a specific node ID.
-    /// </summary>
-    private Guid GetLeastLoadedNode(IReadOnlyList<NodeInfo> activeNodes, HashSet<Guid> activeNodeIds, Guid excludeNodeId)
+    private static List<NodeInfo> OrderNodes(IReadOnlyList<NodeInfo> nodes) =>
+        nodes.DistinctBy(n => n.NodeId).OrderBy(n => n.NodeId).ToList();
+
+    private (Guid Primary, Guid Replica) ComputeOwners(int partitionIndex, List<NodeInfo> orderedNodes)
     {
-        var loadCounts = new Dictionary<Guid, int>();
-        foreach (var node in activeNodes)
-        {
-            loadCounts[node.NodeId] = 0;
-        }
-
-        foreach (var partitions in _assignments.Values)
-        {
-            foreach (var p in partitions)
-            {
-                if (loadCounts.ContainsKey(p.PrimaryNodeId))
-                    loadCounts[p.PrimaryNodeId]++;
-                if (loadCounts.ContainsKey(p.ReplicaNodeId))
-                    loadCounts[p.ReplicaNodeId]++;
-            }
-        }
-
-        return loadCounts
-            .Where(kv => kv.Key != excludeNodeId && activeNodeIds.Contains(kv.Key))
-            .OrderBy(kv => kv.Value)
-            .Select(kv => kv.Key)
-            .FirstOrDefault(activeNodes[0].NodeId);
+        var primary = orderedNodes[partitionIndex % orderedNodes.Count].NodeId;
+        var replica = _replicationFactor > 1 && orderedNodes.Count > 1
+            ? orderedNodes[(partitionIndex + 1) % orderedNodes.Count].NodeId
+            : Guid.Empty;
+        return (primary, replica);
     }
 }

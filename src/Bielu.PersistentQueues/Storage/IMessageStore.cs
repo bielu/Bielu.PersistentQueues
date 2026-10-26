@@ -321,14 +321,18 @@ public interface IMessageStore : IDisposable
     /// </summary>
     /// <param name="queueName">The name of the queue to retrieve messages from.</param>
     /// <param name="afterMessageId">
-    /// The message ID to start from (exclusive). Only messages stored after this ID are returned.
+    /// The message ID to start from (exclusive). Only messages whose
+    /// <see cref="MessageId.MessageIdentifier"/> sorts after this ID are returned.
     /// If null, all messages for the queue are returned.
     /// </param>
     /// <returns>Messages stored after the specified message ID, in storage order.</returns>
     /// <remarks>
-    /// The default implementation retrieves all incoming messages and filters by ID comparison.
-    /// Storage implementations with COMB-ordered keys (like LMDB) can provide an optimized
-    /// implementation using range queries.
+    /// Message identifiers are COMB GUIDs whose leading bytes encode a big-endian timestamp, so
+    /// comparing their byte representation gives chronological order. Comparing by order rather
+    /// than looking for an exact match means the marker message does not have to still exist
+    /// (it may already have been consumed). The default implementation scans all incoming
+    /// messages; storage implementations with COMB-ordered keys (like LMDB) can provide an
+    /// optimized implementation using range queries.
     /// </remarks>
     IEnumerable<Message> GetMessagesAfter(string queueName, MessageId? afterMessageId)
     {
@@ -336,20 +340,14 @@ public interface IMessageStore : IDisposable
         if (afterMessageId == null)
             return messages;
 
-        // Default: iterate all and skip until we find the marker
-        var found = false;
+        var marker = afterMessageId.MessageIdentifier.ToByteArray();
         var result = new List<Message>();
+        Span<byte> current = stackalloc byte[16];
         foreach (var msg in messages)
         {
-            if (found)
-            {
+            msg.Id.MessageIdentifier.TryWriteBytes(current);
+            if (current.SequenceCompareTo(marker) > 0)
                 result.Add(msg);
-            }
-            else if (msg.Id.MessageIdentifier == afterMessageId.MessageIdentifier &&
-                     msg.Id.SourceInstanceId == afterMessageId.SourceInstanceId)
-            {
-                found = true;
-            }
         }
         return result;
     }

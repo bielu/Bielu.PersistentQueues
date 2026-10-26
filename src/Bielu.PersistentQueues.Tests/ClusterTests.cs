@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Bielu.PersistentQueues.Cluster;
+using Bielu.PersistentQueues.Storage;
 using Microsoft.Extensions.Logging;
 using Shouldly;
 using Xunit;
@@ -262,6 +263,72 @@ public class PartitionAssignmentTableTests
         table.PromoteReplica("orders", 0);
         eventFired.ShouldBeTrue();
     }
+
+    [Fact]
+    public void assignment_is_independent_of_node_order()
+    {
+        var nodes = CreateNodes(3);
+        var first = new PartitionAssignmentTable(_logger);
+        var second = new PartitionAssignmentTable(_logger);
+
+        first.AssignPartitions("orders", 6, nodes);
+        second.AssignPartitions("orders", 6, nodes.AsEnumerable().Reverse().ToList());
+
+        second.GetAssignments("orders").Select(a => (a.PrimaryNodeId, a.ReplicaNodeId))
+            .ShouldBe(first.GetAssignments("orders").Select(a => (a.PrimaryNodeId, a.ReplicaNodeId)));
+    }
+
+    [Fact]
+    public void rebalance_converges_regardless_of_history()
+    {
+        var nodes = CreateNodes(2);
+
+        // Each node starts alone (before gossip found its peer) and assigns everything to itself
+        var first = new PartitionAssignmentTable(_logger);
+        var second = new PartitionAssignmentTable(_logger);
+        first.AssignPartitions("orders", 4, [nodes[0]]);
+        second.AssignPartitions("orders", 4, [nodes[1]]);
+
+        first.Rebalance(nodes);
+        second.Rebalance(nodes);
+
+        second.GetAssignments("orders").Select(a => (a.PrimaryNodeId, a.ReplicaNodeId))
+            .ShouldBe(first.GetAssignments("orders").Select(a => (a.PrimaryNodeId, a.ReplicaNodeId)));
+        foreach (var node in nodes)
+            first.GetPrimaryPartitions(node.NodeId).Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void rebalance_increments_epoch_only_when_primary_moves()
+    {
+        var table = new PartitionAssignmentTable(_logger);
+        var nodes = CreateNodes(2);
+        table.AssignPartitions("orders", 4, [nodes[0]]);
+        var before = table.GetAssignments("orders").ToDictionary(a => a.PartitionIndex, a => a.PrimaryNodeId);
+
+        table.Rebalance(nodes);
+
+        foreach (var partition in table.GetAssignments("orders"))
+            partition.Epoch.ShouldBe(before[partition.PartitionIndex] == partition.PrimaryNodeId ? 1 : 2);
+    }
+
+    [Fact]
+    public void replication_factor_one_assigns_no_replica()
+    {
+        var table = new PartitionAssignmentTable(_logger, replicationFactor: 1);
+
+        table.AssignPartitions("orders", 4, CreateNodes(3));
+
+        table.GetAssignments("orders").ShouldAllBe(a => a.ReplicaNodeId == Guid.Empty);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    public void unsupported_replication_factor_throws(int replicationFactor)
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() => new PartitionAssignmentTable(_logger, replicationFactor));
+    }
 }
 
 public class NodeInfoTests
@@ -329,7 +396,7 @@ public class ClusterConfigurationTests
         var config = new ClusterConfiguration
         {
             NodeId = nodeId,
-            ReplicationFactor = 3,
+            ReplicationFactor = 1,
             ReplicationMode = ReplicationMode.Asynchronous,
             HeartbeatInterval = TimeSpan.FromSeconds(5),
             SuspicionThreshold = 5,
@@ -339,9 +406,63 @@ public class ClusterConfigurationTests
         };
 
         config.NodeId.ShouldBe(nodeId);
-        config.ReplicationFactor.ShouldBe(3);
+        config.ReplicationFactor.ShouldBe(1);
         config.ReplicationMode.ShouldBe(ReplicationMode.Asynchronous);
         config.SeedNodes.Count.ShouldBe(1);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    public void validate_rejects_unsupported_replication_factor(int replicationFactor)
+    {
+        var config = new ClusterConfiguration { ReplicationFactor = replicationFactor };
+
+        Should.Throw<ArgumentOutOfRangeException>(config.Validate);
+    }
+
+    [Fact]
+    public void validate_rejects_non_positive_payload_limit()
+    {
+        var config = new ClusterConfiguration { MaxPayloadBytes = 0 };
+
+        Should.Throw<ArgumentOutOfRangeException>(config.Validate);
+    }
+
+    [Fact]
+    public void validate_accepts_defaults()
+    {
+        Should.NotThrow(new ClusterConfiguration().Validate);
+    }
+}
+
+public class GetMessagesAfterTests(ITestOutputHelper output) : TestBase(output)
+{
+    [Fact]
+    public void returns_messages_after_marker_even_when_marker_was_removed()
+    {
+        StorageScenario(store =>
+        {
+            var messages = Enumerable.Range(0, 4).Select(i => NewMessage(payload: $"m{i}")).ToList();
+            store.StoreIncoming(messages);
+            store.DeleteIncoming([messages[1]]);
+
+            var after = ((IMessageStore)store).GetMessagesAfter("test", messages[1].Id).Select(m => m.Id).ToList();
+
+            after.ShouldBe([messages[2].Id, messages[3].Id]);
+        });
+    }
+
+    [Fact]
+    public void returns_all_messages_without_marker()
+    {
+        StorageScenario(store =>
+        {
+            var messages = Enumerable.Range(0, 3).Select(i => NewMessage(payload: $"m{i}")).ToList();
+            store.StoreIncoming(messages);
+
+            ((IMessageStore)store).GetMessagesAfter("test", null).Count().ShouldBe(3);
+        });
     }
 }
 

@@ -51,7 +51,9 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
     private readonly ClusterConfiguration _config;
     private readonly ILogger _logger;
     private readonly IContentSerializer _contentSerializer;
-    private CancellationTokenSource? _cts;
+    private readonly CancellationTokenSource _cts = new();
+    private readonly object _reconcileLock = new();
+    private int _clusterStarted;
     private bool _disposed;
 
     /// <summary>
@@ -82,6 +84,7 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _contentSerializer = contentSerializer ?? JsonContentSerializer.Default;
+        _config.Validate();
 
         // Subscribe to membership changes for automatic failover
         _coordinator.MembershipChanged += OnMembershipChanged;
@@ -105,21 +108,73 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
     public void CreateQueue(string queueName) => _innerPartitionedQueue.CreateQueue(queueName);
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Starts the inner queue (receiver and sender) and then the cluster components
+    /// (see <see cref="StartCluster"/>). When the inner queue is already started (for example by
+    /// <c>AutoStart()</c>), call <see cref="StartCluster"/> instead.
+    /// </remarks>
     public void Start()
     {
-        _cts = new CancellationTokenSource();
-
-        // Start the inner queue (receiver, sender, etc.)
         _innerPartitionedQueue.Start();
+        StartCluster();
+    }
 
-        // Start replication listener in the background
-        _ = _replication.StartListeningAsync(_cts.Token);
+    /// <summary>
+    /// Starts the replication listener, joins the cluster and assigns ownership of the
+    /// partitioned queues that already exist in the store. Calling it more than once has no effect.
+    /// </summary>
+    /// <exception cref="System.Net.Sockets.SocketException">
+    /// Thrown when the gossip or replication port cannot be bound.
+    /// </exception>
+    public void StartCluster()
+    {
+        if (Interlocked.Exchange(ref _clusterStarted, 1) == 1)
+            return;
 
-        // Join the cluster
-        _ = _coordinator.JoinAsync(_cts.Token);
+        InitializeAssignments();
 
-        _logger.LogInformation("ClusteredPartitionedQueueDecorator started. Node {NodeId} listening on {Endpoint}",
+        // Both calls bind their listener synchronously before the first await, so a port
+        // conflict surfaces here instead of being lost in a discarded task.
+        var listening = _replication.StartListeningAsync(_cts.Token);
+        ThrowIfFaulted(listening);
+        ObserveFaults(listening, "Replication listener");
+
+        var joining = _coordinator.JoinAsync(_cts.Token);
+        ThrowIfFaulted(joining);
+        ObserveFaults(joining, "Cluster join");
+
+        _logger.LogInformation("Cluster started. Node {NodeId} listening on {Endpoint}",
             _coordinator.LocalNode.NodeId, _coordinator.LocalNode.QueueEndpoint);
+    }
+
+    private static void ThrowIfFaulted(Task task)
+    {
+        if (task.IsFaulted)
+            task.GetAwaiter().GetResult();
+    }
+
+    private void ObserveFaults(Task task, string operation)
+    {
+        _ = task.ContinueWith(
+            t => _logger.LogError(t.Exception, "{Operation} failed", operation),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    /// <summary>
+    /// Assigns ownership for every partitioned queue that exists in the store but has no
+    /// assignment yet (e.g. queues created through <c>UsePartitioning(strategy, ("orders", 6))</c>).
+    /// </summary>
+    private void InitializeAssignments()
+    {
+        // The inner partitioned queue reports logical queue names
+        foreach (var queueName in _innerPartitionedQueue.Queues)
+        {
+            var count = _innerPartitionedQueue.GetPartitionCount(queueName);
+            if (count > 0 && _assignment.GetAssignments(queueName).Count == 0)
+                AssignPartitions(queueName, count);
+        }
     }
 
     // ---- Receive: only from partitions this node owns as primary ----
@@ -264,18 +319,12 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
         }
 
         var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
+        var localNodeId = _coordinator.LocalNode.NodeId;
 
-        if (partitionAssignment.PrimaryNodeId == _coordinator.LocalNode.NodeId)
+        if (partitionAssignment.PrimaryNodeId == localNodeId)
         {
             // This node is the primary — write locally
             _innerPartitionedQueue.EnqueueToPartition(message, partition);
-
-            // Replicate to replica if assigned. The replica stores the message directly, so it
-            // must carry the partition sub-queue name rather than the logical queue name.
-            if (partitionAssignment.ReplicaNodeId != Guid.Empty)
-            {
-                ReplicateToReplica(partitionAssignment, message.WithQueue(partitionQueueName), partitionQueueName);
-            }
         }
         else
         {
@@ -306,6 +355,19 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
 
             _innerPartitionedQueue.Send(forwardedMessage);
         }
+
+        // The node that accepts the write also replicates it, whether it stored the message as
+        // primary or forwarded it: the primary's transport receiver stores forwarded messages
+        // without going through this decorator, so it cannot replicate them itself.
+        // The replica stores the message directly, so it must carry the partition sub-queue name.
+        if (_config.ReplicationFactor > 1 && partitionAssignment.ReplicaNodeId != Guid.Empty)
+        {
+            var partitionMessage = message.WithQueue(partitionQueueName);
+            if (partitionAssignment.ReplicaNodeId == localNodeId)
+                Store.StoreIncoming(partitionMessage);
+            else
+                ReplicateToReplica(partitionAssignment, partitionMessage, partitionQueueName);
+        }
     }
 
     private void ReplicateToReplica(PartitionReplica partitionAssignment, Message partitionMessage, string partitionQueueName)
@@ -315,16 +377,15 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
 
         if (replicaNode == null || replicaNode.State != NodeState.Active)
         {
-            _logger.LogWarning("Replica node {ReplicaNodeId} for {Partition} is not available. " +
-                               "Message stored on primary only (under-replicated).",
-                partitionAssignment.ReplicaNodeId, partitionAssignment.PartitionKey);
+            OnReplicationFailed(partitionAssignment,
+                $"Replica node {partitionAssignment.ReplicaNodeId} for {partitionAssignment.PartitionKey} is not available.");
             return;
         }
 
         var replicaEndpoint = GetReplicationEndpoint(replicaNode);
         var replication = _replication.ReplicateAsync(
             replicaEndpoint, partitionQueueName, new[] { partitionMessage },
-            partitionAssignment.Epoch, _cts?.Token ?? CancellationToken.None);
+            partitionAssignment.Epoch, _cts.Token);
 
         if (_config.ReplicationMode == ReplicationMode.Synchronous)
         {
@@ -334,12 +395,22 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
             // RF=2 durability before returning to the caller.
             if (!replication.GetAwaiter().GetResult())
             {
-                _logger.LogWarning(
-                    "Synchronous replication failed for {Partition}. Message stored locally only.",
-                    partitionAssignment.PartitionKey);
+                OnReplicationFailed(partitionAssignment,
+                    $"Replica node {partitionAssignment.ReplicaNodeId} did not acknowledge the write for {partitionAssignment.PartitionKey}.");
             }
         }
         // Asynchronous mode: fire-and-forget; ReplicateAsync never throws and logs its own failures.
+    }
+
+    private void OnReplicationFailed(PartitionReplica partitionAssignment, string reason)
+    {
+        if (_config.ReplicationMode == ReplicationMode.Synchronous)
+        {
+            throw new ClusterReplicationException(partitionAssignment.PartitionKey,
+                reason + " The message was stored for the primary only (under-replicated).");
+        }
+
+        _logger.LogWarning("{Reason} Message stored for the primary only (under-replicated).", reason);
     }
 
     // ---- Partitioned queue pass-through ----
@@ -468,78 +539,86 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
         switch (e.ChangeType)
         {
             case ClusterMembershipChangeType.NodeDead:
-                HandleNodeFailure(e.Node);
-                break;
-
+            case ClusterMembershipChangeType.NodeLeft:
             case ClusterMembershipChangeType.NodeJoined:
             case ClusterMembershipChangeType.NodeRecovered:
-                HandleNodeJoin(e.Node);
+                _logger.LogInformation("Membership change {ChangeType} for node {NodeId}. Reconciling partition ownership.",
+                    e.ChangeType, e.Node.NodeId);
+                ReconcileAssignments();
                 break;
         }
     }
 
-    private void HandleNodeFailure(NodeInfo failedNode)
+    /// <summary>
+    /// Recomputes partition ownership for the current active membership and pulls data for
+    /// every partition whose ownership moved to this node.
+    /// </summary>
+    /// <remarks>
+    /// The assignment is a deterministic function of the active node set, so every node that
+    /// sees the same membership converges on the same owners. When this node becomes the
+    /// primary of a partition it copies the partition from the previous primary (or, when that
+    /// node is gone, from the previous replica, which holds the replicated copy). When it becomes
+    /// the replica it copies the partition from the new primary.
+    /// </remarks>
+    private void ReconcileAssignments()
     {
-        _logger.LogWarning("Node {NodeId} failed. Checking for partitions to promote.", failedNode.NodeId);
-
-        // Find all partitions where the failed node was the primary
-        var primaryPartitions = _assignment.GetPrimaryPartitions(failedNode.NodeId);
-        foreach (var partition in primaryPartitions)
+        lock (_reconcileLock)
         {
-            // If this node is the replica, promote ourselves
-            if (partition.ReplicaNodeId == _coordinator.LocalNode.NodeId)
+            var localNodeId = _coordinator.LocalNode.NodeId;
+            var previous = SnapshotAssignments();
+
+            _assignment.Rebalance(_coordinator.GetActiveMembers());
+
+            foreach (var (key, current) in SnapshotAssignments())
             {
-                _assignment.PromoteReplica(partition.QueueName, partition.PartitionIndex);
-                _logger.LogInformation(
-                    "Promoted self to primary for {Partition} after failure of {FailedNode}",
-                    partition.PartitionKey, failedNode.NodeId);
-            }
-        }
+                if (!previous.TryGetValue(key, out var before))
+                    continue;
 
-        // Rebalance to assign new replicas for under-replicated partitions
-        _assignment.Rebalance(_coordinator.GetActiveMembers());
-    }
-
-    private void HandleNodeJoin(NodeInfo newNode)
-    {
-        _logger.LogInformation("Node {NodeId} joined. Triggering rebalance.", newNode.NodeId);
-
-        // Rebalance to spread partitions across the new set of nodes
-        _assignment.Rebalance(_coordinator.GetActiveMembers());
-
-        // Trigger catch-up sync for any partitions this node is now a replica for
-        var replicaPartitions = _assignment.GetReplicaPartitions(_coordinator.LocalNode.NodeId);
-        foreach (var partition in replicaPartitions)
-        {
-            if (partition.PrimaryNodeId != Guid.Empty)
-            {
-                var primaryNode = _coordinator.GetMembers()
-                    .FirstOrDefault(n => n.NodeId == partition.PrimaryNodeId);
-
-                if (primaryNode != null)
+                if (current.Primary == localNodeId && before.Primary != localNodeId)
                 {
-                    _ = CatchUpSyncAsync(partition, primaryNode);
+                    var source = FindActiveNode(before.Primary) ?? FindActiveNode(before.Replica, exclude: localNodeId);
+                    if (source != null)
+                        _ = CatchUpSyncAsync(key, source);
+                }
+                else if (current.Replica == localNodeId && before.Replica != localNodeId)
+                {
+                    var source = FindActiveNode(current.Primary);
+                    if (source != null)
+                        _ = CatchUpSyncAsync(key, source);
                 }
             }
         }
     }
 
-    private async Task CatchUpSyncAsync(PartitionReplica partition, NodeInfo primaryNode)
+    private Dictionary<string, (Guid Primary, Guid Replica)> SnapshotAssignments() =>
+        _innerPartitionedQueue.Queues
+            .SelectMany(_assignment.GetAssignments)
+            .ToDictionary(a => a.PartitionKey, a => (a.PrimaryNodeId, a.ReplicaNodeId));
+
+    private NodeInfo? FindActiveNode(Guid nodeId, Guid? exclude = null)
+    {
+        if (nodeId == Guid.Empty || nodeId == exclude)
+            return null;
+
+        return _coordinator.GetMembers()
+            .FirstOrDefault(n => n.NodeId == nodeId && n.State == NodeState.Active);
+    }
+
+    private async Task CatchUpSyncAsync(string partitionQueueName, NodeInfo sourceNode)
     {
         try
         {
-            var sourceEndpoint = GetReplicationEndpoint(primaryNode);
+            var sourceEndpoint = GetReplicationEndpoint(sourceNode);
 
-            _logger.LogInformation("Starting catch-up sync for {Partition} from {PrimaryNode}",
-                partition.PartitionKey, primaryNode.NodeId);
+            _logger.LogInformation("Starting catch-up sync for {Partition} from {SourceNode}",
+                partitionQueueName, sourceNode.NodeId);
 
             var messages = await _replication.SyncPartitionAsync(
-                sourceEndpoint, partition.PartitionKey, afterMessageId: null,
-                _cts?.Token ?? CancellationToken.None).ConfigureAwait(false);
+                sourceEndpoint, partitionQueueName, afterMessageId: null, _cts.Token).ConfigureAwait(false);
 
-            // The replica may already hold some of these messages (e.g. it was a replica before
-            // a rebalance), so only store the ones that are missing locally.
-            var localIds = Store.PersistedIncoming(partition.PartitionKey)
+            // This node may already hold some of these messages (e.g. it was the replica before
+            // the change), so only store the ones that are missing locally.
+            var localIds = Store.PersistedIncoming(partitionQueueName)
                 .Select(m => m.Id)
                 .ToHashSet();
             var missing = messages.Where(m => !localIds.Contains(m.Id)).ToList();
@@ -547,13 +626,13 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
             if (missing.Count > 0)
             {
                 Store.StoreIncoming(missing);
-                _logger.LogInformation("Synced {Count} messages for {Partition} from {PrimaryNode}",
-                    missing.Count, partition.PartitionKey, primaryNode.NodeId);
+                _logger.LogInformation("Synced {Count} messages for {Partition} from {SourceNode}",
+                    missing.Count, partitionQueueName, sourceNode.NodeId);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Catch-up sync failed for {Partition}", partition.PartitionKey);
+            _logger.LogWarning(ex, "Catch-up sync failed for {Partition}", partitionQueueName);
         }
     }
 
@@ -573,15 +652,16 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
         _disposed = true;
 
         _coordinator.MembershipChanged -= OnMembershipChanged;
-        _cts?.Cancel();
+        _cts.Cancel();
 
-        _coordinator.LeaveAsync().GetAwaiter().GetResult();
+        if (_clusterStarted == 1)
+            _coordinator.LeaveAsync().GetAwaiter().GetResult();
 
         _replication.Dispose();
         _coordinator.Dispose();
         _innerPartitionedQueue.Dispose();
 
-        _cts?.Dispose();
+        _cts.Dispose();
     }
 
     /// <inheritdoc />
@@ -591,14 +671,15 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
         _disposed = true;
 
         _coordinator.MembershipChanged -= OnMembershipChanged;
-        if (_cts != null) await _cts.CancelAsync().ConfigureAwait(false);
+        await _cts.CancelAsync().ConfigureAwait(false);
 
-        await _coordinator.LeaveAsync().ConfigureAwait(false);
+        if (_clusterStarted == 1)
+            await _coordinator.LeaveAsync().ConfigureAwait(false);
 
         await _replication.DisposeAsync().ConfigureAwait(false);
         await _coordinator.DisposeAsync().ConfigureAwait(false);
         await _innerPartitionedQueue.DisposeAsync().ConfigureAwait(false);
 
-        _cts?.Dispose();
+        _cts.Dispose();
     }
 }

@@ -33,6 +33,8 @@ namespace Bielu.PersistentQueues.Cluster;
 /// </remarks>
 public sealed class GossipClusterCoordinator : IClusterCoordinator
 {
+    private static readonly TimeSpan GossipConnectionTimeout = TimeSpan.FromSeconds(5);
+
     private readonly ClusterConfiguration _config;
     private readonly ILogger _logger;
     private readonly ConcurrentDictionary<Guid, NodeInfo> _members = new();
@@ -167,12 +169,25 @@ public sealed class GossipClusterCoordinator : IClusterCoordinator
 
     private async Task HandleGossipConnectionAsync(Socket socket, CancellationToken cancellationToken)
     {
+        // Bound both the size and the duration of a gossip exchange so a misbehaving peer
+        // cannot exhaust memory or pin handlers.
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(GossipConnectionTimeout);
+
         try
         {
             await using var stream = new NetworkStream(socket, ownsSocket: true);
-            using var reader = new StreamReader(stream, Encoding.UTF8);
-            var json = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-            var gossipData = JsonSerializer.Deserialize<GossipMessage>(json);
+            using var buffer = new MemoryStream();
+            var chunk = new byte[8192];
+            int read;
+            while ((read = await stream.ReadAsync(chunk, timeoutCts.Token).ConfigureAwait(false)) > 0)
+            {
+                if (buffer.Length + read > _config.MaxPayloadBytes)
+                    throw new InvalidDataException($"Gossip payload exceeds {_config.MaxPayloadBytes} bytes.");
+                buffer.Write(chunk, 0, read);
+            }
+
+            var gossipData = JsonSerializer.Deserialize<GossipMessage>(buffer.GetBuffer().AsSpan(0, (int)buffer.Length));
 
             if (gossipData?.Members != null)
             {
@@ -228,6 +243,11 @@ public sealed class GossipClusterCoordinator : IClusterCoordinator
     {
         foreach (var remote in remoteMembers)
         {
+            // Only this node is authoritative about its own state; never let a peer's
+            // (possibly stale) view mark the local node as suspected or dead.
+            if (remote.NodeId == LocalNode.NodeId)
+                continue;
+
             var endpoint = new IPEndPoint(IPAddress.Parse(remote.QueueEndpointAddress), remote.QueueEndpointPort);
             var gossipEndpoint = new IPEndPoint(IPAddress.Parse(remote.GossipEndpointAddress), remote.GossipEndpointPort);
 
@@ -294,17 +314,31 @@ public sealed class GossipClusterCoordinator : IClusterCoordinator
 
                 // Send gossip to a random subset (up to 3 peers per cycle for scalability)
                 var random = Random.Shared;
-                var targets = peers.Count <= 3 ? peers : peers.OrderBy(_ => random.Next()).Take(3).ToList();
+                var targets = (peers.Count <= 3 ? peers : peers.OrderBy(_ => random.Next()).Take(3))
+                    .Select(n => n.GossipEndpoint)
+                    .ToList();
 
-                foreach (var peer in targets)
+                // Also probe one dead peer per cycle. Without this, two nodes that declared each
+                // other dead during a network partition would never learn that the other recovered.
+                var deadPeers = _members.Values
+                    .Where(n => n.NodeId != LocalNode.NodeId && n.State == NodeState.Dead)
+                    .ToList();
+                if (deadPeers.Count > 0)
+                    targets.Add(deadPeers[random.Next(deadPeers.Count)].GossipEndpoint);
+
+                // With no reachable peers, fall back to the seed nodes to rediscover the cluster.
+                if (peers.Count == 0)
+                    targets.AddRange(_config.SeedNodes.Where(s => !s.Equals(LocalNode.GossipEndpoint)));
+
+                foreach (var target in targets.Distinct())
                 {
                     try
                     {
-                        await SendGossipAsync(peer.GossipEndpoint, cancellationToken).ConfigureAwait(false);
+                        await SendGossipAsync(target, cancellationToken).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogDebug(ex, "Heartbeat to {NodeId} failed", peer.NodeId);
+                        _logger.LogDebug(ex, "Heartbeat to {Endpoint} failed", target);
                     }
                 }
             }

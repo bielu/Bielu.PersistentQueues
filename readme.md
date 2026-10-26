@@ -795,27 +795,35 @@ services.AddPersistentQueues(builder =>
     builder.AutomaticEndpoint()
            .AddLmdbStorage("/data/queues")
            .UsePartitioning(new HashPartitionStrategy(), ("orders", 6))
+           .AutoStart()
            .AddClusterSupport(cluster =>
            {
+               cluster.ReplicationFactor = 2; // 1 (no replica) or 2
                cluster.ReplicationMode = ReplicationMode.Synchronous;
                cluster.SeedNodes.Add(new IPEndPoint(IPAddress.Parse("10.0.0.1"), 5001));
            });
 });
 ```
 
+Under a .NET generic host, a hosted service starts the cluster (gossip, replication and partition assignment) automatically. `AutoStart()` starts the underlying queue transport. Without a host, call `Start()` on the resolved `IPartitionedQueue` (or `StartCluster()` on `ClusteredPartitionedQueueDecorator` when the queue is already started). If a gossip or replication port cannot be bound, startup fails instead of running without a cluster.
+
 Resolve `IPartitionedQueue` to get the cluster-aware queue:
 
-- **Writes**: `Enqueue` / `EnqueueToPartition` write locally and replicate when this node is the partition's primary, or forward the message to the primary over the regular queue transport.
-- **Replication**: in `Synchronous` mode the enqueue blocks until the replica acknowledges. In `Asynchronous` mode replication is fire-and-forget.
+- **Writes**: `Enqueue` / `EnqueueToPartition` write locally when this node is the partition's primary, or forward the message to the primary over the regular queue transport. Either way, the node that accepted the write also replicates it to the partition's replica.
+- **Replication**: in `Synchronous` mode the enqueue blocks until the replica acknowledges, and throws `ClusterReplicationException` if the replica is unavailable or rejects the write. The message has already been stored (or forwarded) for the primary at that point, so a retry can create a duplicate. In `Asynchronous` mode replication is fire-and-forget.
 - **Reads**: `ReceiveFromPartition(s)`, `GetActivePartitions` and `GetAvailablePartitions` only cover partitions this node owns as primary.
-- **Failover**: when a node is declared dead, its replicas are promoted to primary (with an incremented epoch) and partitions are rebalanced. A node that joins or recovers catches up on the partitions it replicates.
+- **Ownership**: partitions are assigned round-robin over the active nodes ordered by node id, so every node with the same membership view computes the same owners. When a node joins, leaves or dies, ownership is recomputed. A node that becomes primary copies the partition from the previous primary (or from the previous replica if the primary is gone), and a new replica copies it from the primary.
+- **Recovery**: nodes keep probing peers they consider dead and fall back to the seed nodes when they have no reachable peers, so a cluster heals after a network partition.
 
 Ports: gossip listens on the queue port + `GossipPortOffset` (default `1`), and replication listens on the queue port + `GossipPortOffset` + 1. Both must be reachable between nodes.
 
+> **Security:** the gossip and replication listeners do not authenticate peers. Only expose these ports to other cluster nodes (private network or firewall rules). Payloads are capped by `MaxPayloadBytes`, connections time out, and the replication listener only accepts reads and writes for partition sub-queues.
+
 **Current limitations**
 
-- Replication copies enqueued messages only. Messages consumed on the primary are not removed from the replica, so after a failover the promoted replica can redeliver messages that were already processed (at-least-once delivery). Consumers should be idempotent.
-- The assignment table is computed locally on each node from the same membership view; there is no consensus protocol.
+- Replication copies enqueued messages only. Messages consumed on the primary are not removed from the replica, so after a failover or ownership change the new primary can redeliver messages that were already processed (at-least-once delivery). Consumers should be idempotent.
+- There is no consensus protocol. Nodes with different membership views (for example while gossip converges) can briefly disagree on ownership. Assignment epochs are tracked per node and are not used to fence stale primaries.
+- An ownership change copies the whole partition from its source node.
 - `EnablePartitioning`, `DisablePartitioning` and `Repartition` only affect the local node and must be run on every node while the queue is quiesced.
 
 ---
