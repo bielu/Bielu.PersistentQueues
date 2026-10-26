@@ -17,9 +17,15 @@ permissions:
 #
 # Reusable-workflow refs are pinned to an immutable commit of bielu/bielu.GithubActions.Templates
 # rather than @main, so this workflow cannot change behavior out from under a merged PR. Verified
-# revision (2026-08-08): contains versionChangeset.yml, nextVersion.yml, explicit NuGet version
-# overrides, and release workflow outputs.
-# https://github.com/bielu/bielu.GithubActions.Templates/commit/3af716c7a02c7e3ee980329d7a6391adf19b653f
+# revision (2026-10-24): contains versionChangeset.yml, nextVersion.yml, explicit NuGet version
+# overrides, release workflow outputs, the push-nuget input and the publish-nuget action.
+# https://github.com/bielu/bielu.GithubActions.Templates/commit/1676f5d58454b529bcb9246b5bdf3ab8ff13211a
+#
+# NuGet trusted publishing: nuget.org only accepts an OIDC token whose job_workflow_ref is a
+# workflow in THIS repository, so a push from inside the template's releaseNuget.yml is rejected
+# (HTTP 401). The release jobs therefore only build (push-nuget: false), and publishNugetStable /
+# publishNugetBeta push the package from jobs declared here. The nuget.org trusted publishing
+# policy must name this repository and this workflow file (buildAndPublishPackage.yml).
 jobs:
   # Pull request: build/test/pack validation, publish nothing.
   buildPr:
@@ -31,16 +37,20 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: bielu/bielu.GithubActions.Templates/.github/workflows/ciNoSchema.yml@3af716c7a02c7e3ee980329d7a6391adf19b653f
+    uses: bielu/bielu.GithubActions.Templates/.github/workflows/ciNoSchema.yml@1676f5d58454b529bcb9246b5bdf3ab8ff13211a
     with:
       suffix: "pr"
 
   # Pull request: require a changeset so the version bump + changelog are recorded. Skipped for the
   # "Version Packages" PR that changesets/action itself opens (branch changeset-release/main,
   # configured by versionChangeset.yml's default) — that PR only consumes changesets, it never adds
-  # one, so this check could never pass on it.
+  # one, so this check could never pass on it. Also skipped for Dependabot PRs: Dependabot cannot
+  # write a changeset, and committing one to its branch stops it from rebasing the PR. Dependency
+  # bumps that matter to consumers are recorded in a changeset by the next human PR instead.
   changeset-check:
-    if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
+    if: >-
+      github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
+      && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -74,27 +84,66 @@ jobs:
     concurrency:
       group: release-main
       cancel-in-progress: false
-    uses: bielu/bielu.GithubActions.Templates/.github/workflows/versionChangeset.yml@3af716c7a02c7e3ee980329d7a6391adf19b653f
+    uses: bielu/bielu.GithubActions.Templates/.github/workflows/versionChangeset.yml@1676f5d58454b529bcb9246b5bdf3ab8ff13211a
     with:
       working-directory: .
+
+  # Did this push change anything that ends up in a package? A docs, test, CI or changeset-only push
+  # while changesets are pending would otherwise publish a beta identical to the previous one. The
+  # betas below only run when this says yes (manual dispatch always runs them).
+  codeChanged:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Detect shipped-code changes
+        id: diff
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # Fail open: no usable base (manual dispatch, new branch, force push) counts as changed.
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+              || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "No usable base commit; treating as changed."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Shipped code = anything under src/ (except tests, benchmarks, examples and markdown) plus
+          # the shared build/package inputs. Docs, workflows and .changeset do not change a package.
+          CHANGED=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" \
+            | { grep -E '^(src/|Directory\.Packages\.props$|version\.props$|global\.json$|nuget\.config$|readme\.md$|icon\.png$)' || true; } \
+            | { grep -vE '^src/Bielu\.PersistentQueues\.(Tests|Benchmarks|Examples)/|^src/.*\.md$' || true; })
+          if [ -n "$CHANGED" ]; then
+            echo "Shipped-code changes:"; echo "$CHANGED"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No shipped-code changes in this push; skipping the beta release."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
   # Decide what an in-flight beta should be numbered. Left alone, the build templates would stamp
   # `-beta.<ticks>` onto whatever version.props currently carries; while a Version Packages PR is
   # pending that is still the last-released (or bootstrap) version, so the beta would sort at or
   # below it. This derives the version from the pending changesets instead.
   betaVersions:
-    needs: version
+    needs: [ version, codeChanged ]
     if: >-
-      always() && !cancelled()
+      always() && !cancelled() && needs.codeChanged.result == 'success'
       && (github.event_name == 'workflow_dispatch'
-          || (github.event_name == 'push' && needs.version.outputs.hasChangesets == 'true'))
-    uses: bielu/bielu.GithubActions.Templates/.github/workflows/nextVersion.yml@3af716c7a02c7e3ee980329d7a6391adf19b653f
+          || (github.event_name == 'push' && needs.version.outputs.hasChangesets == 'true'
+              && needs.codeChanged.outputs.changed == 'true'))
+    uses: bielu/bielu.GithubActions.Templates/.github/workflows/nextVersion.yml@1676f5d58454b529bcb9246b5bdf3ab8ff13211a
     with:
       nuget-package: bielu-persistentqueues
 
-  # In-flight prerelease: publish a beta while a release is still pending (changesets not yet
-  # merged), and on manual dispatch. Skipped on the Version-PR-merge commit so it does not shadow the
-  # stable release.
+  # In-flight prerelease: build a beta while a release is still pending (changesets not yet merged),
+  # and on manual dispatch. Skipped on the Version-PR-merge commit so it does not shadow the stable
+  # release. Only builds; publishNugetBeta pushes it.
   releaseBeta:
     needs: [ version, betaVersions ]
     if: >-
@@ -112,19 +161,31 @@ jobs:
     concurrency:
       group: release-main
       cancel-in-progress: false
-    uses: bielu/bielu.GithubActions.Templates/.github/workflows/release.yml@3af716c7a02c7e3ee980329d7a6391adf19b653f
+    uses: bielu/bielu.GithubActions.Templates/.github/workflows/release.yml@1676f5d58454b529bcb9246b5bdf3ab8ff13211a
     with:
       publish-npm: false
       generate-schema: false
+      push-nuget: false
       nuget-version-override: ${{ needs.betaVersions.outputs.nuget }}
-    secrets:
-      NUGET_APIKEY: ${{ secrets.NUGET_APIKEY }}
+
+  # Pushes the beta NuGet package releaseBeta built (see the trusted publishing note at the top).
+  publishNugetBeta:
+    needs: releaseBeta
+    if: always() && !cancelled() && needs.releaseBeta.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: bielu/bielu.GithubActions.Templates/.github/actions/publish-nuget@1676f5d58454b529bcb9246b5bdf3ab8ff13211a
+        with:
+          api-key: ${{ secrets.NUGET_APIKEY }}
 
   # Record-keeping for interim betas: surface each published beta build as an idempotent GitHub
   # prerelease, using the exact version that was packed and the pending changesets as release notes.
   tagBeta:
-    needs: releaseBeta
-    if: always() && !cancelled() && needs.releaseBeta.result == 'success'
+    needs: [ releaseBeta, publishNugetBeta ]
+    if: always() && !cancelled() && needs.publishNugetBeta.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -153,8 +214,8 @@ jobs:
           gh release create "v$VERSION" --title "v$VERSION" \
             --notes-file release-notes.md --prerelease
 
-  # Version PR merged (no changesets left): publish the NuGet packages at the version the Version PR
-  # committed. --skip-duplicate makes retries and unrelated later pushes safe no-ops.
+  # Version PR merged (no changesets left): build the NuGet packages at the version the Version PR
+  # committed. Only builds; publishNugetStable pushes them.
   releaseStable:
     needs: version
     if: github.event_name == 'push' && needs.version.outputs.hasChangesets == 'false'
@@ -165,21 +226,33 @@ jobs:
     concurrency:
       group: release-main
       cancel-in-progress: false
-    uses: bielu/bielu.GithubActions.Templates/.github/workflows/release.yml@3af716c7a02c7e3ee980329d7a6391adf19b653f
+    uses: bielu/bielu.GithubActions.Templates/.github/workflows/release.yml@1676f5d58454b529bcb9246b5bdf3ab8ff13211a
     with:
       publish-npm: false
       generate-schema: false
-    secrets:
-      NUGET_APIKEY: ${{ secrets.NUGET_APIKEY }}
+      push-nuget: false
+
+  # Pushes the NuGet packages releaseStable built. --skip-duplicate (inside the action) makes retries
+  # and unrelated later pushes safe no-ops.
+  publishNugetStable:
+    needs: releaseStable
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: bielu/bielu.GithubActions.Templates/.github/actions/publish-nuget@1676f5d58454b529bcb9246b5bdf3ab8ff13211a
+        with:
+          api-key: ${{ secrets.NUGET_APIKEY }}
 
   # Record-keeping: idempotent tag + GitHub Release for the shared NuGet version. Release notes are
   # the version's section of CHANGELOG.md (written by the changeset adapter in the Version Packages
   # PR). Created with GITHUB_TOKEN, so it does not itself trigger this workflow again.
   tagRelease:
-    needs: [ version, releaseStable ]
+    needs: [ version, publishNugetStable ]
     if: >-
       github.event_name == 'push' && needs.version.outputs.hasChangesets == 'false'
-      && needs.releaseStable.result == 'success'
+      && needs.publishNugetStable.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

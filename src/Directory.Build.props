@@ -6,6 +6,7 @@
       <Title>$(MSBuildProjectName)</Title>
       <AssemblyName>$(MSBuildProjectName)</AssemblyName>
       <AssemblyVersion>$(Version)</AssemblyVersion>
+      <RunSettingsFilePath>$(MSBuildThisFileDirectory)../coverlet.runsettings</RunSettingsFilePath>
     </PropertyGroup>
 
     <PropertyGroup>
