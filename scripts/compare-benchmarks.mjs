@@ -1,6 +1,8 @@
 // Compares two BenchmarkDotNet JSON reports (the "full-compressed" exporter output) and fails when
 // any benchmark in the head report is slower than the same benchmark in the base report by more
-// than the threshold.
+// than the threshold AND the slowdown is outside the noise: the head's 99.9% confidence interval
+// (BenchmarkDotNet's default) must lie entirely above the base's. A ratio alone is not enough: two
+// runs of identical code on the same runner differed by up to 1.45x on the sub-millisecond cases.
 //
 //   node scripts/compare-benchmarks.mjs <base.json> <head.json> [threshold-percent=125]
 //
@@ -18,9 +20,9 @@ if (!basePath || !headPath) {
 }
 const threshold = Number(thresholdArg) / 100;
 
-function medians(path) {
+function statistics(path) {
   const report = JSON.parse(readFileSync(path, "utf8"));
-  return new Map(report.Benchmarks.map((b) => [`${b.Method}(${b.Parameters})`, b.Statistics?.Median]));
+  return new Map(report.Benchmarks.map((b) => [`${b.Method}(${b.Parameters})`, b.Statistics]));
 }
 
 function formatNs(ns) {
@@ -29,30 +31,32 @@ function formatNs(ns) {
   return `${ns.toFixed(0)} ns`;
 }
 
-const base = medians(basePath);
-const head = medians(headPath);
+const base = statistics(basePath);
+const head = statistics(headPath);
 
 const rows = [];
 const regressions = [];
-for (const [name, headMedian] of head) {
-  const baseMedian = base.get(name);
-  if (baseMedian == null || headMedian == null) {
-    rows.push(`| \`${name}\` | n/a | ${headMedian == null ? "n/a" : formatNs(headMedian)} | new |`);
+for (const [name, headStats] of head) {
+  const baseStats = base.get(name);
+  if (baseStats?.Median == null || headStats?.Median == null) {
+    rows.push(`| \`${name}\` | n/a | ${headStats?.Median == null ? "n/a" : formatNs(headStats.Median)} | new | |`);
     continue;
   }
-  const ratio = headMedian / baseMedian;
-  const flag = ratio > threshold ? " ❌" : "";
-  if (flag) regressions.push(name);
-  rows.push(`| \`${name}\` | ${formatNs(baseMedian)} | ${formatNs(headMedian)} | ${ratio.toFixed(2)}${flag} |`);
+  const ratio = headStats.Median / baseStats.Median;
+  const separated = headStats.ConfidenceInterval.Lower > baseStats.ConfidenceInterval.Upper;
+  const regressed = ratio > threshold && separated;
+  if (regressed) regressions.push(name);
+  const verdict = regressed ? "❌ regression" : ratio > threshold ? "noise (intervals overlap)" : "";
+  rows.push(`| \`${name}\` | ${formatNs(baseStats.Median)} | ${formatNs(headStats.Median)} | ${ratio.toFixed(2)} | ${verdict} |`);
 }
 
 const markdown = [
   `## Regression benchmarks: PR vs base (same runner, median)`,
   ``,
-  `Threshold: ${thresholdArg}%. ${regressions.length === 0 ? "No regressions." : `${regressions.length} regression(s).`}`,
+  `Threshold: ${thresholdArg}%, outside the 99.9% confidence interval. ${regressions.length === 0 ? "No regressions." : `${regressions.length} regression(s).`}`,
   ``,
-  `| Benchmark | Base | PR | Ratio |`,
-  `|:---|---:|---:|---:|`,
+  `| Benchmark | Base | PR | Ratio | |`,
+  `|:---|---:|---:|---:|:---|`,
   ...rows,
   ``,
 ].join("\n");
@@ -61,6 +65,8 @@ if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMM
 console.log(markdown);
 
 if (regressions.length > 0) {
-  for (const name of regressions) console.log(`::error::${name} is more than ${thresholdArg}% of its base time`);
+  for (const name of regressions) {
+    console.log(`::error::${name} is more than ${thresholdArg}% of its base time, outside the confidence interval`);
+  }
   process.exit(1);
 }

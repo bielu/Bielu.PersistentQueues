@@ -9,7 +9,9 @@ namespace Bielu.PersistentQueues.Benchmarks;
 /// Lightweight regression benchmark suite designed for CI/CD pipelines.
 /// Focuses on core operations with small datasets for fast execution.
 /// </summary>
-[SimpleJob(RunStrategy.Throughput, iterationCount: 5, warmupCount: 1)]
+// 15 iterations: with 5, one slow iteration on a shared CI runner moved the sub-millisecond cases by
+// up to 1.45x between two runs of identical code, too noisy to gate PRs on.
+[SimpleJob(RunStrategy.Throughput, iterationCount: 15, warmupCount: 3)]
 [MemoryDiagnoser]
 [MinColumn, MaxColumn, MeanColumn, MedianColumn]
 public class RegressionBenchmark
