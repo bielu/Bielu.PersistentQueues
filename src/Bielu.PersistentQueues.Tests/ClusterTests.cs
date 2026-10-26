@@ -15,11 +15,11 @@ namespace Bielu.PersistentQueues.Tests;
 
 public class PartitionAssignmentTableTests
 {
-    private readonly ILogger _logger;
+    private readonly ILogger<PartitionAssignmentTable> _logger;
 
     public PartitionAssignmentTableTests(ITestOutputHelper output)
     {
-        _logger = new Bielu.PersistentQueues.Logging.RecordingLogger(
+        _logger = new Bielu.PersistentQueues.Logging.RecordingLogger<PartitionAssignmentTable>(
             new TestOutputHelperWriter(output), LogLevel.Information);
     }
 

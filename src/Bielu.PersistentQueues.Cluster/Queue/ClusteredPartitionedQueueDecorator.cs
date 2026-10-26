@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Bielu.PersistentQueues.Partitioning;
+using Bielu.PersistentQueues.Serialization;
 using Bielu.PersistentQueues.Storage;
 using Microsoft.Extensions.Logging;
 
@@ -17,14 +18,14 @@ namespace Bielu.PersistentQueues.Cluster;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <see cref="ClusteredQueue"/> wraps an existing <see cref="IPartitionedQueue"/> (which itself
+/// <see cref="ClusteredPartitionedQueueDecorator"/> wraps an existing <see cref="IPartitionedQueue"/> (which itself
 /// wraps <see cref="IQueue"/>) and adds:
 /// </para>
 /// <list type="bullet">
 ///   <item>
 ///     <description><b>Write routing</b>: On enqueue, checks the partition assignment table.
 ///     If this node is the primary, writes locally and replicates to the replica.
-///     If not, forwards to the correct primary via the existing <see cref="IQueue.Send"/> TCP path.</description>
+///     If not, forwards to the correct primary via the existing <see cref="IQueue.Send(Message)"/> TCP path.</description>
 ///   </item>
 ///   <item>
 ///     <description><b>Replication</b>: After a local write, the primary replicates to the
@@ -41,7 +42,7 @@ namespace Bielu.PersistentQueues.Cluster;
 ///   </item>
 /// </list>
 /// </remarks>
-public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
+public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsyncDisposable
 {
     private readonly IPartitionedQueue _innerPartitionedQueue;
     private readonly IClusterCoordinator _coordinator;
@@ -49,11 +50,12 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
     private readonly IReplicationProtocol _replication;
     private readonly ClusterConfiguration _config;
     private readonly ILogger _logger;
+    private readonly IContentSerializer _contentSerializer;
     private CancellationTokenSource? _cts;
     private bool _disposed;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ClusteredQueue"/> class.
+    /// Initializes a new instance of the <see cref="ClusteredPartitionedQueueDecorator"/> class.
     /// </summary>
     /// <param name="innerPartitionedQueue">The underlying partitioned queue.</param>
     /// <param name="coordinator">The cluster coordinator for membership tracking.</param>
@@ -61,13 +63,17 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
     /// <param name="replication">The replication protocol for primary → replica communication.</param>
     /// <param name="config">The cluster configuration.</param>
     /// <param name="logger">The logger instance.</param>
-    public ClusteredQueue(
+    /// <param name="contentSerializer">
+    /// The serializer used by <see cref="Enqueue{T}"/>. Defaults to <see cref="JsonContentSerializer.Default"/>.
+    /// </param>
+    public ClusteredPartitionedQueueDecorator(
         IPartitionedQueue innerPartitionedQueue,
         IClusterCoordinator coordinator,
         IPartitionAssignment assignment,
         IReplicationProtocol replication,
         ClusterConfiguration config,
-        ILogger logger)
+        ILogger<ClusteredPartitionedQueueDecorator> logger,
+        IContentSerializer? contentSerializer = null)
     {
         _innerPartitionedQueue = innerPartitionedQueue ?? throw new ArgumentNullException(nameof(innerPartitionedQueue));
         _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
@@ -75,6 +81,7 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
         _replication = replication ?? throw new ArgumentNullException(nameof(replication));
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _contentSerializer = contentSerializer ?? JsonContentSerializer.Default;
 
         // Subscribe to membership changes for automatic failover
         _coordinator.MembershipChanged += OnMembershipChanged;
@@ -111,7 +118,7 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
         // Join the cluster
         _ = _coordinator.JoinAsync(_cts.Token);
 
-        _logger.LogInformation("ClusteredQueue started. Node {NodeId} listening on {Endpoint}",
+        _logger.LogInformation("ClusteredPartitionedQueueDecorator started. Node {NodeId} listening on {Endpoint}",
             _coordinator.LocalNode.NodeId, _coordinator.LocalNode.QueueEndpoint);
     }
 
@@ -184,13 +191,7 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         // Filter to only partitions this node is primary for
-        var ownedPartitions = partitions
-            .Where(p =>
-            {
-                var a = _assignment.GetAssignment(queueName, p);
-                return a == null || a.PrimaryNodeId == _coordinator.LocalNode.NodeId;
-            })
-            .ToArray();
+        var ownedPartitions = FilterOwnedPartitions(queueName, partitions);
 
         if (ownedPartitions.Length == 0)
         {
@@ -209,75 +210,71 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
     // ---- Enqueue with replication ----
 
     /// <inheritdoc />
-    public void EnqueueToPartition(Message message, string queueName)
+    /// <remarks>
+    /// If the message's queue is partitioned, the partition is resolved with the configured
+    /// <see cref="IPartitionStrategy"/> and the message is routed through the cluster
+    /// (written locally and replicated when this node is the primary, forwarded otherwise).
+    /// Non-partitioned queues are not cluster-managed and are enqueued locally.
+    /// </remarks>
+    public void Enqueue(Message message)
     {
-        var partitionCount = _innerPartitionedQueue.GetPartitionCount(queueName);
-        if (partitionCount == 0)
-            throw new InvalidOperationException($"No partitions found for queue '{queueName}'.");
+        var queueName = message.QueueString;
+        if (queueName != null)
+        {
+            var partitionCount = _innerPartitionedQueue.GetPartitionCount(queueName);
+            if (partitionCount > 0)
+            {
+                var partition = _innerPartitionedQueue.PartitionStrategy.GetPartition(message, partitionCount);
+                EnqueueToPartition(message, partition);
+                return;
+            }
+        }
 
-        var partition = _innerPartitionedQueue.PartitionStrategy.GetPartition(message, partitionCount);
-        EnqueueToPartition(message, queueName, partition);
+        _innerPartitionedQueue.Enqueue(message);
     }
 
     /// <inheritdoc />
-    public void EnqueueToPartition(Message message, string queueName, int partition)
+    public void Enqueue<T>(
+        T content,
+        string? queueName = null,
+        Dictionary<string, string>? headers = null,
+        string? partitionKey = null)
     {
+        var message = Message.Create(
+            content,
+            contentSerializer: _contentSerializer,
+            queue: queueName,
+            headers: headers,
+            partitionKey: partitionKey);
+        Enqueue(message);
+    }
+
+    /// <inheritdoc />
+    public void EnqueueToPartition(Message message, int partition)
+    {
+        var queueName = message.QueueString
+            ?? throw new InvalidOperationException("Message must have a queue name set.");
         var partitionAssignment = _assignment.GetAssignment(queueName, partition);
 
         if (partitionAssignment == null)
         {
             // No cluster assignment — fall back to local-only enqueue
-            _innerPartitionedQueue.EnqueueToPartition(message, queueName, partition);
+            _innerPartitionedQueue.EnqueueToPartition(message, partition);
             return;
         }
+
+        var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
 
         if (partitionAssignment.PrimaryNodeId == _coordinator.LocalNode.NodeId)
         {
             // This node is the primary — write locally
-            _innerPartitionedQueue.EnqueueToPartition(message, queueName, partition);
+            _innerPartitionedQueue.EnqueueToPartition(message, partition);
 
-            // Replicate to replica if assigned
+            // Replicate to replica if assigned. The replica stores the message directly, so it
+            // must carry the partition sub-queue name rather than the logical queue name.
             if (partitionAssignment.ReplicaNodeId != Guid.Empty)
             {
-                var replicaNode = _coordinator.GetMembers()
-                    .FirstOrDefault(n => n.NodeId == partitionAssignment.ReplicaNodeId);
-
-                if (replicaNode != null && replicaNode.State == NodeState.Active)
-                {
-                    var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
-                    var replicaEndpoint = GetReplicationEndpoint(replicaNode);
-
-                    if (_config.ReplicationMode == ReplicationMode.Synchronous)
-                    {
-                        // Intentional synchronous wait: IQueue.Enqueue/EnqueueToPartition are
-                        // synchronous by design (matching the existing IQueue contract). In sync
-                        // replication mode, we block until the replica acknowledges to guarantee
-                        // RF=2 durability before returning to the caller.
-                        var acked = _replication.ReplicateAsync(
-                            replicaEndpoint, partitionQueueName, new[] { message },
-                            partitionAssignment.Epoch).GetAwaiter().GetResult();
-
-                        if (!acked)
-                        {
-                            _logger.LogWarning(
-                                "Synchronous replication failed for {Partition}. Message stored locally only.",
-                                partitionAssignment.PartitionKey);
-                        }
-                    }
-                    else
-                    {
-                        // Fire-and-forget async replication
-                        _ = _replication.ReplicateAsync(
-                            replicaEndpoint, partitionQueueName, new[] { message },
-                            partitionAssignment.Epoch);
-                    }
-                }
-                else
-                {
-                    _logger.LogWarning("Replica node {ReplicaNodeId} for {Partition} is not available. " +
-                                       "Message stored on primary only (under-replicated).",
-                        partitionAssignment.ReplicaNodeId, partitionAssignment.PartitionKey);
-                }
+                ReplicateToReplica(partitionAssignment, message.WithQueue(partitionQueueName), partitionQueueName);
             }
         }
         else
@@ -293,7 +290,6 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
             }
 
             // Use the existing Send() mechanism to forward to the primary
-            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(queueName, partition);
             var destinationUri = $"lq.tcp://{primaryNode.QueueEndpoint}";
 
             var forwardedMessage = new Message(
@@ -312,6 +308,40 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
         }
     }
 
+    private void ReplicateToReplica(PartitionReplica partitionAssignment, Message partitionMessage, string partitionQueueName)
+    {
+        var replicaNode = _coordinator.GetMembers()
+            .FirstOrDefault(n => n.NodeId == partitionAssignment.ReplicaNodeId);
+
+        if (replicaNode == null || replicaNode.State != NodeState.Active)
+        {
+            _logger.LogWarning("Replica node {ReplicaNodeId} for {Partition} is not available. " +
+                               "Message stored on primary only (under-replicated).",
+                partitionAssignment.ReplicaNodeId, partitionAssignment.PartitionKey);
+            return;
+        }
+
+        var replicaEndpoint = GetReplicationEndpoint(replicaNode);
+        var replication = _replication.ReplicateAsync(
+            replicaEndpoint, partitionQueueName, new[] { partitionMessage },
+            partitionAssignment.Epoch, _cts?.Token ?? CancellationToken.None);
+
+        if (_config.ReplicationMode == ReplicationMode.Synchronous)
+        {
+            // Intentional synchronous wait: IQueue.Enqueue/EnqueueToPartition are
+            // synchronous by design (matching the existing IQueue contract). In sync
+            // replication mode, we block until the replica acknowledges to guarantee
+            // RF=2 durability before returning to the caller.
+            if (!replication.GetAwaiter().GetResult())
+            {
+                _logger.LogWarning(
+                    "Synchronous replication failed for {Partition}. Message stored locally only.",
+                    partitionAssignment.PartitionKey);
+            }
+        }
+        // Asynchronous mode: fire-and-forget; ReplicateAsync never throws and logs its own failures.
+    }
+
     // ---- Partitioned queue pass-through ----
 
     /// <inheritdoc />
@@ -321,8 +351,59 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
     public void CreatePartitionedQueue(string queueName, int partitionCount)
     {
         _innerPartitionedQueue.CreatePartitionedQueue(queueName, partitionCount);
+        AssignPartitions(queueName, partitionCount);
+    }
 
-        // Assign partitions across the cluster
+    /// <inheritdoc />
+    public int ResolvePartition(Message message) =>
+        _innerPartitionedQueue.ResolvePartition(message);
+
+    /// <inheritdoc />
+    public long GetPartitionMessageCount(string queueName, int partition) =>
+        _innerPartitionedQueue.GetPartitionMessageCount(queueName, partition);
+
+    /// <inheritdoc />
+    /// <remarks>Only partitions for which this node is the primary are returned.</remarks>
+    public int[] GetActivePartitions(string queueName) =>
+        FilterOwnedPartitions(queueName, _innerPartitionedQueue.GetActivePartitions(queueName));
+
+    /// <inheritdoc />
+    /// <remarks>Only partitions for which this node is the primary are returned.</remarks>
+    public int[] GetAvailablePartitions(string queueName) =>
+        FilterOwnedPartitions(queueName, _innerPartitionedQueue.GetAvailablePartitions(queueName));
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// This only redistributes messages stored on the local node. Every node in the cluster
+    /// must run the same operation while the queue is quiesced.
+    /// </remarks>
+    public void EnablePartitioning(string queueName, int partitionCount)
+    {
+        _innerPartitionedQueue.EnablePartitioning(queueName, partitionCount);
+        AssignPartitions(queueName, partitionCount);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// This only affects the local node. Every node in the cluster must run the same
+    /// operation while the queue is quiesced.
+    /// </remarks>
+    public void DisablePartitioning(string queueName) =>
+        _innerPartitionedQueue.DisablePartitioning(queueName);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// This only redistributes messages stored on the local node. Every node in the cluster
+    /// must run the same operation while the queue is quiesced.
+    /// </remarks>
+    public void Repartition(string queueName, int newPartitionCount)
+    {
+        _innerPartitionedQueue.Repartition(queueName, newPartitionCount);
+        AssignPartitions(queueName, newPartitionCount);
+    }
+
+    private void AssignPartitions(string queueName, int partitionCount)
+    {
         var activeNodes = _coordinator.GetActiveMembers();
         if (activeNodes.Count > 0)
         {
@@ -330,9 +411,14 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
         }
     }
 
-    /// <inheritdoc />
-    public int ResolvePartition(Message message, string queueName) =>
-        _innerPartitionedQueue.ResolvePartition(message, queueName);
+    private int[] FilterOwnedPartitions(string queueName, int[] partitions) =>
+        partitions.Where(p => IsLocalPrimary(queueName, p)).ToArray();
+
+    private bool IsLocalPrimary(string queueName, int partition)
+    {
+        var assignment = _assignment.GetAssignment(queueName, partition);
+        return assignment == null || assignment.PrimaryNodeId == _coordinator.LocalNode.NodeId;
+    }
 
     // ---- Simple IQueue delegation ----
 
@@ -357,8 +443,23 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
         => _innerPartitionedQueue.Send(message);
 
     /// <inheritdoc />
-    public void Enqueue(Message message)
-        => _innerPartitionedQueue.Enqueue(message);
+    public void Send<T>(
+        T content,
+        string? destinationUri = null,
+        string? queueName = null,
+        Dictionary<string, string>? headers = null,
+        DateTime? deliverBy = null,
+        int? maxAttempts = null,
+        string? partitionKey = null)
+        => _innerPartitionedQueue.Send(content, destinationUri, queueName, headers, deliverBy, maxAttempts, partitionKey);
+
+    /// <inheritdoc />
+    public int RequeueDeadLetterMessages()
+        => _innerPartitionedQueue.RequeueDeadLetterMessages();
+
+    /// <inheritdoc />
+    public int ClearDeadLetterQueue()
+        => _innerPartitionedQueue.ClearDeadLetterQueue();
 
     // ---- Failover handling ----
 
@@ -436,11 +537,18 @@ public sealed class ClusteredQueue : IPartitionedQueue, IAsyncDisposable
                 sourceEndpoint, partition.PartitionKey, afterMessageId: null,
                 _cts?.Token ?? CancellationToken.None).ConfigureAwait(false);
 
-            if (messages.Count > 0)
+            // The replica may already hold some of these messages (e.g. it was a replica before
+            // a rebalance), so only store the ones that are missing locally.
+            var localIds = Store.PersistedIncoming(partition.PartitionKey)
+                .Select(m => m.Id)
+                .ToHashSet();
+            var missing = messages.Where(m => !localIds.Contains(m.Id)).ToList();
+
+            if (missing.Count > 0)
             {
-                Store.StoreIncoming(messages);
+                Store.StoreIncoming(missing);
                 _logger.LogInformation("Synced {Count} messages for {Partition} from {PrimaryNode}",
-                    messages.Count, partition.PartitionKey, primaryNode.NodeId);
+                    missing.Count, partition.PartitionKey, primaryNode.NodeId);
             }
         }
         catch (Exception ex)

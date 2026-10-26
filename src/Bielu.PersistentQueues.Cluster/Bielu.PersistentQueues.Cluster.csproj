@@ -1,14 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>Bielu.PersistentQueues.Cluster - Distributed clustering with RF=2 replication for persistent queues</Description>
+    <Description>Distributed clustering with partition replication for Bielu.PersistentQueues</Description>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>14</LangVersion>
     <Nullable>enable</Nullable>
-    <AssemblyName>Bielu.PersistentQueues.Cluster</AssemblyName>
     <PackageId>Bielu.PersistentQueues.Cluster</PackageId>
-    <PackageTags>queue;messaging;cluster;replication;distributed</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>queue;persistent;messaging;cluster;replication;distributed</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

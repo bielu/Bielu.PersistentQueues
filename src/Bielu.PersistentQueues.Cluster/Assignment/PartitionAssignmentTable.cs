@@ -34,7 +34,7 @@ public sealed class PartitionAssignmentTable : IPartitionAssignment
     /// Initializes a new instance of the <see cref="PartitionAssignmentTable"/> class.
     /// </summary>
     /// <param name="logger">The logger instance.</param>
-    public PartitionAssignmentTable(ILogger logger)
+    public PartitionAssignmentTable(ILogger<PartitionAssignmentTable> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }

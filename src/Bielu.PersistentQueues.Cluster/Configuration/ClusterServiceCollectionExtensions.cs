@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using Bielu.PersistentQueues.Partitioning;
+using Bielu.PersistentQueues.Serialization;
 using Bielu.PersistentQueues.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -19,7 +20,7 @@ public static class ClusterServiceCollectionExtensions
     /// <remarks>
     /// <para>
     /// This extension wraps the registered <see cref="IPartitionedQueue"/> with a
-    /// <see cref="ClusteredQueue"/> decorator that adds:
+    /// <see cref="ClusteredPartitionedQueueDecorator"/> decorator that adds:
     /// </para>
     /// <list type="bullet">
     ///   <item>Gossip-based cluster membership tracking</item>
@@ -28,7 +29,7 @@ public static class ClusterServiceCollectionExtensions
     ///   <item>Automatic failover when a node dies</item>
     /// </list>
     /// <para>
-    /// Requires <see cref="PartitionedQueueBuilderExtensions.UsePartitioning"/> to be called first.
+    /// Requires <see cref="PartitionedQueueBuilderExtensions.UsePartitioning(PersistentQueuesBuilder, IPartitionStrategy?)"/> to be called first.
     /// </para>
     /// </remarks>
     /// <param name="builder">The queue builder.</param>
@@ -68,7 +69,7 @@ public static class ClusterServiceCollectionExtensions
             return new TcpReplicationProtocol(store, replicationEndpoint, logger);
         });
 
-        // Decorate IPartitionedQueue with ClusteredQueue
+        // Decorate IPartitionedQueue with ClusteredPartitionedQueueDecorator
         builder.Services.AddSingleton<IPartitionedQueue>(sp =>
         {
             // Resolve the inner partitioned queue
@@ -81,9 +82,10 @@ public static class ClusterServiceCollectionExtensions
             var coordinator = sp.GetRequiredService<IClusterCoordinator>();
             var assignment = sp.GetRequiredService<IPartitionAssignment>();
             var replication = sp.GetRequiredService<IReplicationProtocol>();
-            var logger = sp.GetRequiredService<ILogger<ClusteredQueue>>();
+            var logger = sp.GetRequiredService<ILogger<ClusteredPartitionedQueueDecorator>>();
+            var contentSerializer = sp.GetService<IContentSerializer>();
 
-            return new ClusteredQueue(innerPartitioned, coordinator, assignment, replication, config, logger);
+            return new ClusteredPartitionedQueueDecorator(innerPartitioned, coordinator, assignment, replication, config, logger, contentSerializer);
         });
 
         return builder;

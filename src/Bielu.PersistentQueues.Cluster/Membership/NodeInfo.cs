@@ -9,7 +9,7 @@ namespace Bielu.PersistentQueues.Cluster;
 /// </summary>
 /// <remarks>
 /// Each cluster node is uniquely identified by its <see cref="NodeId"/>. The node's
-/// <see cref="Endpoint"/> is used for both queue traffic and cluster gossip communication.
+/// <see cref="QueueEndpoint"/> carries queue traffic and <see cref="GossipEndpoint"/> carries cluster gossip.
 /// <see cref="State"/> tracks the node's lifecycle, and <see cref="LastSeen"/> records
 /// the last time a heartbeat was received from this node.
 /// </remarks>

@@ -37,6 +37,7 @@ excellent choice for lightweight and cross-platform message queuing needs.
 | `Bielu.PersistentQueues` | Core library with queue abstractions and DI support | [![NuGet](https://img.shields.io/nuget/v/Bielu.PersistentQueues.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues/) |
 | `Bielu.PersistentQueues.Storage.LMDB` | LMDB storage provider (using LightningDB) | [![NuGet](https://img.shields.io/nuget/v/Bielu.PersistentQueues.Storage.LMDB.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues.Storage.LMDB/) |
 | `Bielu.PersistentQueues.OpenTelemetry` | OpenTelemetry instrumentation for distributed tracing and metrics | [![NuGet](https://img.shields.io/nuget/v/Bielu.PersistentQueues.OpenTelemetry.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues.OpenTelemetry/) |
+| `Bielu.PersistentQueues.Cluster` | Distributed clustering with partition replication and automatic failover | [![NuGet](https://img.shields.io/nuget/v/Bielu.PersistentQueues.Cluster.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues.Cluster/) |
 
 ---
 
@@ -775,6 +776,47 @@ public class GeoPartitionStrategy : IPartitionStrategy
 ### LMDB Configuration Note
 
 When using partitioned queues with LMDB storage, ensure `MaxDatabases` is set high enough to accommodate all partitions. Each partition creates a separate LMDB database. For example, 4 partitions + 1 outgoing database requires at least `MaxDatabases = 6`.
+
+---
+
+## Clustering and Replication
+
+The `Bielu.PersistentQueues.Cluster` package turns a set of nodes running partitioned queues into a cluster. Each partition has one **primary** and one **replica** on different nodes. No external infrastructure is required: membership uses a gossip protocol over TCP.
+
+```bash
+dotnet add package Bielu.PersistentQueues.Cluster
+```
+
+```csharp
+using Bielu.PersistentQueues.Cluster;
+
+services.AddPersistentQueues(builder =>
+{
+    builder.AutomaticEndpoint()
+           .AddLmdbStorage("/data/queues")
+           .UsePartitioning(new HashPartitionStrategy(), ("orders", 6))
+           .AddClusterSupport(cluster =>
+           {
+               cluster.ReplicationMode = ReplicationMode.Synchronous;
+               cluster.SeedNodes.Add(new IPEndPoint(IPAddress.Parse("10.0.0.1"), 5001));
+           });
+});
+```
+
+Resolve `IPartitionedQueue` to get the cluster-aware queue:
+
+- **Writes**: `Enqueue` / `EnqueueToPartition` write locally and replicate when this node is the partition's primary, or forward the message to the primary over the regular queue transport.
+- **Replication**: in `Synchronous` mode the enqueue blocks until the replica acknowledges. In `Asynchronous` mode replication is fire-and-forget.
+- **Reads**: `ReceiveFromPartition(s)`, `GetActivePartitions` and `GetAvailablePartitions` only cover partitions this node owns as primary.
+- **Failover**: when a node is declared dead, its replicas are promoted to primary (with an incremented epoch) and partitions are rebalanced. A node that joins or recovers catches up on the partitions it replicates.
+
+Ports: gossip listens on the queue port + `GossipPortOffset` (default `1`), and replication listens on the queue port + `GossipPortOffset` + 1. Both must be reachable between nodes.
+
+**Current limitations**
+
+- Replication copies enqueued messages only. Messages consumed on the primary are not removed from the replica, so after a failover the promoted replica can redeliver messages that were already processed (at-least-once delivery). Consumers should be idempotent.
+- The assignment table is computed locally on each node from the same membership view; there is no consensus protocol.
+- `EnablePartitioning`, `DisablePartitioning` and `Repartition` only affect the local node and must be run on every node while the queue is quiesced.
 
 ---
 

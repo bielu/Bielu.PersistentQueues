@@ -42,7 +42,7 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
     /// <param name="store">The local message store for persisting replicated messages.</param>
     /// <param name="replicationEndpoint">The local endpoint to listen on for replication.</param>
     /// <param name="logger">The logger instance.</param>
-    public TcpReplicationProtocol(IMessageStore store, IPEndPoint replicationEndpoint, ILogger logger)
+    public TcpReplicationProtocol(IMessageStore store, IPEndPoint replicationEndpoint, ILogger<TcpReplicationProtocol> logger)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _replicationEndpoint = replicationEndpoint ?? throw new ArgumentNullException(nameof(replicationEndpoint));
@@ -74,18 +74,7 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
                 Type = ReplicationMessageType.Replicate,
                 QueueName = queueName,
                 Epoch = epoch,
-                Messages = messages.Select(m => new ReplicatedMessage
-                {
-                    SourceInstanceId = m.Id.SourceInstanceId,
-                    MessageIdentifier = m.Id.MessageIdentifier,
-                    Queue = m.Queue.ToString(),
-                    Data = m.Data.ToArray(),
-                    SentAt = m.SentAt,
-                    SubQueue = m.SubQueue.ToString(),
-                    PartitionKey = m.PartitionKey.ToString(),
-                    DeliverBy = m.DeliverBy,
-                    MaxAttempts = m.MaxAttempts
-                }).ToList()
+                Messages = messages.Select(ToReplicatedMessage).ToList()
             };
 
             var json = JsonSerializer.Serialize(request);
@@ -166,12 +155,7 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
             if (response?.Messages == null)
                 return Array.Empty<Message>();
 
-            return response.Messages.Select(rm => Message.Create(
-                id: rm.MessageIdentifier,
-                data: rm.Data,
-                queue: rm.Queue,
-                partitionKey: rm.PartitionKey
-            )).ToList().AsReadOnly();
+            return response.Messages.Select(FromReplicatedMessage).ToList().AsReadOnly();
         }
         catch (Exception ex)
         {
@@ -261,27 +245,7 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
             }
 
             // Convert replicated messages to Message structs and store them
-            var messages = request.Messages.Select(rm =>
-            {
-                var id = new MessageId
-                {
-                    SourceInstanceId = rm.SourceInstanceId,
-                    MessageIdentifier = rm.MessageIdentifier
-                };
-
-                return new Message(
-                    id,
-                    rm.Data != null ? new ReadOnlyMemory<byte>(rm.Data) : ReadOnlyMemory<byte>.Empty,
-                    rm.Queue?.AsMemory() ?? ReadOnlyMemory<char>.Empty,
-                    rm.SentAt,
-                    rm.SubQueue?.AsMemory() ?? ReadOnlyMemory<char>.Empty,
-                    ReadOnlyMemory<char>.Empty, // DestinationUri not needed for replicated messages
-                    rm.DeliverBy,
-                    rm.MaxAttempts,
-                    default, // FixedHeaders
-                    partitionKey: rm.PartitionKey?.AsMemory() ?? ReadOnlyMemory<char>.Empty
-                );
-            }).ToList();
+            var messages = request.Messages.Select(FromReplicatedMessage).ToList();
 
             _store.StoreIncoming(messages);
 
@@ -301,32 +265,17 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
         try
         {
             var queueName = request.QueueName ?? string.Empty;
-            var allMessages = _store.PersistedIncoming(queueName).ToList();
-
-            // If afterMessageId is specified, filter to messages after that ID
-            // Since COMB GUIDs are chronologically sorted, we can use simple comparison
-            List<ReplicatedMessage> replicatedMessages;
-            if (request.AfterMessageIdentifier.HasValue)
-            {
-                var afterId = request.AfterMessageIdentifier.Value;
-                var found = false;
-                replicatedMessages = new List<ReplicatedMessage>();
-                foreach (var msg in allMessages)
+            var afterMessageId = request.AfterMessageIdentifier.HasValue
+                ? new MessageId
                 {
-                    if (found)
-                    {
-                        replicatedMessages.Add(ToReplicatedMessage(msg));
-                    }
-                    else if (msg.Id.MessageIdentifier == afterId)
-                    {
-                        found = true;
-                    }
+                    SourceInstanceId = request.AfterSourceInstanceId ?? Guid.Empty,
+                    MessageIdentifier = request.AfterMessageIdentifier.Value
                 }
-            }
-            else
-            {
-                replicatedMessages = allMessages.Select(ToReplicatedMessage).ToList();
-            }
+                : null;
+
+            var replicatedMessages = _store.GetMessagesAfter(queueName, afterMessageId)
+                .Select(ToReplicatedMessage)
+                .ToList();
 
             var response = new SyncResponse { Messages = replicatedMessages };
             var responseJson = JsonSerializer.Serialize(response);
@@ -353,8 +302,25 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
         SubQueue = m.SubQueue.ToString(),
         PartitionKey = m.PartitionKey.ToString(),
         DeliverBy = m.DeliverBy,
-        MaxAttempts = m.MaxAttempts
+        MaxAttempts = m.MaxAttempts,
+        Headers = m.GetHeadersDictionary()
     };
+
+    private static Message FromReplicatedMessage(ReplicatedMessage rm) => new(
+        new MessageId
+        {
+            SourceInstanceId = rm.SourceInstanceId,
+            MessageIdentifier = rm.MessageIdentifier
+        },
+        rm.Data != null ? new ReadOnlyMemory<byte>(rm.Data) : ReadOnlyMemory<byte>.Empty,
+        rm.Queue?.AsMemory() ?? ReadOnlyMemory<char>.Empty,
+        rm.SentAt,
+        rm.SubQueue?.AsMemory() ?? ReadOnlyMemory<char>.Empty,
+        ReadOnlyMemory<char>.Empty, // DestinationUri not needed for replicated messages
+        rm.DeliverBy,
+        rm.MaxAttempts,
+        rm.Headers is { Count: > 0 } ? FixedHeaders.FromDictionary(rm.Headers) : default,
+        partitionKey: rm.PartitionKey?.AsMemory() ?? ReadOnlyMemory<char>.Empty);
 
     /// <inheritdoc />
     public void Dispose()
@@ -405,6 +371,7 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
         public string? PartitionKey { get; set; }
         public DateTime? DeliverBy { get; set; }
         public int? MaxAttempts { get; set; }
+        public Dictionary<string, string>? Headers { get; set; }
     }
 
     private sealed class SyncResponse

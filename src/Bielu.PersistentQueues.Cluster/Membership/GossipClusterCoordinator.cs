@@ -55,7 +55,7 @@ public sealed class GossipClusterCoordinator : IClusterCoordinator
     /// <param name="config">The cluster configuration.</param>
     /// <param name="queueEndpoint">The local queue endpoint.</param>
     /// <param name="logger">The logger instance.</param>
-    public GossipClusterCoordinator(ClusterConfiguration config, IPEndPoint queueEndpoint, ILogger logger)
+    public GossipClusterCoordinator(ClusterConfiguration config, IPEndPoint queueEndpoint, ILogger<GossipClusterCoordinator> logger)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
