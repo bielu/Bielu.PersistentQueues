@@ -99,6 +99,10 @@ public readonly struct Message
     /// <summary>
     /// Initializes a new instance of the <see cref="Message"/> struct.
     /// </summary>
+    /// <param name="bytes">
+    /// Ignored. A message no longer keeps its raw serialized bytes; the parameter is kept only so
+    /// the 1.x public signature stays binary compatible, and will be removed in the next major version.
+    /// </param>
     public Message(
         MessageId id,
         ReadOnlyMemory<byte> data,
@@ -122,6 +126,7 @@ public readonly struct Message
         MaxAttempts = maxAttempts;
         Headers = headers;
         PartitionKey = partitionKey;
+        _ = bytes;
     }
 
     /// <summary>
@@ -255,8 +260,10 @@ public readonly struct Message
     }
 
     /// <summary>
-    /// Creates a new Message with updated bytes
+    /// Returns an unchanged copy of this message. A message no longer keeps its raw serialized
+    /// bytes, so <paramref name="bytes"/> is ignored.
     /// </summary>
+    [Obsolete("Message no longer stores raw bytes; this returns an unchanged copy. It will be removed in the next major version.")]
     public Message WithBytes(ReadOnlySequence<byte> bytes)
     {
         return new Message(
