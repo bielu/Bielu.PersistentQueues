@@ -7,59 +7,87 @@ on:
       - 'src/Bielu.PersistentQueues/**'
       - 'src/Bielu.PersistentQueues.Storage.*/**'
       - 'src/Bielu.PersistentQueues.Benchmarks/**'
+      - '.github/workflows/benchmark-pr.yml'
 
 permissions:
   contents: read
   pull-requests: write
 
+# The PR is compared against its own base commit, benchmarked back to back on the same runner.
+# Comparing against the gh-pages history instead meant comparing against whatever hardware an
+# earlier run happened to land on: shared GitHub runners differ by up to ~1.5x, so every benchmark
+# moved together and the 115% threshold failed PRs that touched no runtime code at all.
 jobs:
   benchmark:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
-    - uses: actions/checkout@v7
+    - name: Checkout PR head
+      uses: actions/checkout@v7
+      with:
+        path: head
+        persist-credentials: false
+
+    - name: Checkout PR base
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ github.event.pull_request.base.sha }}
+        path: base
+        persist-credentials: false
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v6
       with:
         dotnet-version: '10.0.x'
 
-    - name: Restore dependencies
-      run: dotnet restore src/Bielu.PersistentQueues.Benchmarks/Bielu.PersistentQueues.Benchmarks.csproj
-
-    - name: Build benchmarks
-      run: dotnet build src/Bielu.PersistentQueues.Benchmarks/Bielu.PersistentQueues.Benchmarks.csproj -c Release --no-restore
-
-    - name: Run regression benchmarks
+    - name: Run regression benchmarks (base)
+      working-directory: base
       run: |
         dotnet run --project src/Bielu.PersistentQueues.Benchmarks/Bielu.PersistentQueues.Benchmarks.csproj \
-          -c Release --no-build -- \
+          -c Release -- \
           --filter "*RegressionBenchmark*" \
           --exporters json \
-          --artifacts ./BenchmarkDotNet.Artifacts
+          --artifacts ../artifacts/base
 
-    - name: Post benchmark results
+    - name: Run regression benchmarks (head)
+      working-directory: head
+      run: |
+        dotnet run --project src/Bielu.PersistentQueues.Benchmarks/Bielu.PersistentQueues.Benchmarks.csproj \
+          -c Release -- \
+          --filter "*RegressionBenchmark*" \
+          --exporters json \
+          --artifacts ../artifacts/head
+
+    # Seeds a local data file with the base results; nothing to compare against yet, so no alert.
+    - name: Record base results
       uses: benchmark-action/github-action-benchmark@v1
       with:
         name: Regression Benchmarks
         tool: 'benchmarkdotnet'
-        output-file-path: ./BenchmarkDotNet.Artifacts/results/Bielu.PersistentQueues.Benchmarks.RegressionBenchmark-report-full-compressed.json
+        output-file-path: artifacts/base/results/Bielu.PersistentQueues.Benchmarks.RegressionBenchmark-report-full-compressed.json
+        external-data-json-path: ./benchmark-data.json
+        fail-on-alert: false
+
+    # Compares head against the base results recorded in the previous step.
+    - name: Compare head against base
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: Regression Benchmarks
+        tool: 'benchmarkdotnet'
+        output-file-path: artifacts/head/results/Bielu.PersistentQueues.Benchmarks.RegressionBenchmark-report-full-compressed.json
+        external-data-json-path: ./benchmark-data.json
         github-token: ${{ secrets.GITHUB_TOKEN }}
         comment-on-alert: true
         comment-always: true
         summary-always: true
-        alert-threshold: '115%'
+        alert-threshold: '125%'
         fail-on-alert: true
-        # Compare with historical data from gh-pages but do not push (PR context)
-        auto-push: false
-        gh-pages-branch: gh-pages
-        benchmark-data-dir-path: benchmarks
 
     - name: Upload benchmark results
       if: always()
       uses: actions/upload-artifact@v7
       with:
         name: benchmark-results-pr-${{ github.event.pull_request.number }}
-        path: ./BenchmarkDotNet.Artifacts/results/
+        path: artifacts/*/results/
         retention-days: 90
