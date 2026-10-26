@@ -99,10 +99,20 @@ public readonly struct Message
     /// <summary>
     /// Initializes a new instance of the <see cref="Message"/> struct.
     /// </summary>
+    /// <param name="id">The unique identifier for the message.</param>
+    /// <param name="data">The message payload.</param>
+    /// <param name="queue">The name of the queue the message belongs to.</param>
+    /// <param name="sentAt">When the message was sent; <see langword="default"/> uses the current UTC time.</param>
+    /// <param name="subQueue">The optional sub-queue within <paramref name="queue"/>.</param>
+    /// <param name="destinationUri">For outgoing messages, the endpoint to send to (typically <c>lq.tcp://hostname:port</c>).</param>
+    /// <param name="deliverBy">The optional time after which the message is considered expired.</param>
+    /// <param name="maxAttempts">The optional maximum number of delivery attempts.</param>
+    /// <param name="headers">Application-specific metadata that travels with the message.</param>
     /// <param name="bytes">
     /// Ignored. A message no longer keeps its raw serialized bytes; the parameter is kept only so
     /// the 1.x public signature stays binary compatible, and will be removed in the next major version.
     /// </param>
+    /// <param name="partitionKey">The optional key routing related messages to the same partition.</param>
     public Message(
         MessageId id,
         ReadOnlyMemory<byte> data,
