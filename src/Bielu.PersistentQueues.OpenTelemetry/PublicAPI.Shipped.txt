@@ -1,0 +1,90 @@
+#nullable enable
+Bielu.PersistentQueues.OpenTelemetry.Configuration.OpenTelemetryExtensions
+Bielu.PersistentQueues.OpenTelemetry.Configuration.ServiceCollectionExtensions
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.CreateActivePartitionsGauge(System.Func<int>! observeValue) -> System.Diagnostics.Metrics.ObservableGauge<int>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.CreateActivePartitionsPerQueueGauge(System.Func<System.Collections.Generic.IEnumerable<System.Diagnostics.Metrics.Measurement<int>>!>! observeValues) -> System.Diagnostics.Metrics.ObservableGauge<int>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.CreateActiveQueuesGauge(System.Func<int>! observeValue) -> System.Diagnostics.Metrics.ObservableGauge<int>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.CreateDeadLetterQueueDepthGauge(System.Func<System.Collections.Generic.IEnumerable<System.Diagnostics.Metrics.Measurement<long>>!>! observeValues) -> System.Diagnostics.Metrics.ObservableGauge<long>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.CreatePartitionDepthGauge(System.Func<System.Collections.Generic.IEnumerable<System.Diagnostics.Metrics.Measurement<long>>!>! observeValues) -> System.Diagnostics.Metrics.ObservableGauge<long>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.CreatePartitionsPerQueueGauge(System.Func<System.Collections.Generic.IEnumerable<System.Diagnostics.Metrics.Measurement<int>>!>! observeValues) -> System.Diagnostics.Metrics.ObservableGauge<int>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.CreateQueueDepthGauge(System.Func<System.Collections.Generic.IEnumerable<System.Diagnostics.Metrics.Measurement<long>>!>! observeValues) -> System.Diagnostics.Metrics.ObservableGauge<long>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.CreateStorageTotalBytesGauge(System.Func<long>! observeValue) -> System.Diagnostics.Metrics.ObservableGauge<long>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.CreateStorageUsagePercentGauge(System.Func<double>! observeValue) -> System.Diagnostics.Metrics.ObservableGauge<double>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.CreateStorageUsedBytesGauge(System.Func<long>! observeValue) -> System.Diagnostics.Metrics.ObservableGauge<long>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.QueueMetrics() -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordBatchFailed(string? queueName = null, int itemCount = 0) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordBatchProcessed(string? queueName = null) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordBatchSize(int size, string? queueName = null) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordDequeueDuration(double durationMs, string! queueName, int messageCount = 1) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordEnqueueDuration(double durationMs, string! queueName, int messageCount = 1) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordMessageEnqueued(string! queueName) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordMessageSent(string? queueName = null) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordMessagesReceived(int count, string! queueName) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordMessagesSent(int count) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordOperationError(string! operation, string? queueName = null, int? batchSize = null) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordPartitionConsumerStarted(string! queueName, int partition) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordPartitionConsumerStopped(string! queueName, int partition) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordPartitionCreated(string! queueName, int partitionCount) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordPartitionEnqueueDuration(double durationMs, string! queueName, int partition) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordPartitionEnqueued(string! queueName, int partition, string? partitionKey = null) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordPartitionProducerStarted(string! queueName) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordPartitionProducerStopped(string! queueName) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordPartitionReceived(int count, string! queueName, int partition) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordProcessingDuration(double durationMs, string! queueName, int? batchSize = null) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordTimeInQueue(double durationMs, string! queueName) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics.RecordTimeInQueue(double durationMs, string! queueName, int partition) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.CreatePartitionedQueue(string! queueName, int partitionCount) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.DisablePartitioning(string! queueName) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.EnablePartitioning(string! queueName, int partitionCount) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.EnqueueToPartition(Bielu.PersistentQueues.Message message, int partition) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.GetActivePartitions(string! queueName) -> int[]!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.GetAvailablePartitions(string! queueName) -> int[]!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.GetPartitionCount(string! queueName) -> int
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.GetPartitionMessageCount(string! queueName, int partition) -> long
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.OtelPartitionedQueueDecorator(Bielu.PersistentQueues.Partitioning.IPartitionedQueue! partitionedQueue, Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics! queueMetrics, Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing.QueueActivitySource! activitySource) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.PartitionStrategy.get -> Bielu.PersistentQueues.Partitioning.IPartitionStrategy!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.ReceiveBatchFromPartition(string! queueName, int partition, int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IBatchQueueContext!>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.ReceiveFromPartition(string! queueName, int partition, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IMessageContext!>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.ReceiveFromPartitions(string! queueName, int[]! partitions, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IMessageContext!>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.Repartition(string! queueName, int newPartitionCount) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelPartitionedQueueDecorator.ResolvePartition(Bielu.PersistentQueues.Message message) -> int
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.ClearDeadLetterQueue() -> int
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.CreateQueue(string! queueName) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.Dispose() -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.Endpoint.get -> System.Net.IPEndPoint!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.Enqueue(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.Enqueue<T>(T content, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, string? partitionKey = null) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.MoveToQueue(string! queueName, Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.OtelQueueDecorator(Bielu.PersistentQueues.IQueue! queue, Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Metrics.QueueMetrics! queueMetrics, Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing.QueueActivitySource! activitySource) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.Queues.get -> string![]!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.Receive(string! queueName, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IMessageContext!>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.ReceiveBatch(string! queueName, int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IBatchQueueContext!>!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.ReceiveLater(Bielu.PersistentQueues.Message message, System.DateTimeOffset time) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.ReceiveLater(Bielu.PersistentQueues.Message message, System.TimeSpan timeSpan) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.RequeueDeadLetterMessages() -> int
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.Send(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.Send(params Bielu.PersistentQueues.Message[]! messages) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.Send<T>(T content, string? destinationUri = null, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, System.DateTime? deliverBy = null, int? maxAttempts = null, string? partitionKey = null) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.Start() -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.OtelQueueDecorator.Store.get -> Bielu.PersistentQueues.Storage.IMessageStore!
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing.QueueActivitySource
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing.QueueActivitySource.QueueActivitySource() -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing.QueueActivitySource.RecordException(System.Diagnostics.Activity? activity, System.Exception! exception) -> void
+Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing.QueueActivitySource.StartActivity(string! name, System.Diagnostics.ActivityKind kind) -> System.Diagnostics.Activity?
+const Bielu.PersistentQueues.OpenTelemetry.Configuration.ServiceCollectionExtensions.ActivityName = "BieluPersistentQueues" -> string!
+const Bielu.PersistentQueues.OpenTelemetry.Configuration.ServiceCollectionExtensions.MetricName = "BieluPersistentQueues" -> string!
+static Bielu.PersistentQueues.OpenTelemetry.Configuration.OpenTelemetryExtensions.AddBieluPersistentQueuesInstrumentation(this OpenTelemetry.Metrics.MeterProviderBuilder! builder) -> OpenTelemetry.Metrics.MeterProviderBuilder!
+static Bielu.PersistentQueues.OpenTelemetry.Configuration.OpenTelemetryExtensions.AddBieluPersistentQueuesInstrumentation(this OpenTelemetry.Trace.TracerProviderBuilder! builder) -> OpenTelemetry.Trace.TracerProviderBuilder!
+static Bielu.PersistentQueues.OpenTelemetry.Configuration.ServiceCollectionExtensions.AddBieluPersistentQueueInstrumentation(this Microsoft.Extensions.DependencyInjection.IServiceCollection! serviceCollection) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing.QueueActivitySource.SetBatchTags(System.Diagnostics.Activity? activity, int batchSize, string? queueName = null) -> void
+static Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing.QueueActivitySource.SetDelayTags(System.Diagnostics.Activity? activity, System.TimeSpan timeSpan) -> void
+static Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing.QueueActivitySource.SetMessageTags(System.Diagnostics.Activity? activity, System.Guid messageId, string? queueName = null, string? destination = null) -> void
+static Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing.QueueActivitySource.SetPartitionCountTag(System.Diagnostics.Activity? activity, int partitionCount) -> void
+static Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing.QueueActivitySource.SetPartitionTags(System.Diagnostics.Activity? activity, string! queueName, int partition, string? partitionKey = null) -> void
+static Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing.QueueActivitySource.SetPollIntervalTag(System.Diagnostics.Activity? activity, int pollIntervalInMilliseconds) -> void
+static Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing.QueueActivitySource.SetQueueTags(System.Diagnostics.Activity? activity, string! queueName) -> void
+static Bielu.PersistentQueues.OpenTelemetry.Instrumentation.Tracing.QueueActivitySource.SetScheduledTimeTags(System.Diagnostics.Activity? activity, System.DateTimeOffset time) -> void

@@ -1,0 +1,453 @@
+#nullable enable
+Bielu.PersistentQueues.BatchQueueContext
+Bielu.PersistentQueues.BatchQueueContext.CommitChanges() -> void
+Bielu.PersistentQueues.BatchQueueContext.Enqueue(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.BatchQueueContext.Enqueue<T>(T content, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, string? partitionKey = null) -> void
+Bielu.PersistentQueues.BatchQueueContext.Messages.get -> Bielu.PersistentQueues.Message[]!
+Bielu.PersistentQueues.BatchQueueContext.MoveTo(string! queueName) -> void
+Bielu.PersistentQueues.BatchQueueContext.MoveTo(string! queueName, Bielu.PersistentQueues.Message[]! messages) -> void
+Bielu.PersistentQueues.BatchQueueContext.MoveToDeadLetter() -> void
+Bielu.PersistentQueues.BatchQueueContext.MoveToDeadLetter(Bielu.PersistentQueues.Message[]! messages) -> void
+Bielu.PersistentQueues.BatchQueueContext.MoveToDeadLetter(System.Guid[]! messageIds) -> void
+Bielu.PersistentQueues.BatchQueueContext.ReceiveLater(Bielu.PersistentQueues.Message[]! messages, System.DateTimeOffset time) -> void
+Bielu.PersistentQueues.BatchQueueContext.ReceiveLater(Bielu.PersistentQueues.Message[]! messages, System.TimeSpan timeSpan) -> void
+Bielu.PersistentQueues.BatchQueueContext.ReceiveLater(System.DateTimeOffset time) -> void
+Bielu.PersistentQueues.BatchQueueContext.ReceiveLater(System.Guid[]! messageIds, System.DateTimeOffset time) -> void
+Bielu.PersistentQueues.BatchQueueContext.ReceiveLater(System.Guid[]! messageIds, System.TimeSpan timeSpan) -> void
+Bielu.PersistentQueues.BatchQueueContext.ReceiveLater(System.TimeSpan timeSpan) -> void
+Bielu.PersistentQueues.BatchQueueContext.Send(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.BatchQueueContext.Send<T>(T content, string? destinationUri = null, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, System.DateTime? deliverBy = null, int? maxAttempts = null, string? partitionKey = null) -> void
+Bielu.PersistentQueues.BatchQueueContext.SuccessfullyReceived() -> void
+Bielu.PersistentQueues.BatchQueueContext.SuccessfullyReceived(Bielu.PersistentQueues.Message[]! messages) -> void
+Bielu.PersistentQueues.BatchQueueContext.SuccessfullyReceived(System.Guid[]! messageIds) -> void
+Bielu.PersistentQueues.DeadLetterConstants
+Bielu.PersistentQueues.DeadLetterOptions
+Bielu.PersistentQueues.DeadLetterOptions.DeadLetterOptions() -> void
+Bielu.PersistentQueues.DeadLetterOptions.Enabled.get -> bool
+Bielu.PersistentQueues.DeadLetterOptions.Enabled.set -> void
+Bielu.PersistentQueues.DeadLetterOptions.GlobalMaxAttemptsForMessage.get -> int
+Bielu.PersistentQueues.DeadLetterOptions.GlobalMaxAttemptsForMessage.set -> void
+Bielu.PersistentQueues.FixedHeaders
+Bielu.PersistentQueues.FixedHeaders.CopyTo(System.Collections.Generic.IDictionary<string!, string!>! target) -> void
+Bielu.PersistentQueues.FixedHeaders.Count.get -> int
+Bielu.PersistentQueues.FixedHeaders.FixedHeaders() -> void
+Bielu.PersistentQueues.FixedHeaders.GetHeaderAt(int index) -> (System.ReadOnlyMemory<char> key, System.ReadOnlyMemory<char> value)
+Bielu.PersistentQueues.FixedHeaders.GetOriginalQueue() -> string?
+Bielu.PersistentQueues.FixedHeaders.GetProcessingAttempts() -> int
+Bielu.PersistentQueues.FixedHeaders.GetSentAttempts() -> int
+Bielu.PersistentQueues.FixedHeaders.WithOriginalQueue(string! queueName) -> Bielu.PersistentQueues.FixedHeaders
+Bielu.PersistentQueues.FixedHeaders.WithProcessingAttempts(int attempts) -> Bielu.PersistentQueues.FixedHeaders
+Bielu.PersistentQueues.FixedHeaders.WithSentAttempts(int attempts) -> Bielu.PersistentQueues.FixedHeaders
+Bielu.PersistentQueues.IBatchQueueContext
+Bielu.PersistentQueues.IBatchQueueContext.Messages.get -> Bielu.PersistentQueues.Message[]!
+Bielu.PersistentQueues.IBatchQueueContext.MoveTo(string! queueName, Bielu.PersistentQueues.Message[]! messages) -> void
+Bielu.PersistentQueues.IBatchQueueContext.MoveToDeadLetter() -> void
+Bielu.PersistentQueues.IBatchQueueContext.MoveToDeadLetter(Bielu.PersistentQueues.Message[]! messages) -> void
+Bielu.PersistentQueues.IBatchQueueContext.MoveToDeadLetter(System.Guid[]! messageIds) -> void
+Bielu.PersistentQueues.IBatchQueueContext.ReceiveLater(Bielu.PersistentQueues.Message[]! messages, System.DateTimeOffset time) -> void
+Bielu.PersistentQueues.IBatchQueueContext.ReceiveLater(Bielu.PersistentQueues.Message[]! messages, System.TimeSpan timeSpan) -> void
+Bielu.PersistentQueues.IBatchQueueContext.ReceiveLater(System.Guid[]! messageIds, System.DateTimeOffset time) -> void
+Bielu.PersistentQueues.IBatchQueueContext.ReceiveLater(System.Guid[]! messageIds, System.TimeSpan timeSpan) -> void
+Bielu.PersistentQueues.IBatchQueueContext.SuccessfullyReceived(Bielu.PersistentQueues.Message[]! messages) -> void
+Bielu.PersistentQueues.IBatchQueueContext.SuccessfullyReceived(System.Guid[]! messageIds) -> void
+Bielu.PersistentQueues.IMessageContext
+Bielu.PersistentQueues.IMessageContext.Message.get -> Bielu.PersistentQueues.Message
+Bielu.PersistentQueues.IMessageContext.QueueContext.get -> Bielu.PersistentQueues.IQueueContext!
+Bielu.PersistentQueues.IQueue
+Bielu.PersistentQueues.IQueue.ClearDeadLetterQueue() -> int
+Bielu.PersistentQueues.IQueue.CreateQueue(string! queueName) -> void
+Bielu.PersistentQueues.IQueue.Endpoint.get -> System.Net.IPEndPoint!
+Bielu.PersistentQueues.IQueue.Enqueue(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.IQueue.Enqueue<T>(T content, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, string? partitionKey = null) -> void
+Bielu.PersistentQueues.IQueue.MoveToQueue(string! queueName, Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.IQueue.Queues.get -> string![]!
+Bielu.PersistentQueues.IQueue.Receive(string! queueName, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IMessageContext!>!
+Bielu.PersistentQueues.IQueue.ReceiveBatch(string! queueName, int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IBatchQueueContext!>!
+Bielu.PersistentQueues.IQueue.ReceiveLater(Bielu.PersistentQueues.Message message, System.DateTimeOffset time) -> void
+Bielu.PersistentQueues.IQueue.ReceiveLater(Bielu.PersistentQueues.Message message, System.TimeSpan timeSpan) -> void
+Bielu.PersistentQueues.IQueue.RequeueDeadLetterMessages() -> int
+Bielu.PersistentQueues.IQueue.Send(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.IQueue.Send(params Bielu.PersistentQueues.Message[]! messages) -> void
+Bielu.PersistentQueues.IQueue.Send<T>(T content, string? destinationUri = null, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, System.DateTime? deliverBy = null, int? maxAttempts = null, string? partitionKey = null) -> void
+Bielu.PersistentQueues.IQueue.Start() -> void
+Bielu.PersistentQueues.IQueue.Store.get -> Bielu.PersistentQueues.Storage.IMessageStore!
+Bielu.PersistentQueues.IQueueContext
+Bielu.PersistentQueues.IQueueContext.CommitChanges() -> void
+Bielu.PersistentQueues.IQueueContext.Enqueue(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.IQueueContext.Enqueue<T>(T content, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, string? partitionKey = null) -> void
+Bielu.PersistentQueues.IQueueContext.MoveTo(string! queueName) -> void
+Bielu.PersistentQueues.IQueueContext.MoveToDeadLetter() -> void
+Bielu.PersistentQueues.IQueueContext.ReceiveLater(System.DateTimeOffset time) -> void
+Bielu.PersistentQueues.IQueueContext.ReceiveLater(System.TimeSpan timeSpan) -> void
+Bielu.PersistentQueues.IQueueContext.Send(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.IQueueContext.Send<T>(T content, string? destinationUri = null, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, System.DateTime? deliverBy = null, int? maxAttempts = null, string? partitionKey = null) -> void
+Bielu.PersistentQueues.IQueueContext.SuccessfullyReceived() -> void
+Bielu.PersistentQueues.Message
+Bielu.PersistentQueues.Message.DataArray.get -> byte[]?
+Bielu.PersistentQueues.Message.Destination.get -> System.Uri?
+Bielu.PersistentQueues.Message.GetContent<T>(Bielu.PersistentQueues.Serialization.IContentSerializer? contentSerializer = null) -> T?
+Bielu.PersistentQueues.Message.GetHeadersDictionary() -> System.Collections.Generic.Dictionary<string!, string!>!
+Bielu.PersistentQueues.Message.Message() -> void
+Bielu.PersistentQueues.Message.Message(Bielu.PersistentQueues.MessageId! id, System.ReadOnlyMemory<byte> data, System.ReadOnlyMemory<char> queue, System.DateTime sentAt = default(System.DateTime), System.ReadOnlyMemory<char> subQueue = default(System.ReadOnlyMemory<char>), System.ReadOnlyMemory<char> destinationUri = default(System.ReadOnlyMemory<char>), System.DateTime? deliverBy = null, int? maxAttempts = null, Bielu.PersistentQueues.FixedHeaders headers = default(Bielu.PersistentQueues.FixedHeaders), System.Buffers.ReadOnlySequence<byte> bytes = default(System.Buffers.ReadOnlySequence<byte>), System.ReadOnlyMemory<char> partitionKey = default(System.ReadOnlyMemory<char>)) -> void
+Bielu.PersistentQueues.Message.OriginalQueue.get -> string?
+Bielu.PersistentQueues.Message.PartitionKeyString.get -> string?
+Bielu.PersistentQueues.Message.ProcessingAttempts.get -> int
+Bielu.PersistentQueues.Message.QueueString.get -> string?
+Bielu.PersistentQueues.Message.SentAttempts.get -> int
+Bielu.PersistentQueues.Message.SubQueueString.get -> string?
+Bielu.PersistentQueues.Message.WithBytes(System.Buffers.ReadOnlySequence<byte> bytes) -> Bielu.PersistentQueues.Message
+Bielu.PersistentQueues.Message.WithHeaders(Bielu.PersistentQueues.FixedHeaders headers) -> Bielu.PersistentQueues.Message
+Bielu.PersistentQueues.Message.WithOriginalQueue(string! queueName) -> Bielu.PersistentQueues.Message
+Bielu.PersistentQueues.Message.WithPartitionKey(System.ReadOnlyMemory<char> partitionKey) -> Bielu.PersistentQueues.Message
+Bielu.PersistentQueues.Message.WithProcessingAttempts(int attempts) -> Bielu.PersistentQueues.Message
+Bielu.PersistentQueues.Message.WithQueue(string! queueName) -> Bielu.PersistentQueues.Message
+Bielu.PersistentQueues.Message.WithSentAttempts(int attempts) -> Bielu.PersistentQueues.Message
+Bielu.PersistentQueues.MessageContext
+Bielu.PersistentQueues.MessageContext.Message.get -> Bielu.PersistentQueues.Message
+Bielu.PersistentQueues.MessageContext.QueueContext.get -> Bielu.PersistentQueues.IQueueContext!
+Bielu.PersistentQueues.MessageId
+Bielu.PersistentQueues.MessageId.MessageId() -> void
+Bielu.PersistentQueues.MessageId.MessageId(Bielu.PersistentQueues.MessageId! original) -> void
+Bielu.PersistentQueues.MessageId.MessageIdentifier.get -> System.Guid
+Bielu.PersistentQueues.MessageId.MessageIdentifier.init -> void
+Bielu.PersistentQueues.MessageId.SourceInstanceId.get -> System.Guid
+Bielu.PersistentQueues.MessageId.SourceInstanceId.init -> void
+Bielu.PersistentQueues.Network.OutgoingMessageFailure
+Bielu.PersistentQueues.Network.OutgoingMessageFailure.Messages.get -> System.Collections.Generic.IList<Bielu.PersistentQueues.Message>!
+Bielu.PersistentQueues.Network.OutgoingMessageFailure.Messages.init -> void
+Bielu.PersistentQueues.Network.OutgoingMessageFailure.OutgoingMessageFailure() -> void
+Bielu.PersistentQueues.Network.OutgoingMessageFailure.ShouldRetry.get -> bool
+Bielu.PersistentQueues.Network.OutgoingMessageFailure.ShouldRetry.init -> void
+Bielu.PersistentQueues.Network.Protocol.IReceivingProtocol
+Bielu.PersistentQueues.Network.Protocol.IReceivingProtocol.ReceiveMessagesAsync(System.IO.Stream! stream, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IList<Bielu.PersistentQueues.Message>!>!
+Bielu.PersistentQueues.Network.Protocol.ISendingProtocol
+Bielu.PersistentQueues.Network.Protocol.ISendingProtocol.SendAsync(System.Uri! destination, System.IO.Stream! stream, System.Collections.Generic.List<Bielu.PersistentQueues.Message>! batch, System.Threading.CancellationToken token) -> System.Threading.Tasks.ValueTask
+Bielu.PersistentQueues.Network.Protocol.ISendingProtocol.SendRawAsync(System.Uri! destination, System.IO.Stream! stream, System.Collections.Generic.List<Bielu.PersistentQueues.Serialization.RawOutgoingMessage>! rawMessages, System.Threading.CancellationToken token) -> System.Threading.Tasks.ValueTask
+Bielu.PersistentQueues.Network.Protocol.ProtocolBase
+Bielu.PersistentQueues.Network.Protocol.ProtocolBase.ProtocolBase(Microsoft.Extensions.Logging.ILogger! logger) -> void
+Bielu.PersistentQueues.Network.Protocol.ProtocolBase.ReceiveIntoBufferAsync(System.IO.Pipelines.PipeWriter! writer, System.IO.Stream! stream, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Bielu.PersistentQueues.Network.Protocol.V1.Constants
+Bielu.PersistentQueues.Network.Protocol.V1.ReceivingProtocol
+Bielu.PersistentQueues.Network.Protocol.V1.ReceivingProtocol.ReceiveMessagesAsync(System.IO.Stream! stream, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IList<Bielu.PersistentQueues.Message>!>!
+Bielu.PersistentQueues.Network.Protocol.V1.ReceivingProtocol.ReceivingProtocol(Bielu.PersistentQueues.Storage.IMessageStore! store, Bielu.PersistentQueues.Network.Security.IStreamSecurity! security, Bielu.PersistentQueues.Serialization.IMessageSerializer! serializer, System.Uri! receivingUri, Microsoft.Extensions.Logging.ILogger! logger) -> void
+Bielu.PersistentQueues.Network.Protocol.V1.SendingProtocol
+Bielu.PersistentQueues.Network.Protocol.V1.SendingProtocol.SendAsync(System.Uri! destination, System.IO.Stream! stream, System.Collections.Generic.List<Bielu.PersistentQueues.Message>! batch, System.Threading.CancellationToken token) -> System.Threading.Tasks.ValueTask
+Bielu.PersistentQueues.Network.Protocol.V1.SendingProtocol.SendRawAsync(System.Uri! destination, System.IO.Stream! stream, System.Collections.Generic.List<Bielu.PersistentQueues.Serialization.RawOutgoingMessage>! rawMessages, System.Threading.CancellationToken token) -> System.Threading.Tasks.ValueTask
+Bielu.PersistentQueues.Network.Protocol.V1.SendingProtocol.SendingProtocol(Bielu.PersistentQueues.Storage.IMessageStore! store, Bielu.PersistentQueues.Network.Security.IStreamSecurity! security, Bielu.PersistentQueues.Serialization.IMessageSerializer! serializer, Microsoft.Extensions.Logging.ILogger! logger) -> void
+Bielu.PersistentQueues.Network.Security.IStreamSecurity
+Bielu.PersistentQueues.Network.Security.IStreamSecurity.ApplyAsync(System.Uri! endpoint, System.IO.Stream! stream) -> System.Threading.Tasks.ValueTask<System.IO.Stream!>
+Bielu.PersistentQueues.Network.Security.NoSecurity
+Bielu.PersistentQueues.Network.Security.NoSecurity.ApplyAsync(System.Uri! endpoint, System.IO.Stream! stream) -> System.Threading.Tasks.ValueTask<System.IO.Stream!>
+Bielu.PersistentQueues.Network.Security.NoSecurity.NoSecurity() -> void
+Bielu.PersistentQueues.Network.Security.TlsStreamSecurity
+Bielu.PersistentQueues.Network.Security.TlsStreamSecurity.ApplyAsync(System.Uri! endpoint, System.IO.Stream! stream) -> System.Threading.Tasks.ValueTask<System.IO.Stream!>
+Bielu.PersistentQueues.Network.Security.TlsStreamSecurity.TlsStreamSecurity(System.Func<System.Uri!, System.IO.Stream!, System.Threading.Tasks.Task<System.IO.Stream!>!>! streamSecurity) -> void
+Bielu.PersistentQueues.Network.SendingErrorPolicy
+Bielu.PersistentQueues.Network.SendingErrorPolicy.Retries.get -> System.Threading.Channels.ChannelReader<Bielu.PersistentQueues.Message>!
+Bielu.PersistentQueues.Network.SendingErrorPolicy.SendingErrorPolicy(Microsoft.Extensions.Logging.ILogger! logger, Bielu.PersistentQueues.Storage.IMessageStore! store, System.Threading.Channels.Channel<Bielu.PersistentQueues.Network.OutgoingMessageFailure!>! failedToConnect, Bielu.PersistentQueues.DeadLetterOptions? deadLetterOptions = null) -> void
+Bielu.PersistentQueues.Network.SendingErrorPolicy.ShouldRetry(Bielu.PersistentQueues.Message message, bool shouldRetryOverride = true) -> bool
+Bielu.PersistentQueues.Network.SendingErrorPolicy.StartRetriesAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Bielu.PersistentQueues.Network.Tcp.NetExtensions
+Bielu.PersistentQueues.Network.Tcp.Receiver
+Bielu.PersistentQueues.Network.Tcp.Receiver.Dispose() -> void
+Bielu.PersistentQueues.Network.Tcp.Receiver.Endpoint.get -> System.Net.IPEndPoint!
+Bielu.PersistentQueues.Network.Tcp.Receiver.Receiver(System.Net.IPEndPoint! endpoint, Bielu.PersistentQueues.Network.Protocol.IReceivingProtocol! protocol, Microsoft.Extensions.Logging.ILogger! logger) -> void
+Bielu.PersistentQueues.Network.Tcp.Receiver.StartReceivingAsync(System.Threading.Channels.ChannelWriter<Bielu.PersistentQueues.Message>! receivedChannel, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Bielu.PersistentQueues.Network.Tcp.Sender
+Bielu.PersistentQueues.Network.Tcp.Sender.Dispose() -> void
+Bielu.PersistentQueues.Network.Tcp.Sender.FailedToSend() -> System.Threading.Channels.Channel<Bielu.PersistentQueues.Network.OutgoingMessageFailure!>!
+Bielu.PersistentQueues.Network.Tcp.Sender.Sender(Bielu.PersistentQueues.Network.Protocol.ISendingProtocol! protocol, Bielu.PersistentQueues.Serialization.IMessageSerializer! serializer, Microsoft.Extensions.Logging.ILogger! logger, System.TimeSpan sendTimeout) -> void
+Bielu.PersistentQueues.Network.Tcp.Sender.StartSendingAsync(Bielu.PersistentQueues.Storage.IMessageStore! messageStore, int batchSize = 50, System.TimeSpan pollInterval = default(System.TimeSpan), System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Bielu.PersistentQueues.PartitionedQueueBuilderExtensions
+Bielu.PersistentQueues.PartitionedQueueConfigurationExtensions
+Bielu.PersistentQueues.Partitioning.ExplicitPartitionStrategy
+Bielu.PersistentQueues.Partitioning.ExplicitPartitionStrategy.ExplicitPartitionStrategy() -> void
+Bielu.PersistentQueues.Partitioning.ExplicitPartitionStrategy.GetPartition(Bielu.PersistentQueues.Message message, int partitionCount) -> int
+Bielu.PersistentQueues.Partitioning.HashPartitionStrategy
+Bielu.PersistentQueues.Partitioning.HashPartitionStrategy.GetPartition(Bielu.PersistentQueues.Message message, int partitionCount) -> int
+Bielu.PersistentQueues.Partitioning.HashPartitionStrategy.HashPartitionStrategy() -> void
+Bielu.PersistentQueues.Partitioning.IPartitionStrategy
+Bielu.PersistentQueues.Partitioning.IPartitionStrategy.GetPartition(Bielu.PersistentQueues.Message message, int partitionCount) -> int
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue.CreatePartitionedQueue(string! queueName, int partitionCount) -> void
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue.DisablePartitioning(string! queueName) -> void
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue.EnablePartitioning(string! queueName, int partitionCount) -> void
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue.EnqueueToPartition(Bielu.PersistentQueues.Message message, int partition) -> void
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue.GetActivePartitions(string! queueName) -> int[]!
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue.GetAvailablePartitions(string! queueName) -> int[]!
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue.GetPartitionCount(string! queueName) -> int
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue.GetPartitionMessageCount(string! queueName, int partition) -> long
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue.PartitionStrategy.get -> Bielu.PersistentQueues.Partitioning.IPartitionStrategy!
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue.ReceiveBatchFromPartition(string! queueName, int partition, int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IBatchQueueContext!>!
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue.ReceiveFromPartition(string! queueName, int partition, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IMessageContext!>!
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue.ReceiveFromPartitions(string! queueName, int[]! partitions, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IMessageContext!>!
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue.Repartition(string! queueName, int newPartitionCount) -> void
+Bielu.PersistentQueues.Partitioning.IPartitionedQueue.ResolvePartition(Bielu.PersistentQueues.Message message) -> int
+Bielu.PersistentQueues.Partitioning.PartitionConstants
+Bielu.PersistentQueues.Partitioning.PartitionedQueue
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.ClearDeadLetterQueue() -> int
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.CreatePartitionedQueue(string! queueName, int partitionCount) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.CreateQueue(string! queueName) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.DisablePartitioning(string! queueName) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.Dispose() -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.EnablePartitioning(string! queueName, int partitionCount) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.Endpoint.get -> System.Net.IPEndPoint!
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.Enqueue(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.Enqueue<T>(T content, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, string? partitionKey = null) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.EnqueueToPartition(Bielu.PersistentQueues.Message message, int partition) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.GetActivePartitions(string! queueName) -> int[]!
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.GetAvailablePartitions(string! queueName) -> int[]!
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.GetPartitionCount(string! queueName) -> int
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.GetPartitionMessageCount(string! queueName, int partition) -> long
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.MoveToQueue(string! queueName, Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.PartitionStrategy.get -> Bielu.PersistentQueues.Partitioning.IPartitionStrategy!
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.PartitionedQueue(Bielu.PersistentQueues.IQueue! innerQueue, Bielu.PersistentQueues.Partitioning.IPartitionStrategy! partitionStrategy) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.Queues.get -> string![]!
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.Receive(string! queueName, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IMessageContext!>!
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.ReceiveBatch(string! queueName, int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IBatchQueueContext!>!
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.ReceiveBatchFromPartition(string! queueName, int partition, int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IBatchQueueContext!>!
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.ReceiveFromPartition(string! queueName, int partition, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IMessageContext!>!
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.ReceiveFromPartitions(string! queueName, int[]! partitions, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IMessageContext!>!
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.ReceiveLater(Bielu.PersistentQueues.Message message, System.DateTimeOffset time) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.ReceiveLater(Bielu.PersistentQueues.Message message, System.TimeSpan timeSpan) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.Repartition(string! queueName, int newPartitionCount) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.RequeueDeadLetterMessages() -> int
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.ResolvePartition(Bielu.PersistentQueues.Message message) -> int
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.Send(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.Send(params Bielu.PersistentQueues.Message[]! messages) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.Send<T>(T content, string? destinationUri = null, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, System.DateTime? deliverBy = null, int? maxAttempts = null, string? partitionKey = null) -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.Start() -> void
+Bielu.PersistentQueues.Partitioning.PartitionedQueue.Store.get -> Bielu.PersistentQueues.Storage.IMessageStore!
+Bielu.PersistentQueues.Partitioning.RoundRobinPartitionStrategy
+Bielu.PersistentQueues.Partitioning.RoundRobinPartitionStrategy.GetPartition(Bielu.PersistentQueues.Message message, int partitionCount) -> int
+Bielu.PersistentQueues.Partitioning.RoundRobinPartitionStrategy.RoundRobinPartitionStrategy() -> void
+Bielu.PersistentQueues.PersistentQueuesBuilder
+Bielu.PersistentQueues.PersistentQueuesBuilder.AutoStart() -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+Bielu.PersistentQueues.PersistentQueuesBuilder.AutomaticEndpoint() -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+Bielu.PersistentQueues.PersistentQueuesBuilder.CreateQueues(params string![]! queueNames) -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+Bielu.PersistentQueues.PersistentQueuesBuilder.ListenOn(System.Net.IPEndPoint! endpoint) -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+Bielu.PersistentQueues.PersistentQueuesBuilder.NetworkBatchTimeout(System.TimeSpan timeout) -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+Bielu.PersistentQueues.PersistentQueuesBuilder.PersistentQueuesBuilder(Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> void
+Bielu.PersistentQueues.PersistentQueuesBuilder.SecureTransportWith(Bielu.PersistentQueues.Network.Security.IStreamSecurity! sending, Bielu.PersistentQueues.Network.Security.IStreamSecurity! receiving) -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+Bielu.PersistentQueues.PersistentQueuesBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Bielu.PersistentQueues.PersistentQueuesBuilder.UseStorage(System.Func<System.IServiceProvider!, Bielu.PersistentQueues.Storage.IMessageStore!>! storeFactory) -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+Bielu.PersistentQueues.PersistentQueuesBuilder.WithDeadLetterQueue() -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+Bielu.PersistentQueues.PortFinder
+Bielu.PersistentQueues.Queue
+Bielu.PersistentQueues.Queue.ClearDeadLetterQueue() -> int
+Bielu.PersistentQueues.Queue.CreateQueue(string! queueName) -> void
+Bielu.PersistentQueues.Queue.Dispose() -> void
+Bielu.PersistentQueues.Queue.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Bielu.PersistentQueues.Queue.Endpoint.get -> System.Net.IPEndPoint!
+Bielu.PersistentQueues.Queue.Enqueue(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Queue.Enqueue<T>(T content, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, string? partitionKey = null) -> void
+Bielu.PersistentQueues.Queue.MoveToQueue(string! queueName, Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Queue.Queue(Bielu.PersistentQueues.Network.Tcp.Receiver! receiver, Bielu.PersistentQueues.Network.Tcp.Sender! sender, Bielu.PersistentQueues.Storage.IMessageStore! messageStore, Microsoft.Extensions.Logging.ILogger! logger, Bielu.PersistentQueues.Serialization.IContentSerializer? contentSerializer = null, Bielu.PersistentQueues.DeadLetterOptions? deadLetterOptions = null) -> void
+Bielu.PersistentQueues.Queue.Queues.get -> string![]!
+Bielu.PersistentQueues.Queue.Receive(string! queueName, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IMessageContext!>!
+Bielu.PersistentQueues.Queue.ReceiveBatch(string! queueName, int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IBatchQueueContext!>!
+Bielu.PersistentQueues.Queue.ReceiveLater(Bielu.PersistentQueues.Message message, System.DateTimeOffset time) -> void
+Bielu.PersistentQueues.Queue.ReceiveLater(Bielu.PersistentQueues.Message message, System.TimeSpan timeSpan) -> void
+Bielu.PersistentQueues.Queue.RequeueDeadLetterMessages() -> int
+Bielu.PersistentQueues.Queue.Send(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Queue.Send(params Bielu.PersistentQueues.Message[]! messages) -> void
+Bielu.PersistentQueues.Queue.Send<T>(T content, string? destinationUri = null, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, System.DateTime? deliverBy = null, int? maxAttempts = null, string? partitionKey = null) -> void
+Bielu.PersistentQueues.Queue.Start() -> void
+Bielu.PersistentQueues.Queue.Store.get -> Bielu.PersistentQueues.Storage.IMessageStore!
+Bielu.PersistentQueues.QueueConfiguration
+Bielu.PersistentQueues.QueueConfiguration.AutomaticEndpoint() -> Bielu.PersistentQueues.QueueConfiguration!
+Bielu.PersistentQueues.QueueConfiguration.BuildAndStart(string! queueName) -> Bielu.PersistentQueues.IQueue!
+Bielu.PersistentQueues.QueueConfiguration.BuildQueue() -> Bielu.PersistentQueues.IQueue!
+Bielu.PersistentQueues.QueueConfiguration.CommunicateWithProtocol(Bielu.PersistentQueues.Network.Protocol.IReceivingProtocol! receivingProtocol, Bielu.PersistentQueues.Network.Protocol.ISendingProtocol! sendingProtocol) -> Bielu.PersistentQueues.QueueConfiguration!
+Bielu.PersistentQueues.QueueConfiguration.LogWith(Microsoft.Extensions.Logging.ILogger! logger) -> Bielu.PersistentQueues.QueueConfiguration!
+Bielu.PersistentQueues.QueueConfiguration.QueueConfiguration() -> void
+Bielu.PersistentQueues.QueueConfiguration.ReceiveMessagesAt(System.Net.IPEndPoint! endpoint) -> Bielu.PersistentQueues.QueueConfiguration!
+Bielu.PersistentQueues.QueueConfiguration.SecureTransportWith(Bielu.PersistentQueues.Network.Security.IStreamSecurity! sending, Bielu.PersistentQueues.Network.Security.IStreamSecurity! receiving) -> Bielu.PersistentQueues.QueueConfiguration!
+Bielu.PersistentQueues.QueueConfiguration.SerializeContentWith(Bielu.PersistentQueues.Serialization.IContentSerializer! contentSerializer) -> Bielu.PersistentQueues.QueueConfiguration!
+Bielu.PersistentQueues.QueueConfiguration.SerializeWith(Bielu.PersistentQueues.Serialization.IMessageSerializer! serializer) -> Bielu.PersistentQueues.QueueConfiguration!
+Bielu.PersistentQueues.QueueConfiguration.Serializer.get -> Bielu.PersistentQueues.Serialization.IMessageSerializer?
+Bielu.PersistentQueues.QueueConfiguration.StoreMessagesWith(System.Func<Bielu.PersistentQueues.Storage.IMessageStore!>! store) -> Bielu.PersistentQueues.QueueConfiguration!
+Bielu.PersistentQueues.QueueConfiguration.TimeoutNetworkBatchAfter(System.TimeSpan timeSpan) -> Bielu.PersistentQueues.QueueConfiguration!
+Bielu.PersistentQueues.QueueConfiguration.WithDeadLetterQueue() -> Bielu.PersistentQueues.QueueConfiguration!
+Bielu.PersistentQueues.QueueConfiguration.WithDefaults() -> Bielu.PersistentQueues.QueueConfiguration!
+Bielu.PersistentQueues.QueueContextExtensions
+Bielu.PersistentQueues.QueueExtensions
+Bielu.PersistentQueues.Serialization.IContentSerializer
+Bielu.PersistentQueues.Serialization.IContentSerializer.Deserialize<T>(System.ReadOnlySpan<byte> data) -> T?
+Bielu.PersistentQueues.Serialization.IContentSerializer.Serialize<T>(T content) -> byte[]!
+Bielu.PersistentQueues.Serialization.IMessageSerializer
+Bielu.PersistentQueues.Serialization.IMessageSerializer.AsSpan(Bielu.PersistentQueues.Message message) -> System.ReadOnlySpan<byte>
+Bielu.PersistentQueues.Serialization.IMessageSerializer.ReadMessages(System.Buffers.ReadOnlySequence<byte> buffer) -> System.Collections.Generic.IList<Bielu.PersistentQueues.Message>!
+Bielu.PersistentQueues.Serialization.IMessageSerializer.ToMemory(System.Collections.Generic.List<Bielu.PersistentQueues.Message>! messages) -> System.ReadOnlyMemory<byte>
+Bielu.PersistentQueues.Serialization.IMessageSerializer.ToMessage(System.ReadOnlySpan<byte> buffer) -> Bielu.PersistentQueues.Message
+Bielu.PersistentQueues.Serialization.JsonContentSerializer
+Bielu.PersistentQueues.Serialization.JsonContentSerializer.Deserialize<T>(System.ReadOnlySpan<byte> data) -> T?
+Bielu.PersistentQueues.Serialization.JsonContentSerializer.JsonContentSerializer(System.Text.Json.JsonSerializerOptions? options = null) -> void
+Bielu.PersistentQueues.Serialization.JsonContentSerializer.Serialize<T>(T content) -> byte[]!
+Bielu.PersistentQueues.Serialization.MemStringEqualityComparer
+Bielu.PersistentQueues.Serialization.MemStringEqualityComparer.Equals(System.ReadOnlyMemory<char> x, System.ReadOnlyMemory<char> y) -> bool
+Bielu.PersistentQueues.Serialization.MemStringEqualityComparer.GetHashCode(System.ReadOnlyMemory<char> obj) -> int
+Bielu.PersistentQueues.Serialization.MemStringEqualityComparer.MemStringEqualityComparer() -> void
+Bielu.PersistentQueues.Serialization.MessageSerializer
+Bielu.PersistentQueues.Serialization.MessageSerializer.AsSpan(Bielu.PersistentQueues.Message message) -> System.ReadOnlySpan<byte>
+Bielu.PersistentQueues.Serialization.MessageSerializer.MessageSerializer() -> void
+Bielu.PersistentQueues.Serialization.MessageSerializer.ReadMessages(System.Buffers.ReadOnlySequence<byte> buffer) -> System.Collections.Generic.IList<Bielu.PersistentQueues.Message>!
+Bielu.PersistentQueues.Serialization.MessageSerializer.ToMemory(System.Collections.Generic.List<Bielu.PersistentQueues.Message>! messages) -> System.ReadOnlyMemory<byte>
+Bielu.PersistentQueues.Serialization.MessageSerializer.ToMessage(System.ReadOnlySpan<byte> buffer) -> Bielu.PersistentQueues.Message
+Bielu.PersistentQueues.Serialization.RawMessageInfo
+Bielu.PersistentQueues.Serialization.RawMessageInfo.FullMessage.get -> System.ReadOnlyMemory<byte>
+Bielu.PersistentQueues.Serialization.RawMessageInfo.FullMessage.init -> void
+Bielu.PersistentQueues.Serialization.RawMessageInfo.MessageId.get -> System.ReadOnlyMemory<byte>
+Bielu.PersistentQueues.Serialization.RawMessageInfo.MessageId.init -> void
+Bielu.PersistentQueues.Serialization.RawMessageInfo.QueueNameBytes.get -> System.ReadOnlyMemory<byte>
+Bielu.PersistentQueues.Serialization.RawMessageInfo.QueueNameBytes.init -> void
+Bielu.PersistentQueues.Serialization.RawMessageInfo.RawMessageInfo() -> void
+Bielu.PersistentQueues.Serialization.RawOutgoingMessage
+Bielu.PersistentQueues.Serialization.RawOutgoingMessage.DestinationUriBytes.get -> System.ReadOnlyMemory<byte>
+Bielu.PersistentQueues.Serialization.RawOutgoingMessage.DestinationUriBytes.init -> void
+Bielu.PersistentQueues.Serialization.RawOutgoingMessage.FullMessage.get -> System.ReadOnlyMemory<byte>
+Bielu.PersistentQueues.Serialization.RawOutgoingMessage.FullMessage.init -> void
+Bielu.PersistentQueues.Serialization.RawOutgoingMessage.MessageId.get -> System.ReadOnlyMemory<byte>
+Bielu.PersistentQueues.Serialization.RawOutgoingMessage.MessageId.init -> void
+Bielu.PersistentQueues.Serialization.RawOutgoingMessage.QueueNameBytes.get -> System.ReadOnlyMemory<byte>
+Bielu.PersistentQueues.Serialization.RawOutgoingMessage.QueueNameBytes.init -> void
+Bielu.PersistentQueues.Serialization.RawOutgoingMessage.RawOutgoingMessage() -> void
+Bielu.PersistentQueues.Serialization.WireFormatReader
+Bielu.PersistentQueues.Serialization.WireFormatSplitter
+Bielu.PersistentQueues.ServiceCollectionExtensions
+Bielu.PersistentQueues.Storage.IMessageStore
+Bielu.PersistentQueues.Storage.IMessageStore.BeginTransaction() -> Bielu.PersistentQueues.Storage.IStoreTransaction!
+Bielu.PersistentQueues.Storage.IMessageStore.ClearAllStorage() -> void
+Bielu.PersistentQueues.Storage.IMessageStore.CreateQueue(string! queueName) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.DeleteIncoming(params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.DeleteQueue(string! queueName) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.FailedToSend(bool shouldRemove = false, params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! message) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.GetAllQueues() -> string![]!
+Bielu.PersistentQueues.Storage.IMessageStore.GetMessage(string! queueName, Bielu.PersistentQueues.MessageId! messageId) -> Bielu.PersistentQueues.Message?
+Bielu.PersistentQueues.Storage.IMessageStore.GetMessageCount(string! queueName) -> long
+Bielu.PersistentQueues.Storage.IMessageStore.GetStorageUsageInfo() -> Bielu.PersistentQueues.Storage.StorageUsageInfo?
+Bielu.PersistentQueues.Storage.IMessageStore.MoveToQueue(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, string! queueName, Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.MoveToQueue(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, string! queueName, System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.PersistedIncoming(string! queueName) -> System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>!
+Bielu.PersistentQueues.Storage.IMessageStore.PersistedOutgoing() -> System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>!
+Bielu.PersistentQueues.Storage.IMessageStore.PersistedOutgoingRaw() -> System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Serialization.RawOutgoingMessage>!
+Bielu.PersistentQueues.Storage.IMessageStore.StoreIncoming(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.StoreIncoming(params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.StoreOutgoing(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.StoreOutgoing(Bielu.PersistentQueues.Storage.IStoreTransaction! tx, Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.StoreOutgoing(System.ReadOnlySpan<Bielu.PersistentQueues.Message> messages) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.StoreOutgoing(params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.StoreRawIncoming(Bielu.PersistentQueues.Serialization.RawMessageInfo[]! messages, int count, Bielu.PersistentQueues.Serialization.IMessageSerializer! serializer) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.SuccessfullyReceived(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.SuccessfullyReceived(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.SuccessfullySent(params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.IMessageStore.SuccessfullySentByIds(System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>>! messageIds) -> void
+Bielu.PersistentQueues.Storage.IStoreTransaction
+Bielu.PersistentQueues.Storage.IStoreTransaction.Commit() -> void
+Bielu.PersistentQueues.Storage.QueueDoesNotExistException
+Bielu.PersistentQueues.Storage.QueueDoesNotExistException.QueueDoesNotExistException(string! queueName, System.Exception? inner = null) -> void
+Bielu.PersistentQueues.Storage.QueueDoesNotExistException.QueueName.get -> string!
+Bielu.PersistentQueues.Storage.StorageUsageInfo
+Bielu.PersistentQueues.Storage.StorageUsageInfo.Deconstruct(out long UsedBytes, out long TotalBytes, out long FreeBytes) -> void
+Bielu.PersistentQueues.Storage.StorageUsageInfo.Equals(Bielu.PersistentQueues.Storage.StorageUsageInfo other) -> bool
+Bielu.PersistentQueues.Storage.StorageUsageInfo.FreeBytes.get -> long
+Bielu.PersistentQueues.Storage.StorageUsageInfo.FreeBytes.init -> void
+Bielu.PersistentQueues.Storage.StorageUsageInfo.NetUsagePercentage.get -> double
+Bielu.PersistentQueues.Storage.StorageUsageInfo.NetUsedBytes.get -> long
+Bielu.PersistentQueues.Storage.StorageUsageInfo.StorageUsageInfo() -> void
+Bielu.PersistentQueues.Storage.StorageUsageInfo.StorageUsageInfo(long UsedBytes, long TotalBytes, long FreeBytes = 0) -> void
+Bielu.PersistentQueues.Storage.StorageUsageInfo.TotalBytes.get -> long
+Bielu.PersistentQueues.Storage.StorageUsageInfo.TotalBytes.init -> void
+Bielu.PersistentQueues.Storage.StorageUsageInfo.UsagePercentage.get -> double
+Bielu.PersistentQueues.Storage.StorageUsageInfo.UsedBytes.get -> long
+Bielu.PersistentQueues.Storage.StorageUsageInfo.UsedBytes.init -> void
+Bielu.PersistentQueues.StorageSize
+Bielu.PersistentQueues.StorageSize.Bytes.get -> long
+Bielu.PersistentQueues.StorageSize.CompareTo(Bielu.PersistentQueues.StorageSize other) -> int
+Bielu.PersistentQueues.StorageSize.Equals(Bielu.PersistentQueues.StorageSize other) -> bool
+Bielu.PersistentQueues.StorageSize.StorageSize() -> void
+const Bielu.PersistentQueues.DeadLetterConstants.QueueName = "dead-letter" -> string!
+const Bielu.PersistentQueues.Partitioning.PartitionConstants.PartitionSeparator = ":partition-" -> string!
+override Bielu.PersistentQueues.MessageId.Equals(object? obj) -> bool
+override Bielu.PersistentQueues.MessageId.GetHashCode() -> int
+override Bielu.PersistentQueues.MessageId.ToString() -> string!
+override Bielu.PersistentQueues.Storage.StorageUsageInfo.GetHashCode() -> int
+override Bielu.PersistentQueues.StorageSize.Equals(object? obj) -> bool
+override Bielu.PersistentQueues.StorageSize.GetHashCode() -> int
+override Bielu.PersistentQueues.StorageSize.ToString() -> string!
+readonly Bielu.PersistentQueues.Message.Data -> System.ReadOnlyMemory<byte>
+readonly Bielu.PersistentQueues.Message.DeliverBy -> System.DateTime?
+readonly Bielu.PersistentQueues.Message.DestinationUri -> System.ReadOnlyMemory<char>
+readonly Bielu.PersistentQueues.Message.Headers -> Bielu.PersistentQueues.FixedHeaders
+readonly Bielu.PersistentQueues.Message.Id -> Bielu.PersistentQueues.MessageId!
+readonly Bielu.PersistentQueues.Message.MaxAttempts -> int?
+readonly Bielu.PersistentQueues.Message.PartitionKey -> System.ReadOnlyMemory<char>
+readonly Bielu.PersistentQueues.Message.Queue -> System.ReadOnlyMemory<char>
+readonly Bielu.PersistentQueues.Message.SentAt -> System.DateTime
+readonly Bielu.PersistentQueues.Message.SubQueue -> System.ReadOnlyMemory<char>
+readonly Bielu.PersistentQueues.Network.Protocol.ProtocolBase.Logger -> Microsoft.Extensions.Logging.ILogger!
+static Bielu.PersistentQueues.DeadLetterConstants.IsDeadLetterQueue(string! queueName) -> bool
+static Bielu.PersistentQueues.FixedHeaders.CreateDirect(System.ReadOnlyMemory<char> key0 = default(System.ReadOnlyMemory<char>), System.ReadOnlyMemory<char> value0 = default(System.ReadOnlyMemory<char>), System.ReadOnlyMemory<char> key1 = default(System.ReadOnlyMemory<char>), System.ReadOnlyMemory<char> value1 = default(System.ReadOnlyMemory<char>), System.ReadOnlyMemory<char> key2 = default(System.ReadOnlyMemory<char>), System.ReadOnlyMemory<char> value2 = default(System.ReadOnlyMemory<char>), System.ReadOnlyMemory<char> key3 = default(System.ReadOnlyMemory<char>), System.ReadOnlyMemory<char> value3 = default(System.ReadOnlyMemory<char>)) -> Bielu.PersistentQueues.FixedHeaders
+static Bielu.PersistentQueues.FixedHeaders.FromDictionary(System.Collections.Generic.IDictionary<string!, string!>! headers) -> Bielu.PersistentQueues.FixedHeaders
+static Bielu.PersistentQueues.Message.Create(System.Guid? id = null, byte[]? data = null, string? queue = null, string? subQueue = null, string? destinationUri = null, System.DateTime? deliverBy = null, int? maxAttempts = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, string? partitionKey = null) -> Bielu.PersistentQueues.Message
+static Bielu.PersistentQueues.Message.Create<T>(T content, Bielu.PersistentQueues.Serialization.IContentSerializer? contentSerializer = null, System.Guid? id = null, string? queue = null, string? subQueue = null, string? destinationUri = null, System.DateTime? deliverBy = null, int? maxAttempts = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, string? partitionKey = null) -> Bielu.PersistentQueues.Message
+static Bielu.PersistentQueues.MessageId.GenerateRandom() -> Bielu.PersistentQueues.MessageId!
+static Bielu.PersistentQueues.MessageId.WithId(System.Guid id) -> Bielu.PersistentQueues.MessageId!
+static Bielu.PersistentQueues.MessageId.operator !=(Bielu.PersistentQueues.MessageId? left, Bielu.PersistentQueues.MessageId? right) -> bool
+static Bielu.PersistentQueues.MessageId.operator ==(Bielu.PersistentQueues.MessageId? left, Bielu.PersistentQueues.MessageId? right) -> bool
+static Bielu.PersistentQueues.Network.Protocol.ProtocolBase.SequenceEqual(ref System.Buffers.ReadOnlySequence<byte> sequence, byte[]! target) -> bool
+static Bielu.PersistentQueues.Network.Tcp.NetExtensions.ReadBatchAsync<T>(this System.Threading.Channels.ChannelReader<T>! channelReader, int batchSize, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.List<T>!>
+static Bielu.PersistentQueues.PartitionedQueueBuilderExtensions.UsePartitioning(this Bielu.PersistentQueues.PersistentQueuesBuilder! builder, Bielu.PersistentQueues.Partitioning.IPartitionStrategy! partitionStrategy, params (string! queueName, int partitionCount)[]! partitionedQueues) -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+static Bielu.PersistentQueues.PartitionedQueueBuilderExtensions.UsePartitioning(this Bielu.PersistentQueues.PersistentQueuesBuilder! builder, Bielu.PersistentQueues.Partitioning.IPartitionStrategy? partitionStrategy = null) -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+static Bielu.PersistentQueues.PartitionedQueueConfigurationExtensions.BuildAndStartPartitioned(this Bielu.PersistentQueues.QueueConfiguration! configuration, string! queueName, int partitionCount, Bielu.PersistentQueues.Partitioning.IPartitionStrategy? partitionStrategy = null) -> Bielu.PersistentQueues.Partitioning.IPartitionedQueue!
+static Bielu.PersistentQueues.PartitionedQueueConfigurationExtensions.BuildPartitionedQueue(this Bielu.PersistentQueues.QueueConfiguration! configuration, Bielu.PersistentQueues.Partitioning.IPartitionStrategy? partitionStrategy = null) -> Bielu.PersistentQueues.Partitioning.IPartitionedQueue!
+static Bielu.PersistentQueues.Partitioning.PartitionConstants.FormatPartitionQueueName(string! queueName, int partitionIndex) -> string!
+static Bielu.PersistentQueues.Partitioning.PartitionConstants.TryParsePartitionQueueName(string! partitionQueueName, out string! queueName, out int partitionIndex) -> bool
+static Bielu.PersistentQueues.PortFinder.FindPort() -> int
+static Bielu.PersistentQueues.QueueContextExtensions.Enqueue<T>(this Bielu.PersistentQueues.IQueueContext! context, T content, Bielu.PersistentQueues.Serialization.IContentSerializer! contentSerializer, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, string? partitionKey = null) -> void
+static Bielu.PersistentQueues.QueueContextExtensions.Send<T>(this Bielu.PersistentQueues.IQueueContext! context, T content, Bielu.PersistentQueues.Serialization.IContentSerializer! contentSerializer, string? destinationUri = null, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, System.DateTime? deliverBy = null, int? maxAttempts = null, string? partitionKey = null) -> void
+static Bielu.PersistentQueues.QueueExtensions.Enqueue<T>(this Bielu.PersistentQueues.IQueue! queue, T content, Bielu.PersistentQueues.Serialization.IContentSerializer! contentSerializer, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, string? partitionKey = null) -> void
+static Bielu.PersistentQueues.QueueExtensions.Send<T>(this Bielu.PersistentQueues.IQueue! queue, T content, Bielu.PersistentQueues.Serialization.IContentSerializer! contentSerializer, string? destinationUri = null, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, System.DateTime? deliverBy = null, int? maxAttempts = null, string? partitionKey = null) -> void
+static Bielu.PersistentQueues.Serialization.WireFormatReader.DestinationEquals(in Bielu.PersistentQueues.Serialization.RawOutgoingMessage message, string! destination) -> bool
+static Bielu.PersistentQueues.Serialization.WireFormatReader.DestinationsEqual(in Bielu.PersistentQueues.Serialization.RawOutgoingMessage a, in Bielu.PersistentQueues.Serialization.RawOutgoingMessage b) -> bool
+static Bielu.PersistentQueues.Serialization.WireFormatReader.GetDestinationUri(in Bielu.PersistentQueues.Serialization.RawOutgoingMessage message) -> string!
+static Bielu.PersistentQueues.Serialization.WireFormatReader.GetQueueName(in Bielu.PersistentQueues.Serialization.RawOutgoingMessage message) -> string!
+static Bielu.PersistentQueues.Serialization.WireFormatReader.QueueNamesEqual(in Bielu.PersistentQueues.Serialization.RawOutgoingMessage a, in Bielu.PersistentQueues.Serialization.RawOutgoingMessage b) -> bool
+static Bielu.PersistentQueues.Serialization.WireFormatReader.ReadOutgoingMessage(System.ReadOnlyMemory<byte> messageBytes) -> Bielu.PersistentQueues.Serialization.RawOutgoingMessage
+static Bielu.PersistentQueues.Serialization.WireFormatReader.ReadOutgoingMessage(byte[]! messageArray, int offset, int length) -> Bielu.PersistentQueues.Serialization.RawOutgoingMessage
+static Bielu.PersistentQueues.Serialization.WireFormatSplitter.GetQueueName(in Bielu.PersistentQueues.Serialization.RawMessageInfo info) -> string!
+static Bielu.PersistentQueues.Serialization.WireFormatSplitter.SplitBatch(System.ReadOnlySpan<byte> batchBytes, System.Span<Bielu.PersistentQueues.Serialization.RawMessageInfo> output) -> int
+static Bielu.PersistentQueues.Serialization.WireFormatSplitter.SplitBatch(byte[]! batchArray, int offset, int length, Bielu.PersistentQueues.Serialization.RawMessageInfo[]! output) -> int
+static Bielu.PersistentQueues.ServiceCollectionExtensions.AddPersistentQueues(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Bielu.PersistentQueues.PersistentQueuesBuilder!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Bielu.PersistentQueues.Storage.StorageUsageInfo.operator !=(Bielu.PersistentQueues.Storage.StorageUsageInfo left, Bielu.PersistentQueues.Storage.StorageUsageInfo right) -> bool
+static Bielu.PersistentQueues.Storage.StorageUsageInfo.operator ==(Bielu.PersistentQueues.Storage.StorageUsageInfo left, Bielu.PersistentQueues.Storage.StorageUsageInfo right) -> bool
+static Bielu.PersistentQueues.StorageSize.FromBytes(long bytes) -> Bielu.PersistentQueues.StorageSize
+static Bielu.PersistentQueues.StorageSize.FromGigabytes(long gigabytes) -> Bielu.PersistentQueues.StorageSize
+static Bielu.PersistentQueues.StorageSize.FromMegabytes(long megabytes) -> Bielu.PersistentQueues.StorageSize
+static Bielu.PersistentQueues.StorageSize.GB(long gigabytes) -> Bielu.PersistentQueues.StorageSize
+static Bielu.PersistentQueues.StorageSize.MB(long megabytes) -> Bielu.PersistentQueues.StorageSize
+static Bielu.PersistentQueues.StorageSize.implicit operator long(Bielu.PersistentQueues.StorageSize size) -> long
+static Bielu.PersistentQueues.StorageSize.operator !=(Bielu.PersistentQueues.StorageSize left, Bielu.PersistentQueues.StorageSize right) -> bool
+static Bielu.PersistentQueues.StorageSize.operator <(Bielu.PersistentQueues.StorageSize left, Bielu.PersistentQueues.StorageSize right) -> bool
+static Bielu.PersistentQueues.StorageSize.operator <=(Bielu.PersistentQueues.StorageSize left, Bielu.PersistentQueues.StorageSize right) -> bool
+static Bielu.PersistentQueues.StorageSize.operator ==(Bielu.PersistentQueues.StorageSize left, Bielu.PersistentQueues.StorageSize right) -> bool
+static Bielu.PersistentQueues.StorageSize.operator >(Bielu.PersistentQueues.StorageSize left, Bielu.PersistentQueues.StorageSize right) -> bool
+static Bielu.PersistentQueues.StorageSize.operator >=(Bielu.PersistentQueues.StorageSize left, Bielu.PersistentQueues.StorageSize right) -> bool
+static readonly Bielu.PersistentQueues.Network.Protocol.V1.Constants.AcknowledgedBuffer -> byte[]!
+static readonly Bielu.PersistentQueues.Network.Protocol.V1.Constants.AcknowledgedMemory -> System.ReadOnlyMemory<byte>
+static readonly Bielu.PersistentQueues.Network.Protocol.V1.Constants.ProcessingFailureBuffer -> byte[]!
+static readonly Bielu.PersistentQueues.Network.Protocol.V1.Constants.ProcessingFailureMemory -> System.ReadOnlyMemory<byte>
+static readonly Bielu.PersistentQueues.Network.Protocol.V1.Constants.QueueDoesNotExistBuffer -> byte[]!
+static readonly Bielu.PersistentQueues.Network.Protocol.V1.Constants.QueueDoesNotExistMemory -> System.ReadOnlyMemory<byte>
+static readonly Bielu.PersistentQueues.Network.Protocol.V1.Constants.ReceivedBuffer -> byte[]!
+static readonly Bielu.PersistentQueues.Network.Protocol.V1.Constants.ReceivedMemory -> System.ReadOnlyMemory<byte>
+static readonly Bielu.PersistentQueues.Network.Protocol.V1.Constants.SerializationFailureBuffer -> byte[]!
+static readonly Bielu.PersistentQueues.Network.Protocol.V1.Constants.SerializationFailureMemory -> System.ReadOnlyMemory<byte>
+static readonly Bielu.PersistentQueues.Serialization.JsonContentSerializer.Default -> Bielu.PersistentQueues.Serialization.JsonContentSerializer!
+virtual Bielu.PersistentQueues.MessageId.<Clone>$() -> Bielu.PersistentQueues.MessageId!
+virtual Bielu.PersistentQueues.MessageId.EqualityContract.get -> System.Type!
+virtual Bielu.PersistentQueues.MessageId.Equals(Bielu.PersistentQueues.MessageId? other) -> bool
+virtual Bielu.PersistentQueues.MessageId.PrintMembers(System.Text.StringBuilder! builder) -> bool
+~override Bielu.PersistentQueues.Storage.StorageUsageInfo.Equals(object obj) -> bool
+~override Bielu.PersistentQueues.Storage.StorageUsageInfo.ToString() -> string
