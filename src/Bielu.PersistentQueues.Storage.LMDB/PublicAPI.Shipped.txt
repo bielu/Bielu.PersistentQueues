@@ -1,0 +1,81 @@
+#nullable enable
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.BeginTransaction() -> Bielu.PersistentQueues.Storage.IStoreTransaction!
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.ClearAllStorage() -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.CreateQueue(string! queueName) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.DeleteIncoming(System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.DeleteQueue(string! queueName) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.Dispose() -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.FailedToSend(bool shouldRemove = false, params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.GetAllQueues() -> string![]!
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.GetDatabaseHandle(string! queueName) -> LightningDB.LightningDatabase!
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.GetMessage(string! queueName, Bielu.PersistentQueues.MessageId! messageId) -> Bielu.PersistentQueues.Message?
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.GetMessageCount(string! queueName) -> long
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.GetStorageUsageInfo() -> Bielu.PersistentQueues.Storage.StorageUsageInfo?
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.LmdbMessageStore(LightningDB.LightningEnvironment! environment, Bielu.PersistentQueues.Serialization.IMessageSerializer! serializer) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.LmdbMessageStore(LightningDB.LightningEnvironment! environment, Bielu.PersistentQueues.Serialization.IMessageSerializer! serializer, Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions? options) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.MoveToQueue(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, string! queueName, Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.MoveToQueue(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, string! queueName, System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.Path.get -> string!
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.PersistedIncoming(string! queueName) -> System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>!
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.PersistedOutgoing() -> System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>!
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.PersistedOutgoingRaw() -> System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Serialization.RawOutgoingMessage>!
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.StoreIncoming(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.StoreIncoming(params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.StoreOutgoing(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.StoreOutgoing(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.StoreOutgoing(System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.StoreOutgoing(System.ReadOnlySpan<Bielu.PersistentQueues.Message> messages) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.StoreRawIncoming(Bielu.PersistentQueues.Serialization.RawMessageInfo[]! messages, int count) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.StoreRawIncoming(Bielu.PersistentQueues.Serialization.RawMessageInfo[]! messages, int count, Bielu.PersistentQueues.Serialization.IMessageSerializer! serializer) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.StoreRawIncoming(System.ReadOnlySpan<Bielu.PersistentQueues.Serialization.RawMessageInfo> messages) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.StoreRawIncomingToQueue(string! queueName, Bielu.PersistentQueues.Serialization.RawMessageInfo[]! messages, int count) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.StoreRawIncomingToQueueUnsafe(LightningDB.LightningDatabase! db, Bielu.PersistentQueues.Serialization.RawMessageInfo[]! messages, int count) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.StoreRawIncomingToQueueUnsafeAppend(LightningDB.LightningDatabase! db, Bielu.PersistentQueues.Serialization.RawMessageInfo[]! messages, int count) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.SuccessfullyReceived(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.SuccessfullyReceived(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.SuccessfullySent(params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.SuccessfullySentByIds(System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>>! messageIds) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.UseAppendData.get -> bool
+Bielu.PersistentQueues.Storage.LMDB.LmdbMessageStore.~LmdbMessageStore() -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbServiceCollectionExtensions
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageConfiguration
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageConfiguration.EnvironmentConfiguration.get -> LightningDB.EnvironmentConfiguration!
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageConfiguration.EnvironmentConfiguration.set -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageConfiguration.LmdbStorageConfiguration() -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageConfiguration.MapSize.get -> Bielu.PersistentQueues.StorageSize
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageConfiguration.MapSize.set -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageConfiguration.StorageOptions.get -> Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions?
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageConfiguration.StorageOptions.set -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageExtensions
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions.EnvironmentFlags.get -> LightningDB.EnvironmentOpenFlags
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions.EnvironmentFlags.set -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions.KeyComparer.get -> System.Collections.Generic.IComparer<LightningDB.MDBValue>?
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions.KeyComparer.set -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions.LmdbStorageOptions() -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions.UseAppendData.get -> bool
+Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions.UseAppendData.set -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbTransaction
+Bielu.PersistentQueues.Storage.LMDB.LmdbTransaction.Commit() -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbTransaction.Dispose() -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbTransaction.LmdbTransaction(LightningDB.LightningTransaction! tx, System.Threading.ReaderWriterLockSlim! transactionLock) -> void
+Bielu.PersistentQueues.Storage.LMDB.LmdbTransaction.Transaction.get -> LightningDB.LightningTransaction!
+Bielu.PersistentQueues.Storage.LMDB.SequentialKeyGenerator
+Bielu.PersistentQueues.Storage.LMDB.StorageException
+Bielu.PersistentQueues.Storage.LMDB.StorageException.ResultCode.get -> LightningDB.MDBResultCode
+Bielu.PersistentQueues.Storage.LMDB.StorageException.StorageException(string! message, LightningDB.MDBResultCode resultCode) -> void
+static Bielu.PersistentQueues.Storage.LMDB.LmdbServiceCollectionExtensions.AddLmdbStorage(this Bielu.PersistentQueues.PersistentQueuesBuilder! builder, System.Func<LightningDB.LightningEnvironment!>! environmentFactory, Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions? storageOptions = null) -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+static Bielu.PersistentQueues.Storage.LMDB.LmdbServiceCollectionExtensions.AddLmdbStorage(this Bielu.PersistentQueues.PersistentQueuesBuilder! builder, string! path, System.Action<Bielu.PersistentQueues.Storage.LMDB.LmdbStorageConfiguration!>? configure = null) -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+static Bielu.PersistentQueues.Storage.LMDB.LmdbStorageExtensions.StoreWithLmdb(this Bielu.PersistentQueues.QueueConfiguration! configuration, System.Func<LightningDB.LightningEnvironment!>! environment) -> Bielu.PersistentQueues.QueueConfiguration!
+static Bielu.PersistentQueues.Storage.LMDB.LmdbStorageExtensions.StoreWithLmdb(this Bielu.PersistentQueues.QueueConfiguration! configuration, System.Func<LightningDB.LightningEnvironment!>! environment, Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions? storageOptions) -> Bielu.PersistentQueues.QueueConfiguration!
+static Bielu.PersistentQueues.Storage.LMDB.LmdbStorageExtensions.StoreWithLmdb(this Bielu.PersistentQueues.QueueConfiguration! configuration, string! path, Bielu.PersistentQueues.StorageSize mapSize, Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions? storageOptions = null) -> Bielu.PersistentQueues.QueueConfiguration!
+static Bielu.PersistentQueues.Storage.LMDB.LmdbStorageExtensions.StoreWithLmdb(this Bielu.PersistentQueues.QueueConfiguration! configuration, string! path, LightningDB.EnvironmentConfiguration! config) -> Bielu.PersistentQueues.QueueConfiguration!
+static Bielu.PersistentQueues.Storage.LMDB.LmdbStorageExtensions.StoreWithLmdb(this Bielu.PersistentQueues.QueueConfiguration! configuration, string! path, LightningDB.EnvironmentConfiguration! config, Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions? storageOptions) -> Bielu.PersistentQueues.QueueConfiguration!
+static Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions.HighPerformance() -> Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions!
+static Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions.MaxThroughput() -> Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions!
+static Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions.NoMetaSyncOnly() -> Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions!
+static Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions.NoSyncWithPeriodicFlush() -> Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions!
+static Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions.WithAppendData() -> Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions!
+static Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions.WithGuidComparer() -> Bielu.PersistentQueues.Storage.LMDB.LmdbStorageOptions!
+static Bielu.PersistentQueues.Storage.LMDB.SequentialKeyGenerator.GenerateKey(System.Span<byte> destination) -> void

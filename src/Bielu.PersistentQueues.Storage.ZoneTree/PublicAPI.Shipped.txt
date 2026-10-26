@@ -1,0 +1,51 @@
+#nullable enable
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.BeginTransaction() -> Bielu.PersistentQueues.Storage.IStoreTransaction!
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.ClearAllStorage() -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.CreateQueue(string! queueName) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.DeleteIncoming(params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.DeleteQueue(string! queueName) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.Dispose() -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.FailedToSend(bool shouldRemove = false, params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.GetAllQueues() -> string![]!
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.GetMessage(string! queueName, Bielu.PersistentQueues.MessageId! messageId) -> Bielu.PersistentQueues.Message?
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.GetMessageCount(string! queueName) -> long
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.MoveToQueue(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, string! queueName, Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.MoveToQueue(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, string! queueName, System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.Path.get -> string!
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.PersistedIncoming(string! queueName) -> System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>!
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.PersistedOutgoing() -> System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>!
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.PersistedOutgoingRaw() -> System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Serialization.RawOutgoingMessage>!
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.StoreIncoming(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.StoreIncoming(params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.StoreOutgoing(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.StoreOutgoing(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.StoreOutgoing(System.ReadOnlySpan<Bielu.PersistentQueues.Message> messages) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.StoreOutgoing(params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.StoreRawIncoming(Bielu.PersistentQueues.Serialization.RawMessageInfo[]! messages, int count, Bielu.PersistentQueues.Serialization.IMessageSerializer! serializer) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.SuccessfullyReceived(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.SuccessfullyReceived(Bielu.PersistentQueues.Storage.IStoreTransaction! transaction, System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.SuccessfullySent(params System.Collections.Generic.IEnumerable<Bielu.PersistentQueues.Message>! messages) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.SuccessfullySentByIds(System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>>! messageIds) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.ZoneTreeMessageStore(string! dataDirectory, Bielu.PersistentQueues.Serialization.IMessageSerializer! serializer) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeMessageStore.ZoneTreeMessageStore(string! dataDirectory, Bielu.PersistentQueues.Serialization.IMessageSerializer! serializer, Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions? options) -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeServiceCollectionExtensions
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageExtensions
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions.DiskSegmentMaxItemCount.get -> int
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions.DiskSegmentMaxItemCount.set -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions.EnableMaintainer.get -> bool
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions.EnableMaintainer.set -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions.MutableSegmentMaxItemCount.get -> int
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions.MutableSegmentMaxItemCount.set -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions.ZoneTreeStorageOptions() -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeTransaction
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeTransaction.Commit() -> void
+Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeTransaction.Dispose() -> void
+static Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeServiceCollectionExtensions.AddZoneTreeStorage(this Bielu.PersistentQueues.PersistentQueuesBuilder! builder, string! path, Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions! storageOptions) -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+static Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeServiceCollectionExtensions.AddZoneTreeStorage(this Bielu.PersistentQueues.PersistentQueuesBuilder! builder, string! path, System.Action<Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions!>? configure = null) -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+static Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageExtensions.StoreWithZoneTree(this Bielu.PersistentQueues.QueueConfiguration! configuration, string! path) -> Bielu.PersistentQueues.QueueConfiguration!
+static Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageExtensions.StoreWithZoneTree(this Bielu.PersistentQueues.QueueConfiguration! configuration, string! path, Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions? storageOptions) -> Bielu.PersistentQueues.QueueConfiguration!
+static Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions.Default() -> Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions!
+static Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions.HighThroughput() -> Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions!
+static Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions.LowMemory() -> Bielu.PersistentQueues.Storage.ZoneTree.ZoneTreeStorageOptions!
