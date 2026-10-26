@@ -6,7 +6,7 @@
 version: 2
 updates:
   - package-ecosystem: "nuget"
-    directory: "/src"
+    directory: "/" # Directory.Packages.props lives at the repo root
     schedule:
       interval: "weekly"
   - package-ecosystem: "github-actions"
