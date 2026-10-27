@@ -5,16 +5,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Bielu.PersistentQueues.Logging;
 
+// Queues log from their background loops while the test thread reads the recorded messages, so
+// writes are serialized and the message properties return snapshots rather than the live lists.
 public class RecordingLogger(TextWriter? console = null, LogLevel logLevel = LogLevel.Debug) : ILogger
 {
-    private readonly IList<string> _debug = new List<string>();
-    private readonly IList<string> _error = new List<string>();
-    private readonly IList<string> _info = new List<string>();
+    private readonly List<string> _debug = new();
+    private readonly List<string> _error = new();
+    private readonly List<string> _info = new();
+    private readonly Lock _lock = new();
 
-    public IEnumerable<string> DebugMessages => _debug;
-    public IEnumerable<string> InfoMessages => _info;
+    public IEnumerable<string> DebugMessages => Snapshot(_debug);
+    public IEnumerable<string> InfoMessages => Snapshot(_info);
 
-    public IEnumerable<string> ErrorMessages => _error;
+    public IEnumerable<string> ErrorMessages => Snapshot(_error);
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
         Func<TState, Exception?, string> formatter)
@@ -32,8 +35,19 @@ public class RecordingLogger(TextWriter? console = null, LogLevel logLevel = Log
         if (list == null)
             return;
         var message = formatter(state, exception);
-        list.Add(message);
+        lock (_lock)
+        {
+            list.Add(message);
+        }
         console?.WriteLine(message + exception);
+    }
+
+    private string[] Snapshot(List<string> list)
+    {
+        lock (_lock)
+        {
+            return list.ToArray();
+        }
     }
 
     public bool IsEnabled(LogLevel level) => level switch
