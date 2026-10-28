@@ -314,4 +314,41 @@ public interface IMessageStore : IDisposable
     /// Not all storage implementations can report usage. The default implementation returns <c>null</c>.
     /// </remarks>
     StorageUsageInfo? GetStorageUsageInfo() => null;
+
+    /// <summary>
+    /// Retrieves incoming messages from a queue that were stored after a specific message ID.
+    /// Used for catch-up replication when a new replica needs to sync missed messages.
+    /// </summary>
+    /// <param name="queueName">The name of the queue to retrieve messages from.</param>
+    /// <param name="afterMessageId">
+    /// The message ID to start from (exclusive). Only messages whose
+    /// <see cref="MessageId.MessageIdentifier"/> sorts after this ID are returned.
+    /// If null, all messages for the queue are returned.
+    /// </param>
+    /// <returns>Messages stored after the specified message ID, in storage order.</returns>
+    /// <remarks>
+    /// Message identifiers are COMB GUIDs whose leading bytes encode a big-endian timestamp, so
+    /// comparing their byte representation gives chronological order. Comparing by order rather
+    /// than looking for an exact match means the marker message does not have to still exist
+    /// (it may already have been consumed). The default implementation scans all incoming
+    /// messages; storage implementations with COMB-ordered keys (like LMDB) can provide an
+    /// optimized implementation using range queries.
+    /// </remarks>
+    IEnumerable<Message> GetMessagesAfter(string queueName, MessageId? afterMessageId)
+    {
+        var messages = PersistedIncoming(queueName);
+        if (afterMessageId == null)
+            return messages;
+
+        var marker = afterMessageId.MessageIdentifier.ToByteArray();
+        var result = new List<Message>();
+        Span<byte> current = stackalloc byte[16];
+        foreach (var msg in messages)
+        {
+            msg.Id.MessageIdentifier.TryWriteBytes(current);
+            if (current.SequenceCompareTo(marker) > 0)
+                result.Add(msg);
+        }
+        return result;
+    }
 }

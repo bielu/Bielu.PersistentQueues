@@ -37,6 +37,7 @@ excellent choice for lightweight and cross-platform message queuing needs.
 | `Bielu.PersistentQueues` | Core library with queue abstractions and DI support | [![NuGet](https://img.shields.io/nuget/v/Bielu.PersistentQueues.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues/) |
 | `Bielu.PersistentQueues.Storage.LMDB` | LMDB storage provider (using LightningDB) | [![NuGet](https://img.shields.io/nuget/v/Bielu.PersistentQueues.Storage.LMDB.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues.Storage.LMDB/) |
 | `Bielu.PersistentQueues.OpenTelemetry` | OpenTelemetry instrumentation for distributed tracing and metrics | [![NuGet](https://img.shields.io/nuget/v/Bielu.PersistentQueues.OpenTelemetry.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues.OpenTelemetry/) |
+| `Bielu.PersistentQueues.Cluster` | Distributed clustering with partition replication and automatic failover | [![NuGet](https://img.shields.io/nuget/v/Bielu.PersistentQueues.Cluster.svg)](https://www.nuget.org/packages/Bielu.PersistentQueues.Cluster/) |
 
 ---
 
@@ -775,6 +776,59 @@ public class GeoPartitionStrategy : IPartitionStrategy
 ### LMDB Configuration Note
 
 When using partitioned queues with LMDB storage, ensure `MaxDatabases` is set high enough to accommodate all partitions. Each partition creates a separate LMDB database. For example, 4 partitions + 1 outgoing database requires at least `MaxDatabases = 6`.
+
+---
+
+## Clustering and Replication
+
+The `Bielu.PersistentQueues.Cluster` package turns a set of nodes running partitioned queues into a cluster. Each partition has one **primary** and one **replica** on different nodes. No external infrastructure is required: membership uses a gossip protocol over TCP.
+
+```bash
+dotnet add package Bielu.PersistentQueues.Cluster
+```
+
+```csharp
+using Bielu.PersistentQueues.Cluster;
+
+services.AddPersistentQueues(builder =>
+{
+    builder.AutomaticEndpoint()
+           .AddLmdbStorage("/data/queues")
+           .UsePartitioning(new HashPartitionStrategy(), ("orders", 6))
+           .AutoStart()
+           .AddClusterSupport(cluster =>
+           {
+               cluster.ReplicationFactor = 2; // 1 (no replica) or 2
+               cluster.ReplicationMode = ReplicationMode.Synchronous;
+               cluster.AdvertisedAddress = IPAddress.Parse("10.0.0.2"); // this node's address as peers see it
+               cluster.SeedNodes.Add(new IPEndPoint(IPAddress.Parse("10.0.0.1"), 5001));
+           });
+});
+```
+
+Under a .NET generic host, a hosted service starts the cluster (gossip, replication and partition assignment) automatically. `AutoStart()` starts the underlying queue transport. Without a host, call `Start()` on the resolved `IPartitionedQueue` (or `StartCluster()` on `ClusteredPartitionedQueueDecorator` when the queue is already started). If a gossip or replication port cannot be bound, startup fails instead of running without a cluster.
+
+Resolve `IPartitionedQueue` to get the cluster-aware queue:
+
+- **Writes**: `Enqueue` / `EnqueueToPartition` write locally when this node is the partition's primary, or forward the message to the primary over the regular queue transport. Either way, the node that accepted the write also replicates it to the partition's replica.
+- **Replication**: in `Synchronous` mode the enqueue blocks until the replica acknowledges, and throws `ClusterReplicationException` if the replica is unavailable or rejects the write. The message has already been stored (or forwarded) for the primary at that point, so a retry can create a duplicate. In `Asynchronous` mode replication is fire-and-forget.
+- **Reads**: `ReceiveFromPartition(s)`, `GetActivePartitions` and `GetAvailablePartitions` only cover partitions this node owns as primary.
+- **Ownership**: partitions are assigned round-robin over the active nodes ordered by node id, so every node with the same membership view computes the same owners. When a node joins, leaves or dies, ownership is recomputed. A node that becomes primary copies the partition from the previous primary (or from the previous replica if the primary is gone), and a new replica copies it from the primary.
+- **Recovery**: nodes keep probing peers they consider dead and fall back to the seed nodes when they have no reachable peers, so a cluster heals after a network partition.
+
+Ports: gossip listens on the queue port + `GossipPortOffset` (default `1`), and replication listens on the queue port + `GossipPortOffset` + 1. Both must be reachable between nodes.
+
+Addresses: the listeners bind to the queue endpoint address, and peers are told to connect to `AdvertisedAddress` (the queue endpoint address when it is not set). `AutomaticEndpoint()` listens on loopback, which only works for nodes on the same machine, so set `AdvertisedAddress` (and a queue endpoint that is reachable from other hosts) for a real cluster. Cluster traffic is IPv4 only; an IPv6 or wildcard (`0.0.0.0`) advertised address is rejected at startup.
+
+> **Security:** the gossip and replication listeners do not authenticate peers. Only expose these ports to other cluster nodes (private network or firewall rules). Payloads are capped by `MaxPayloadBytes`, connections time out, and the replication listener only accepts reads and writes for partition sub-queues.
+
+**Current limitations**
+
+- Replication copies enqueued messages only. Messages consumed on the primary are not removed from the replica, so after a failover or ownership change the new primary can redeliver messages that were already processed (at-least-once delivery). Consumers should be idempotent.
+- There is no consensus protocol. Nodes with different membership views (for example while gossip converges) can briefly disagree on ownership. Assignment epochs are tracked per node and are not used to fence stale primaries.
+- An ownership change copies the whole partition from its source node. The copy is transferred in pages bounded by `MaxPayloadBytes` and retried with backoff. If it still fails, an error is logged and the partition is served without the missing messages.
+- Replica copies are never trimmed. A replica partition keeps every message ever replicated to it, so its storage grows without limit (for LMDB, until the map size is reached, after which writes and replica acknowledgments on that node fail). After a failover, the new primary redelivers the whole replicated history of the partition, not only unconsumed messages. Size storage accordingly and keep consumers idempotent.
+- `EnablePartitioning`, `DisablePartitioning` and `Repartition` only affect the local node and must be run on every node while the queue is quiesced.
 
 ---
 

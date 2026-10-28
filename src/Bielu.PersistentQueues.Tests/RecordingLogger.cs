@@ -65,3 +65,5 @@ public class RecordingLogger(TextWriter? console = null, LogLevel logLevel = Log
         return null;
     }
 }
+public class RecordingLogger<T>(TextWriter? console = null, LogLevel logLevel = LogLevel.Debug)
+    : RecordingLogger(console, logLevel), ILogger<T>;

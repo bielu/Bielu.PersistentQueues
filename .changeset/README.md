@@ -12,7 +12,7 @@ npx changeset
 ```
 
 Pick the affected package(s) and a bump level, then write a short, user-facing summary. For a
-change to **any** of the four NuGet packages, bump the single `bielu-persistentqueues` entry — all
+change to **any** of the five NuGet packages, bump the single `bielu-persistentqueues` entry — all
 NuGet packages in this repo share one version (`version.props`), so one bump covers the whole
 suite:
 
@@ -20,6 +20,7 @@ suite:
 - `Bielu.PersistentQueues.Storage.LMDB`
 - `Bielu.PersistentQueues.Storage.ZoneTree`
 - `Bielu.PersistentQueues.OpenTelemetry`
+- `Bielu.PersistentQueues.Cluster`
 
 Bump levels follow semver:
 

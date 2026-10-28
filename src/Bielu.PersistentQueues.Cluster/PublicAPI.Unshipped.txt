@@ -1,0 +1,172 @@
+#nullable enable
+Bielu.PersistentQueues.Cluster.ClusterConfiguration
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.ClusterConfiguration() -> void
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.DeathThreshold.get -> int
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.DeathThreshold.set -> void
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.GossipPortOffset.get -> int
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.GossipPortOffset.set -> void
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.HeartbeatInterval.get -> System.TimeSpan
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.HeartbeatInterval.set -> void
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.MaxPayloadBytes.get -> int
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.MaxPayloadBytes.set -> void
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.NodeId.get -> System.Guid
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.NodeId.set -> void
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.ReplicationFactor.get -> int
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.ReplicationFactor.set -> void
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.ReplicationMode.get -> Bielu.PersistentQueues.Cluster.ReplicationMode
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.ReplicationMode.set -> void
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.SeedNodes.get -> System.Collections.Generic.List<System.Net.IPEndPoint!>!
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.SeedNodes.set -> void
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.SuspicionThreshold.get -> int
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.SuspicionThreshold.set -> void
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.Validate() -> void
+Bielu.PersistentQueues.Cluster.ClusterMembershipChangeType
+Bielu.PersistentQueues.Cluster.ClusterMembershipChangeType.NodeDead = 3 -> Bielu.PersistentQueues.Cluster.ClusterMembershipChangeType
+Bielu.PersistentQueues.Cluster.ClusterMembershipChangeType.NodeJoined = 0 -> Bielu.PersistentQueues.Cluster.ClusterMembershipChangeType
+Bielu.PersistentQueues.Cluster.ClusterMembershipChangeType.NodeLeft = 1 -> Bielu.PersistentQueues.Cluster.ClusterMembershipChangeType
+Bielu.PersistentQueues.Cluster.ClusterMembershipChangeType.NodeRecovered = 4 -> Bielu.PersistentQueues.Cluster.ClusterMembershipChangeType
+Bielu.PersistentQueues.Cluster.ClusterMembershipChangeType.NodeSuspected = 2 -> Bielu.PersistentQueues.Cluster.ClusterMembershipChangeType
+Bielu.PersistentQueues.Cluster.ClusterMembershipChangedEventArgs
+Bielu.PersistentQueues.Cluster.ClusterMembershipChangedEventArgs.ChangeType.get -> Bielu.PersistentQueues.Cluster.ClusterMembershipChangeType
+Bielu.PersistentQueues.Cluster.ClusterMembershipChangedEventArgs.ChangeType.init -> void
+Bielu.PersistentQueues.Cluster.ClusterMembershipChangedEventArgs.ClusterMembershipChangedEventArgs() -> void
+Bielu.PersistentQueues.Cluster.ClusterMembershipChangedEventArgs.Node.get -> Bielu.PersistentQueues.Cluster.NodeInfo!
+Bielu.PersistentQueues.Cluster.ClusterMembershipChangedEventArgs.Node.init -> void
+Bielu.PersistentQueues.Cluster.ClusterReplicationException
+Bielu.PersistentQueues.Cluster.ClusterReplicationException.ClusterReplicationException(string! partitionKey, string! message) -> void
+Bielu.PersistentQueues.Cluster.ClusterReplicationException.PartitionKey.get -> string!
+Bielu.PersistentQueues.Cluster.ClusterServiceCollectionExtensions
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.ClearDeadLetterQueue() -> int
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.ClusteredPartitionedQueueDecorator(Bielu.PersistentQueues.Partitioning.IPartitionedQueue! innerPartitionedQueue, Bielu.PersistentQueues.Cluster.IClusterCoordinator! coordinator, Bielu.PersistentQueues.Cluster.IPartitionAssignment! assignment, Bielu.PersistentQueues.Cluster.IReplicationProtocol! replication, Bielu.PersistentQueues.Cluster.ClusterConfiguration! config, Microsoft.Extensions.Logging.ILogger<Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator!>! logger, Bielu.PersistentQueues.Serialization.IContentSerializer? contentSerializer = null) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.CreatePartitionedQueue(string! queueName, int partitionCount) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.CreateQueue(string! queueName) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.DisablePartitioning(string! queueName) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.Dispose() -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.EnablePartitioning(string! queueName, int partitionCount) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.Endpoint.get -> System.Net.IPEndPoint!
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.Enqueue(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.Enqueue<T>(T content, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, string? partitionKey = null) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.EnqueueToPartition(Bielu.PersistentQueues.Message message, int partition) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.GetActivePartitions(string! queueName) -> int[]!
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.GetAvailablePartitions(string! queueName) -> int[]!
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.GetPartitionCount(string! queueName) -> int
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.GetPartitionMessageCount(string! queueName, int partition) -> long
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.MoveToQueue(string! queueName, Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.PartitionStrategy.get -> Bielu.PersistentQueues.Partitioning.IPartitionStrategy!
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.Queues.get -> string![]!
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.Receive(string! queueName, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IMessageContext!>!
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.ReceiveBatch(string! queueName, int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IBatchQueueContext!>!
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.ReceiveBatchFromPartition(string! queueName, int partition, int maxMessages = 0, int batchTimeoutInMilliseconds = 0, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IBatchQueueContext!>!
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.ReceiveFromPartition(string! queueName, int partition, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IMessageContext!>!
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.ReceiveFromPartitions(string! queueName, int[]! partitions, int pollIntervalInMilliseconds = 200, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Bielu.PersistentQueues.IMessageContext!>!
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.ReceiveLater(Bielu.PersistentQueues.Message message, System.DateTimeOffset time) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.ReceiveLater(Bielu.PersistentQueues.Message message, System.TimeSpan timeSpan) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.Repartition(string! queueName, int newPartitionCount) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.RequeueDeadLetterMessages() -> int
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.ResolvePartition(Bielu.PersistentQueues.Message message) -> int
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.Send(Bielu.PersistentQueues.Message message) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.Send(params Bielu.PersistentQueues.Message[]! messages) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.Send<T>(T content, string? destinationUri = null, string? queueName = null, System.Collections.Generic.Dictionary<string!, string!>? headers = null, System.DateTime? deliverBy = null, int? maxAttempts = null, string? partitionKey = null) -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.Start() -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.StartCluster() -> void
+Bielu.PersistentQueues.Cluster.ClusteredPartitionedQueueDecorator.Store.get -> Bielu.PersistentQueues.Storage.IMessageStore!
+Bielu.PersistentQueues.Cluster.GossipClusterCoordinator
+Bielu.PersistentQueues.Cluster.GossipClusterCoordinator.Dispose() -> void
+Bielu.PersistentQueues.Cluster.GossipClusterCoordinator.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Bielu.PersistentQueues.Cluster.GossipClusterCoordinator.GetActiveMembers() -> System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.NodeInfo!>!
+Bielu.PersistentQueues.Cluster.GossipClusterCoordinator.GetMembers() -> System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.NodeInfo!>!
+Bielu.PersistentQueues.Cluster.GossipClusterCoordinator.GossipClusterCoordinator(Bielu.PersistentQueues.Cluster.ClusterConfiguration! config, System.Net.IPEndPoint! queueEndpoint, Microsoft.Extensions.Logging.ILogger<Bielu.PersistentQueues.Cluster.GossipClusterCoordinator!>! logger) -> void
+Bielu.PersistentQueues.Cluster.GossipClusterCoordinator.JoinAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Bielu.PersistentQueues.Cluster.GossipClusterCoordinator.LeaveAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Bielu.PersistentQueues.Cluster.GossipClusterCoordinator.LocalNode.get -> Bielu.PersistentQueues.Cluster.NodeInfo!
+Bielu.PersistentQueues.Cluster.GossipClusterCoordinator.MembershipChanged -> System.EventHandler<Bielu.PersistentQueues.Cluster.ClusterMembershipChangedEventArgs!>?
+Bielu.PersistentQueues.Cluster.IClusterCoordinator
+Bielu.PersistentQueues.Cluster.IClusterCoordinator.GetActiveMembers() -> System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.NodeInfo!>!
+Bielu.PersistentQueues.Cluster.IClusterCoordinator.GetMembers() -> System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.NodeInfo!>!
+Bielu.PersistentQueues.Cluster.IClusterCoordinator.JoinAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Bielu.PersistentQueues.Cluster.IClusterCoordinator.LeaveAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Bielu.PersistentQueues.Cluster.IClusterCoordinator.LocalNode.get -> Bielu.PersistentQueues.Cluster.NodeInfo!
+Bielu.PersistentQueues.Cluster.IClusterCoordinator.MembershipChanged -> System.EventHandler<Bielu.PersistentQueues.Cluster.ClusterMembershipChangedEventArgs!>!
+Bielu.PersistentQueues.Cluster.IPartitionAssignment
+Bielu.PersistentQueues.Cluster.IPartitionAssignment.AssignPartitions(string! queueName, int partitionCount, System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.NodeInfo!>! activeNodes) -> void
+Bielu.PersistentQueues.Cluster.IPartitionAssignment.AssignmentChanged -> System.EventHandler<Bielu.PersistentQueues.Cluster.PartitionAssignmentChangedEventArgs!>!
+Bielu.PersistentQueues.Cluster.IPartitionAssignment.GetAssignment(string! queueName, int partitionIndex) -> Bielu.PersistentQueues.Cluster.PartitionReplica?
+Bielu.PersistentQueues.Cluster.IPartitionAssignment.GetAssignments(string! queueName) -> System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.PartitionReplica!>!
+Bielu.PersistentQueues.Cluster.IPartitionAssignment.GetPrimaryPartitions(System.Guid nodeId) -> System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.PartitionReplica!>!
+Bielu.PersistentQueues.Cluster.IPartitionAssignment.GetReplicaPartitions(System.Guid nodeId) -> System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.PartitionReplica!>!
+Bielu.PersistentQueues.Cluster.IPartitionAssignment.PromoteReplica(string! queueName, int partitionIndex) -> Bielu.PersistentQueues.Cluster.PartitionReplica?
+Bielu.PersistentQueues.Cluster.IPartitionAssignment.Rebalance(System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.NodeInfo!>! activeNodes) -> void
+Bielu.PersistentQueues.Cluster.IReplicationProtocol
+Bielu.PersistentQueues.Cluster.IReplicationProtocol.ReplicateAsync(System.Net.IPEndPoint! replicaEndpoint, string! queueName, System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Message>! messages, long epoch, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Bielu.PersistentQueues.Cluster.IReplicationProtocol.StartListeningAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Bielu.PersistentQueues.Cluster.IReplicationProtocol.SyncPartitionAsync(System.Net.IPEndPoint! sourceEndpoint, string! queueName, Bielu.PersistentQueues.MessageId? afterMessageId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Message>!>!
+Bielu.PersistentQueues.Cluster.NodeInfo
+Bielu.PersistentQueues.Cluster.NodeInfo.Generation.get -> long
+Bielu.PersistentQueues.Cluster.NodeInfo.Generation.set -> void
+Bielu.PersistentQueues.Cluster.NodeInfo.GossipEndpoint.get -> System.Net.IPEndPoint!
+Bielu.PersistentQueues.Cluster.NodeInfo.GossipEndpoint.set -> void
+Bielu.PersistentQueues.Cluster.NodeInfo.LastSeen.get -> System.DateTime
+Bielu.PersistentQueues.Cluster.NodeInfo.LastSeen.set -> void
+Bielu.PersistentQueues.Cluster.NodeInfo.Metadata.get -> System.Collections.Generic.Dictionary<string!, string!>!
+Bielu.PersistentQueues.Cluster.NodeInfo.Metadata.init -> void
+Bielu.PersistentQueues.Cluster.NodeInfo.NodeId.get -> System.Guid
+Bielu.PersistentQueues.Cluster.NodeInfo.NodeId.init -> void
+Bielu.PersistentQueues.Cluster.NodeInfo.NodeInfo() -> void
+Bielu.PersistentQueues.Cluster.NodeInfo.QueueEndpoint.get -> System.Net.IPEndPoint!
+Bielu.PersistentQueues.Cluster.NodeInfo.QueueEndpoint.set -> void
+Bielu.PersistentQueues.Cluster.NodeInfo.State.get -> Bielu.PersistentQueues.Cluster.NodeState
+Bielu.PersistentQueues.Cluster.NodeInfo.State.set -> void
+Bielu.PersistentQueues.Cluster.NodeState
+Bielu.PersistentQueues.Cluster.NodeState.Active = 0 -> Bielu.PersistentQueues.Cluster.NodeState
+Bielu.PersistentQueues.Cluster.NodeState.Dead = 3 -> Bielu.PersistentQueues.Cluster.NodeState
+Bielu.PersistentQueues.Cluster.NodeState.Draining = 1 -> Bielu.PersistentQueues.Cluster.NodeState
+Bielu.PersistentQueues.Cluster.NodeState.Suspected = 2 -> Bielu.PersistentQueues.Cluster.NodeState
+Bielu.PersistentQueues.Cluster.PartitionAssignmentChangedEventArgs
+Bielu.PersistentQueues.Cluster.PartitionAssignmentChangedEventArgs.ChangedPartitions.get -> System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.PartitionReplica!>!
+Bielu.PersistentQueues.Cluster.PartitionAssignmentChangedEventArgs.ChangedPartitions.init -> void
+Bielu.PersistentQueues.Cluster.PartitionAssignmentChangedEventArgs.PartitionAssignmentChangedEventArgs() -> void
+Bielu.PersistentQueues.Cluster.PartitionAssignmentTable
+Bielu.PersistentQueues.Cluster.PartitionAssignmentTable.AssignPartitions(string! queueName, int partitionCount, System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.NodeInfo!>! activeNodes) -> void
+Bielu.PersistentQueues.Cluster.PartitionAssignmentTable.AssignmentChanged -> System.EventHandler<Bielu.PersistentQueues.Cluster.PartitionAssignmentChangedEventArgs!>?
+Bielu.PersistentQueues.Cluster.PartitionAssignmentTable.GetAssignment(string! queueName, int partitionIndex) -> Bielu.PersistentQueues.Cluster.PartitionReplica?
+Bielu.PersistentQueues.Cluster.PartitionAssignmentTable.GetAssignments(string! queueName) -> System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.PartitionReplica!>!
+Bielu.PersistentQueues.Cluster.PartitionAssignmentTable.GetPrimaryPartitions(System.Guid nodeId) -> System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.PartitionReplica!>!
+Bielu.PersistentQueues.Cluster.PartitionAssignmentTable.GetReplicaPartitions(System.Guid nodeId) -> System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.PartitionReplica!>!
+Bielu.PersistentQueues.Cluster.PartitionAssignmentTable.PartitionAssignmentTable(Microsoft.Extensions.Logging.ILogger<Bielu.PersistentQueues.Cluster.PartitionAssignmentTable!>! logger, int replicationFactor = 2) -> void
+Bielu.PersistentQueues.Cluster.PartitionAssignmentTable.PromoteReplica(string! queueName, int partitionIndex) -> Bielu.PersistentQueues.Cluster.PartitionReplica?
+Bielu.PersistentQueues.Cluster.PartitionAssignmentTable.Rebalance(System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Cluster.NodeInfo!>! activeNodes) -> void
+Bielu.PersistentQueues.Cluster.PartitionReplica
+Bielu.PersistentQueues.Cluster.PartitionReplica.Epoch.get -> long
+Bielu.PersistentQueues.Cluster.PartitionReplica.Epoch.set -> void
+Bielu.PersistentQueues.Cluster.PartitionReplica.IsFullyReplicated.get -> bool
+Bielu.PersistentQueues.Cluster.PartitionReplica.PartitionIndex.get -> int
+Bielu.PersistentQueues.Cluster.PartitionReplica.PartitionIndex.init -> void
+Bielu.PersistentQueues.Cluster.PartitionReplica.PartitionKey.get -> string!
+Bielu.PersistentQueues.Cluster.PartitionReplica.PartitionReplica() -> void
+Bielu.PersistentQueues.Cluster.PartitionReplica.PrimaryNodeId.get -> System.Guid
+Bielu.PersistentQueues.Cluster.PartitionReplica.PrimaryNodeId.set -> void
+Bielu.PersistentQueues.Cluster.PartitionReplica.QueueName.get -> string!
+Bielu.PersistentQueues.Cluster.PartitionReplica.QueueName.init -> void
+Bielu.PersistentQueues.Cluster.PartitionReplica.ReplicaNodeId.get -> System.Guid
+Bielu.PersistentQueues.Cluster.PartitionReplica.ReplicaNodeId.set -> void
+Bielu.PersistentQueues.Cluster.ReplicationMode
+Bielu.PersistentQueues.Cluster.ReplicationMode.Asynchronous = 1 -> Bielu.PersistentQueues.Cluster.ReplicationMode
+Bielu.PersistentQueues.Cluster.ReplicationMode.Synchronous = 0 -> Bielu.PersistentQueues.Cluster.ReplicationMode
+Bielu.PersistentQueues.Cluster.TcpReplicationProtocol
+Bielu.PersistentQueues.Cluster.TcpReplicationProtocol.Dispose() -> void
+Bielu.PersistentQueues.Cluster.TcpReplicationProtocol.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Bielu.PersistentQueues.Cluster.TcpReplicationProtocol.ReplicateAsync(System.Net.IPEndPoint! replicaEndpoint, string! queueName, System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Message>! messages, long epoch, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Bielu.PersistentQueues.Cluster.TcpReplicationProtocol.StartListeningAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Bielu.PersistentQueues.Cluster.TcpReplicationProtocol.SyncPartitionAsync(System.Net.IPEndPoint! sourceEndpoint, string! queueName, Bielu.PersistentQueues.MessageId? afterMessageId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.Message>!>!
+Bielu.PersistentQueues.Cluster.TcpReplicationProtocol.TcpReplicationProtocol(Bielu.PersistentQueues.Storage.IMessageStore! store, System.Net.IPEndPoint! replicationEndpoint, Microsoft.Extensions.Logging.ILogger<Bielu.PersistentQueues.Cluster.TcpReplicationProtocol!>! logger, int maxPayloadBytes = 67108864) -> void
+const Bielu.PersistentQueues.Cluster.ClusterConfiguration.DefaultMaxPayloadBytes = 67108864 -> int
+override Bielu.PersistentQueues.Cluster.NodeInfo.Equals(object? obj) -> bool
+override Bielu.PersistentQueues.Cluster.NodeInfo.GetHashCode() -> int
+override Bielu.PersistentQueues.Cluster.NodeInfo.ToString() -> string!
+override Bielu.PersistentQueues.Cluster.PartitionReplica.ToString() -> string!
+static Bielu.PersistentQueues.Cluster.ClusterServiceCollectionExtensions.AddClusterSupport(this Bielu.PersistentQueues.PersistentQueuesBuilder! builder, System.Action<Bielu.PersistentQueues.Cluster.ClusterConfiguration!>! configure) -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.AdvertisedAddress.get -> System.Net.IPAddress?
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.AdvertisedAddress.set -> void
+Bielu.PersistentQueues.Cluster.ClusterReplicationException.ClusterReplicationException(string! partitionKey, string! message, System.Exception? innerException) -> void
