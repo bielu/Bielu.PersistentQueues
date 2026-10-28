@@ -34,6 +34,8 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
     private readonly IMessageStore _store;
     private readonly IPEndPoint _replicationEndpoint;
     private static readonly TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(30);
+    private const int MaxSyncPageMessages = 1000;
+    private const int SyncMessageOverheadBytes = 512;
 
     private readonly ILogger _logger;
     private readonly int _maxPayloadBytes;
@@ -157,15 +159,27 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
             var responseBuffer = await ReadFrameAsync(stream, timeoutCts.Token).ConfigureAwait(false);
             var response = JsonSerializer.Deserialize<SyncResponse>(responseBuffer);
 
-            if (response?.Messages == null)
+            if (response is not { Succeeded: true })
+                throw new ClusterReplicationException(queueName, $"Source node {sourceEndpoint} could not read partition {queueName}.");
+
+            if (response.Messages == null)
                 return Array.Empty<Message>();
 
             return response.Messages.Select(FromReplicatedMessage).ToList().AsReadOnly();
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (ClusterReplicationException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Sync partition from {Endpoint} failed for {QueueName}", sourceEndpoint, queueName);
-            return Array.Empty<Message>();
+            // An empty result would be indistinguishable from an empty partition, so report the failure.
+            throw new ClusterReplicationException(queueName,
+                $"Sync of partition {queueName} from {sourceEndpoint} failed: {ex.Message}", ex);
         }
     }
 
@@ -280,6 +294,7 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
 
     private async Task HandleSyncPartitionAsync(ReplicationRequest request, NetworkStream stream, CancellationToken cancellationToken)
     {
+        SyncResponse response;
         try
         {
             var queueName = request.QueueName ?? string.Empty;
@@ -293,23 +308,54 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
 
             // Only partition sub-queues are replicated, so only those can be read back.
             var replicatedMessages = IsPartitionQueue(queueName)
-                ? _store.GetMessagesAfter(queueName, afterMessageId).Select(ToReplicatedMessage).ToList()
+                ? ReadSyncPage(queueName, afterMessageId)
                 : [];
 
-            var response = new SyncResponse { Messages = replicatedMessages };
-            var responseJson = JsonSerializer.Serialize(response);
-            var responseBytes = Encoding.UTF8.GetBytes(responseJson);
-            var lengthPrefix = BitConverter.GetBytes(responseBytes.Length);
-
-            await stream.WriteAsync(lengthPrefix, cancellationToken).ConfigureAwait(false);
-            await stream.WriteAsync(responseBytes, cancellationToken).ConfigureAwait(false);
-            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            response = new SyncResponse { Succeeded = true, Messages = replicatedMessages };
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Error handling sync partition request for {QueueName}", request.QueueName);
+            response = new SyncResponse { Succeeded = false };
         }
+
+        var responseBytes = JsonSerializer.SerializeToUtf8Bytes(response);
+        var lengthPrefix = BitConverter.GetBytes(responseBytes.Length);
+
+        await stream.WriteAsync(lengthPrefix, cancellationToken).ConfigureAwait(false);
+        await stream.WriteAsync(responseBytes, cancellationToken).ConfigureAwait(false);
+        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Reads the next page of a partition, ordered by message ID so the requester can use the
+    /// last ID as the cursor for the following page.
+    /// </summary>
+    private List<ReplicatedMessage> ReadSyncPage(string queueName, MessageId? afterMessageId)
+    {
+        // Leave room for JSON framing and the ~33% base64 expansion of the payloads.
+        var byteBudget = _maxPayloadBytes / 2;
+        var page = new List<ReplicatedMessage>();
+        long pageBytes = 0;
+
+        foreach (var message in _store.GetMessagesAfter(queueName, afterMessageId).OrderBy(m => m.Id.MessageIdentifier, MessageIdentifierComparer.Instance))
+        {
+            var size = EstimateSerializedSize(message);
+            if (page.Count > 0 && (page.Count >= MaxSyncPageMessages || pageBytes + size > byteBudget))
+                break;
+
+            page.Add(ToReplicatedMessage(message));
+            pageBytes += size;
+        }
+
+        return page;
+    }
+
+    private static long EstimateSerializedSize(Message message) =>
+        SyncMessageOverheadBytes
+        + message.Data.Length * 4L / 3
+        + (message.Queue.Length + message.SubQueue.Length + message.PartitionKey.Length) * 2L
+        + message.GetHeadersDictionary().Sum(h => (h.Key.Length + h.Value.Length) * 2L);
 
     private async Task<byte[]> ReadFrameAsync(NetworkStream stream, CancellationToken cancellationToken)
     {
@@ -412,6 +458,25 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
 
     private sealed class SyncResponse
     {
+        public bool Succeeded { get; set; }
         public List<ReplicatedMessage>? Messages { get; set; }
+    }
+
+    /// <summary>
+    /// Orders message identifiers by their byte representation, the same order
+    /// <see cref="IMessageStore.GetMessagesAfter"/> uses for its cursor.
+    /// </summary>
+    private sealed class MessageIdentifierComparer : IComparer<Guid>
+    {
+        public static readonly MessageIdentifierComparer Instance = new();
+
+        public int Compare(Guid x, Guid y)
+        {
+            Span<byte> left = stackalloc byte[16];
+            Span<byte> right = stackalloc byte[16];
+            x.TryWriteBytes(left);
+            y.TryWriteBytes(right);
+            return left.SequenceCompareTo(right);
+        }
     }
 }

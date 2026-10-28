@@ -434,6 +434,39 @@ public class ClusterConfigurationTests
     {
         Should.NotThrow(new ClusterConfiguration().Validate);
     }
+
+    [Theory]
+    [InlineData("0.0.0.0")]
+    [InlineData("255.255.255.255")]
+    [InlineData("::1")]
+    public void validate_rejects_unroutable_or_non_ipv4_advertised_address(string address)
+    {
+        var config = new ClusterConfiguration { AdvertisedAddress = IPAddress.Parse(address) };
+
+        Should.Throw<ArgumentException>(config.Validate).ParamName.ShouldBe(nameof(ClusterConfiguration.AdvertisedAddress));
+    }
+
+    [Fact]
+    public void coordinator_advertises_configured_address_instead_of_bind_address()
+    {
+        var config = new ClusterConfiguration { AdvertisedAddress = IPAddress.Parse("10.0.0.5") };
+
+        using var coordinator = new GossipClusterCoordinator(config, new IPEndPoint(IPAddress.Any, 5000),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<GossipClusterCoordinator>.Instance);
+
+        coordinator.LocalNode.QueueEndpoint.ShouldBe(new IPEndPoint(IPAddress.Parse("10.0.0.5"), 5000));
+        coordinator.LocalNode.GossipEndpoint.ShouldBe(new IPEndPoint(IPAddress.Parse("10.0.0.5"), 5001));
+    }
+
+    [Theory]
+    [InlineData("0.0.0.0")]
+    [InlineData("::")]
+    public void coordinator_rejects_unadvertisable_queue_address_without_advertised_address(string address)
+    {
+        Should.Throw<ArgumentException>(() => new GossipClusterCoordinator(new ClusterConfiguration(),
+            new IPEndPoint(IPAddress.Parse(address), 5000),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<GossipClusterCoordinator>.Instance));
+    }
 }
 
 public class GetMessagesAfterTests(ITestOutputHelper output) : TestBase(output)

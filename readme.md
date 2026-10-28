@@ -800,6 +800,7 @@ services.AddPersistentQueues(builder =>
            {
                cluster.ReplicationFactor = 2; // 1 (no replica) or 2
                cluster.ReplicationMode = ReplicationMode.Synchronous;
+               cluster.AdvertisedAddress = IPAddress.Parse("10.0.0.2"); // this node's address as peers see it
                cluster.SeedNodes.Add(new IPEndPoint(IPAddress.Parse("10.0.0.1"), 5001));
            });
 });
@@ -817,13 +818,16 @@ Resolve `IPartitionedQueue` to get the cluster-aware queue:
 
 Ports: gossip listens on the queue port + `GossipPortOffset` (default `1`), and replication listens on the queue port + `GossipPortOffset` + 1. Both must be reachable between nodes.
 
+Addresses: the listeners bind to the queue endpoint address, and peers are told to connect to `AdvertisedAddress` (the queue endpoint address when it is not set). `AutomaticEndpoint()` listens on loopback, which only works for nodes on the same machine, so set `AdvertisedAddress` (and a queue endpoint that is reachable from other hosts) for a real cluster. Cluster traffic is IPv4 only; an IPv6 or wildcard (`0.0.0.0`) advertised address is rejected at startup.
+
 > **Security:** the gossip and replication listeners do not authenticate peers. Only expose these ports to other cluster nodes (private network or firewall rules). Payloads are capped by `MaxPayloadBytes`, connections time out, and the replication listener only accepts reads and writes for partition sub-queues.
 
 **Current limitations**
 
 - Replication copies enqueued messages only. Messages consumed on the primary are not removed from the replica, so after a failover or ownership change the new primary can redeliver messages that were already processed (at-least-once delivery). Consumers should be idempotent.
 - There is no consensus protocol. Nodes with different membership views (for example while gossip converges) can briefly disagree on ownership. Assignment epochs are tracked per node and are not used to fence stale primaries.
-- An ownership change copies the whole partition from its source node.
+- An ownership change copies the whole partition from its source node. The copy is transferred in pages bounded by `MaxPayloadBytes` and retried with backoff. If it still fails, an error is logged and the partition is served without the missing messages.
+- Replica copies are never trimmed. A replica partition keeps every message ever replicated to it, so its storage grows without limit (for LMDB, until the map size is reached, after which writes and replica acknowledgments on that node fail). After a failover, the new primary redelivers the whole replicated history of the partition, not only unconsumed messages. Size storage accordingly and keep consumers idempotent.
 - `EnablePartitioning`, `DisablePartitioning` and `Repartition` only affect the local node and must be run on every node while the queue is quiesced.
 
 ---

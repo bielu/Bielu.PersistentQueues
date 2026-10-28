@@ -167,3 +167,6 @@ override Bielu.PersistentQueues.Cluster.NodeInfo.GetHashCode() -> int
 override Bielu.PersistentQueues.Cluster.NodeInfo.ToString() -> string!
 override Bielu.PersistentQueues.Cluster.PartitionReplica.ToString() -> string!
 static Bielu.PersistentQueues.Cluster.ClusterServiceCollectionExtensions.AddClusterSupport(this Bielu.PersistentQueues.PersistentQueuesBuilder! builder, System.Action<Bielu.PersistentQueues.Cluster.ClusterConfiguration!>! configure) -> Bielu.PersistentQueues.PersistentQueuesBuilder!
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.AdvertisedAddress.get -> System.Net.IPAddress?
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.AdvertisedAddress.set -> void
+Bielu.PersistentQueues.Cluster.ClusterReplicationException.ClusterReplicationException(string! partitionKey, string! message, System.Exception? innerException) -> void

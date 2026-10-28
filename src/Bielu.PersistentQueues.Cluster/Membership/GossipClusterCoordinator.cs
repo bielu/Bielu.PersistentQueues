@@ -38,6 +38,7 @@ public sealed class GossipClusterCoordinator : IClusterCoordinator
     private readonly ClusterConfiguration _config;
     private readonly ILogger _logger;
     private readonly ConcurrentDictionary<Guid, NodeInfo> _members = new();
+    private readonly IPEndPoint _gossipBindEndpoint;
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
     private Task? _heartbeatTask;
@@ -61,14 +62,17 @@ public sealed class GossipClusterCoordinator : IClusterCoordinator
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        ArgumentNullException.ThrowIfNull(queueEndpoint);
 
-        var gossipEndpoint = new IPEndPoint(queueEndpoint.Address, queueEndpoint.Port + config.GossipPortOffset);
+        var gossipPort = queueEndpoint.Port + config.GossipPortOffset;
+        var advertisedAddress = config.ResolveAdvertisedAddress(queueEndpoint.Address);
+        _gossipBindEndpoint = new IPEndPoint(queueEndpoint.Address, gossipPort);
 
         LocalNode = new NodeInfo
         {
             NodeId = config.NodeId,
-            QueueEndpoint = queueEndpoint,
-            GossipEndpoint = gossipEndpoint,
+            QueueEndpoint = new IPEndPoint(advertisedAddress, queueEndpoint.Port),
+            GossipEndpoint = new IPEndPoint(advertisedAddress, gossipPort),
             State = NodeState.Active,
             LastSeen = DateTime.UtcNow,
             Generation = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
@@ -91,7 +95,7 @@ public sealed class GossipClusterCoordinator : IClusterCoordinator
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         // Start listening for gossip messages
-        _listener = new TcpListener(LocalNode.GossipEndpoint);
+        _listener = new TcpListener(_gossipBindEndpoint);
         _listener.Start();
         _listenerTask = AcceptGossipConnectionsAsync(_cts.Token);
 
@@ -204,13 +208,16 @@ public sealed class GossipClusterCoordinator : IClusterCoordinator
         }
     }
 
-    private async Task SendGossipAsync(IPEndPoint target, CancellationToken cancellationToken)
+    private Task SendGossipAsync(IPEndPoint target, CancellationToken cancellationToken) =>
+        SendGossipAsync(target, GossipConnectionTimeout, cancellationToken);
+
+    private async Task SendGossipAsync(IPEndPoint target, TimeSpan timeout, CancellationToken cancellationToken)
     {
         using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         socket.NoDelay = true;
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+        timeoutCts.CancelAfter(timeout);
 
         await socket.ConnectAsync(target, timeoutCts.Token).ConfigureAwait(false);
         await using var stream = new NetworkStream(socket, ownsSocket: false);
@@ -236,7 +243,7 @@ public sealed class GossipClusterCoordinator : IClusterCoordinator
 
         var json = JsonSerializer.Serialize(gossipMessage);
         var bytes = Encoding.UTF8.GetBytes(json);
-        await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+        await stream.WriteAsync(bytes, timeoutCts.Token).ConfigureAwait(false);
     }
 
     private void MergeGossipState(List<GossipNodeEntry> remoteMembers)
@@ -330,22 +337,35 @@ public sealed class GossipClusterCoordinator : IClusterCoordinator
                 if (peers.Count == 0)
                     targets.AddRange(_config.SeedNodes.Where(s => !s.Equals(LocalNode.GossipEndpoint)));
 
-                foreach (var target in targets.Distinct())
-                {
-                    try
-                    {
-                        await SendGossipAsync(target, cancellationToken).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogDebug(ex, "Heartbeat to {Endpoint} failed", target);
-                    }
-                }
+                // Probe in parallel and bound each probe by the heartbeat interval, so an
+                // unreachable peer cannot delay the next cycle past the suspicion timeout of the
+                // peers that are still alive.
+                var probeTimeout = _config.HeartbeatInterval < GossipConnectionTimeout
+                    ? _config.HeartbeatInterval
+                    : GossipConnectionTimeout;
+                await Task.WhenAll(targets.Distinct().Select(target => ProbeAsync(target, probeTimeout, cancellationToken)))
+                    .ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
                 break;
             }
+        }
+    }
+
+    private async Task ProbeAsync(IPEndPoint target, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await SendGossipAsync(target, timeout, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Heartbeat to {Endpoint} failed", target);
         }
     }
 

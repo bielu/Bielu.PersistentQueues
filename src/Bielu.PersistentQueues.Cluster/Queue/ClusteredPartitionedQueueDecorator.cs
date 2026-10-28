@@ -44,6 +44,9 @@ namespace Bielu.PersistentQueues.Cluster;
 /// </remarks>
 public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsyncDisposable
 {
+    private const int MaxSyncAttempts = 5;
+    private static readonly TimeSpan SyncRetryBaseDelay = TimeSpan.FromSeconds(1);
+
     private readonly IPartitionedQueue _innerPartitionedQueue;
     private readonly IClusterCoordinator _coordinator;
     private readonly IPartitionAssignment _assignment;
@@ -613,26 +616,60 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
             _logger.LogInformation("Starting catch-up sync for {Partition} from {SourceNode}",
                 partitionQueueName, sourceNode.NodeId);
 
-            var messages = await _replication.SyncPartitionAsync(
-                sourceEndpoint, partitionQueueName, afterMessageId: null, _cts.Token).ConfigureAwait(false);
-
             // This node may already hold some of these messages (e.g. it was the replica before
             // the change), so only store the ones that are missing locally.
             var localIds = Store.PersistedIncoming(partitionQueueName)
                 .Select(m => m.Id)
                 .ToHashSet();
-            var missing = messages.Where(m => !localIds.Contains(m.Id)).ToList();
+            var synced = 0;
+            MessageId? cursor = null;
 
-            if (missing.Count > 0)
+            while (true)
             {
-                Store.StoreIncoming(missing);
-                _logger.LogInformation("Synced {Count} messages for {Partition} from {SourceNode}",
-                    missing.Count, partitionQueueName, sourceNode.NodeId);
+                var page = await SyncPageWithRetryAsync(sourceEndpoint, partitionQueueName, cursor).ConfigureAwait(false);
+                if (page.Count == 0)
+                    break;
+
+                var missing = page.Where(m => localIds.Add(m.Id)).ToList();
+                if (missing.Count > 0)
+                {
+                    Store.StoreIncoming(missing);
+                    synced += missing.Count;
+                }
+
+                cursor = page[^1].Id;
             }
+
+            _logger.LogInformation("Synced {Count} messages for {Partition} from {SourceNode}",
+                synced, partitionQueueName, sourceNode.NodeId);
+        }
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+        {
+            // Shutting down
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Catch-up sync failed for {Partition}", partitionQueueName);
+            _logger.LogError(ex, "Catch-up sync failed for {Partition}; the partition may be missing messages", partitionQueueName);
+        }
+    }
+
+    private async Task<IReadOnlyList<Message>> SyncPageWithRetryAsync(IPEndPoint sourceEndpoint, string partitionQueueName,
+        MessageId? cursor)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await _replication.SyncPartitionAsync(sourceEndpoint, partitionQueueName, cursor, _cts.Token)
+                    .ConfigureAwait(false);
+            }
+            catch (ClusterReplicationException ex) when (attempt < MaxSyncAttempts)
+            {
+                var delay = TimeSpan.FromMilliseconds(SyncRetryBaseDelay.TotalMilliseconds * (1 << (attempt - 1)));
+                _logger.LogWarning(ex, "Sync page for {Partition} failed (attempt {Attempt} of {MaxAttempts}); retrying in {Delay}",
+                    partitionQueueName, attempt, MaxSyncAttempts, delay);
+                await Task.Delay(delay, _cts.Token).ConfigureAwait(false);
+            }
         }
     }
 

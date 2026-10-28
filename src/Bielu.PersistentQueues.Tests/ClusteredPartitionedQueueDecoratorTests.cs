@@ -275,6 +275,115 @@ public class ClusteredPartitionedQueueDecoratorTests(ITestOutputHelper output) :
     }
 
     [Fact]
+    public async Task catch_up_sync_pages_through_source_using_last_message_as_cursor()
+    {
+        await ClusterScenarioAsync(ctx =>
+        {
+            var pages = new Dictionary<string, Message[]>();
+            ctx.Replication.SyncHandler = (queueName, after) =>
+            {
+                lock (pages)
+                {
+                    if (!pages.TryGetValue(queueName, out var messages))
+                        pages[queueName] = messages = [NewMessage(queueName), NewMessage(queueName), NewMessage(queueName)];
+
+                    if (after == null) return messages[..2];
+                    if (messages[1].Id.Equals(after)) return messages[2..];
+                    return [];
+                }
+            };
+
+            var joined = ctx.AddRemote();
+            ctx.Coordinator.Raise(ClusterMembershipChangeType.NodeJoined, joined);
+
+            pages.ShouldNotBeEmpty();
+            foreach (var (queueName, messages) in pages)
+            {
+                ctx.Replication.SyncRequests.Where(r => r.QueueName == queueName).Select(r => r.AfterMessageId)
+                    .ShouldBe([null, messages[1].Id, messages[2].Id]);
+                ctx.Queue.Store.PersistedIncoming(queueName).Select(m => m.Id)
+                    .ShouldBe(messages.Select(m => m.Id), ignoreOrder: true);
+            }
+        }, nodeCount: 1);
+    }
+
+    [Fact]
+    public async Task catch_up_sync_retries_a_failed_page()
+    {
+        await ClusterScenarioAsync(ctx =>
+        {
+            var failed = new HashSet<string>();
+            ctx.Replication.SyncHandler = (queueName, after) =>
+            {
+                lock (failed)
+                {
+                    if (failed.Add(queueName))
+                        throw new ClusterReplicationException(queueName, "source unavailable");
+                    return after == null ? [NewMessage(queueName)] : [];
+                }
+            };
+
+            var joined = ctx.AddRemote();
+            ctx.Coordinator.Raise(ClusterMembershipChangeType.NodeJoined, joined);
+
+            // Every partition fails once, then succeeds with one message and an empty page.
+            SpinWait.SpinUntil(() =>
+            {
+                lock (ctx.Replication.SyncRequests)
+                    return ctx.Replication.SyncRequests.Count == failed.Count * 3;
+            }, TimeSpan.FromSeconds(4)).ShouldBeTrue();
+
+            failed.ShouldNotBeEmpty();
+            foreach (var queueName in failed)
+                SpinWait.SpinUntil(() => ctx.Queue.Store.PersistedIncoming(queueName).Any(), TimeSpan.FromSeconds(1)).ShouldBeTrue();
+        }, nodeCount: 1);
+    }
+
+    [Fact]
+    public async Task replication_protocol_syncs_partition_larger_than_payload_limit_in_ordered_pages()
+    {
+        await ReplicationScenarioAsync(async (store, primary, replicaEndpoint, token) =>
+        {
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(QueueName, 0);
+            var stored = Enumerable.Range(0, 6)
+                .Select(_ => Message.Create(data: new byte[600], queue: partitionQueueName))
+                .ToList();
+            store.StoreIncoming(stored);
+
+            var synced = new List<Message>();
+            var pageCount = 0;
+            MessageId? cursor = null;
+            while (true)
+            {
+                var page = await primary.SyncPartitionAsync(replicaEndpoint, partitionQueueName, cursor, token);
+                if (page.Count == 0) break;
+                pageCount++;
+                synced.AddRange(page);
+                cursor = page[^1].Id;
+            }
+
+            pageCount.ShouldBeGreaterThan(1);
+            synced.Select(m => m.Id).ShouldBe(stored.Select(m => m.Id), ignoreOrder: true);
+        }, maxPayloadBytes: 4096);
+    }
+
+    [Fact]
+    public async Task replication_protocol_sync_throws_when_source_is_unreachable()
+    {
+        await ReplicationScenarioAsync(async (_, primary, _, token) =>
+        {
+            var unreachable = new IPEndPoint(IPAddress.Loopback, GetFreePort());
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(QueueName, 0);
+
+            var ex = await Should.ThrowAsync<ClusterReplicationException>(() =>
+                primary.SyncPartitionAsync(unreachable, partitionQueueName, null, token));
+
+            ex.PartitionKey.ShouldBe(partitionQueueName);
+            ex.InnerException.ShouldNotBeNull();
+        });
+    }
+
+    [Fact]
     public async Task replication_protocol_round_trips_messages_with_headers()
     {
         await ReplicationScenarioAsync(async (store, primary, replicaEndpoint, token) =>
@@ -466,7 +575,8 @@ public class ClusteredPartitionedQueueDecoratorTests(ITestOutputHelper output) :
     private sealed class RecordingReplicationProtocol : IReplicationProtocol
     {
         public List<(IPEndPoint Endpoint, string QueueName, IReadOnlyList<Message> Messages, long Epoch)> Calls { get; } = [];
-        public List<(IPEndPoint Endpoint, string QueueName)> SyncRequests { get; } = [];
+        public List<(IPEndPoint Endpoint, string QueueName, MessageId? AfterMessageId)> SyncRequests { get; } = [];
+        public Func<string, MessageId?, IReadOnlyList<Message>>? SyncHandler { get; set; }
         public bool Acknowledge { get; set; } = true;
         public int ListenCalls { get; private set; }
         public Exception? ListenFailure { get; set; }
@@ -481,8 +591,16 @@ public class ClusteredPartitionedQueueDecoratorTests(ITestOutputHelper output) :
         public Task<IReadOnlyList<Message>> SyncPartitionAsync(IPEndPoint sourceEndpoint, string queueName,
             MessageId? afterMessageId, CancellationToken cancellationToken = default)
         {
-            SyncRequests.Add((sourceEndpoint, queueName));
-            return Task.FromResult<IReadOnlyList<Message>>([]);
+            lock (SyncRequests)
+                SyncRequests.Add((sourceEndpoint, queueName, afterMessageId));
+            try
+            {
+                return Task.FromResult(SyncHandler?.Invoke(queueName, afterMessageId) ?? []);
+            }
+            catch (Exception ex)
+            {
+                return Task.FromException<IReadOnlyList<Message>>(ex);
+            }
         }
 
         public Task StartListeningAsync(CancellationToken cancellationToken = default)

@@ -35,17 +35,21 @@ public interface IReplicationProtocol : IAsyncDisposable, IDisposable
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Requests catch-up synchronization from a source node for a specific partition.
-    /// Used when a new replica needs to sync all messages it missed.
+    /// Requests one page of catch-up synchronization from a source node for a specific partition.
+    /// Used when a node takes over a partition and needs the messages it is missing.
     /// </summary>
     /// <param name="sourceEndpoint">The endpoint of the node to sync from.</param>
     /// <param name="queueName">The partition queue name.</param>
     /// <param name="afterMessageId">
-    /// The last known message ID on the requesting node. Only messages after this ID will be synced.
-    /// If null, all messages for the partition are requested.
+    /// The cursor: only messages whose ID sorts after this ID are returned. Pass <c>null</c> for
+    /// the first page and the ID of the last message of the previous page for the next one.
     /// </param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <returns>The messages that the replica is missing.</returns>
+    /// <returns>
+    /// The next page of messages, ordered by message ID. An empty page means the partition has
+    /// no more messages after <paramref name="afterMessageId"/>.
+    /// </returns>
+    /// <exception cref="ClusterReplicationException">Thrown when the page could not be read from the source node.</exception>
     Task<IReadOnlyList<Message>> SyncPartitionAsync(
         System.Net.IPEndPoint sourceEndpoint,
         string queueName,

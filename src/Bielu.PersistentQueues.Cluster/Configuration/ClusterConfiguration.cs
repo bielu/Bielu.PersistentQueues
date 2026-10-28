@@ -81,6 +81,17 @@ public sealed class ClusterConfiguration
     public int MaxPayloadBytes { get; set; } = DefaultMaxPayloadBytes;
 
     /// <summary>
+    /// Gets or sets the IPv4 address other nodes use to reach this node's queue, gossip and
+    /// replication ports.
+    /// </summary>
+    /// <remarks>
+    /// When not set, the queue endpoint address is advertised. Set it when the queue listens on
+    /// <see cref="IPAddress.Any"/> or on loopback (the default of <c>AutomaticEndpoint()</c>), which
+    /// remote peers cannot connect to. The listeners still bind to the queue endpoint address.
+    /// </remarks>
+    public IPAddress? AdvertisedAddress { get; set; }
+
+    /// <summary>
     /// Validates the configuration.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when a setting is outside its supported range.</exception>
@@ -95,6 +106,34 @@ public sealed class ClusterConfiguration
             throw new ArgumentOutOfRangeException(nameof(DeathThreshold), DeathThreshold, "Death threshold must be positive.");
         if (MaxPayloadBytes <= 0)
             throw new ArgumentOutOfRangeException(nameof(MaxPayloadBytes), MaxPayloadBytes, "Maximum payload size must be positive.");
+        if (AdvertisedAddress != null)
+            ValidateAdvertisedAddress(AdvertisedAddress);
+    }
+
+    /// <summary>
+    /// Resolves the address advertised to peers: <see cref="AdvertisedAddress"/> when set,
+    /// otherwise <paramref name="queueAddress"/>.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the address is not a routable IPv4 address.</exception>
+    internal IPAddress ResolveAdvertisedAddress(IPAddress queueAddress)
+    {
+        var address = AdvertisedAddress ?? queueAddress;
+        ValidateAdvertisedAddress(address);
+        return address;
+    }
+
+    private static void ValidateAdvertisedAddress(IPAddress address)
+    {
+        // Gossip and replication clients use IPv4 sockets, and a wildcard address tells a peer
+        // nothing about where to connect.
+        if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+            throw new ArgumentException(
+                $"Cluster traffic requires an IPv4 address, but '{address}' was advertised. Set {nameof(AdvertisedAddress)}.",
+                nameof(AdvertisedAddress));
+        if (address.Equals(IPAddress.Any) || address.Equals(IPAddress.Broadcast))
+            throw new ArgumentException(
+                $"'{address}' cannot be advertised to peers. Set {nameof(AdvertisedAddress)} to an address other nodes can reach.",
+                nameof(AdvertisedAddress));
     }
 
     internal static void ValidateReplicationFactor(int replicationFactor)
