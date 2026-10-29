@@ -20,6 +20,24 @@ history for the `Bielu.*` package suite, plus the legacy `LightningQueues` linea
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-29
+
+### Major Changes
+
+- [#90](https://github.com/bielu/Bielu.PersistentQueues/pull/90) [`d8abac1`](https://github.com/bielu/Bielu.PersistentQueues/commit/d8abac1628da19933396f6ae3ed2b583c5614c1d) Thanks [@bielu](https://github.com/bielu)! - Upgrade `ZoneTree` 1.9.8 → 2.0.5 (`Bielu.PersistentQueues.Storage.ZoneTree`) and `LightningDB` 0.23.0 → 0.23.1 (`Bielu.PersistentQueues.Storage.LMDB`).
+
+  ZoneTree 2.x is faster (about 1.48× across its reference benchmarks) and fixes crash-recovery, compressed-WAL repair and seek bugs. LightningDB 0.23.1 fixes a process crash on the finalizer thread when opening a cursor or transaction fails.
+
+  **Breaking (on-disk):** ZoneTree 2.0 switches WAL checksums from CRC32 to XXH3 and renames existing WAL files the first time a store is opened. Data written by 1.x is migrated automatically and reads back intact, but the migration is one-way: rolling back to a 1.x ZoneTree provider afterwards silently loses records that were still only in the WAL. Back up the data directory before upgrading if a rollback might be needed. The public API is unchanged.
+
+### Patch Changes
+
+- [#81](https://github.com/bielu/Bielu.PersistentQueues/pull/81) [`c2a66a8`](https://github.com/bielu/Bielu.PersistentQueues/commit/c2a66a830820b59fcea7b82ba439ef71d2bce16e) Thanks [@bielu](https://github.com/bielu)! - Publish NuGet packages through nuget.org trusted publishing from this repository's own workflow (the previous stable release failed because the OIDC token was minted inside the shared template), skip beta releases for pushes that change no shipped code, and align repository tooling with Bielu.AspNetCore.AsyncApi: `.editorconfig`, shared `coverlet.runsettings`, `AGENTS.md`, and a daily ClearlyDefined harvest.
+
+- [#81](https://github.com/bielu/Bielu.PersistentQueues/pull/81) [`c2a66a8`](https://github.com/bielu/Bielu.PersistentQueues/commit/c2a66a830820b59fcea7b82ba439ef71d2bce16e) Thanks [@bielu](https://github.com/bielu)! - Dependency updates: `ZoneTree` 1.9.7 → 1.9.8 (`Bielu.PersistentQueues.Storage.ZoneTree`) and `OpenTelemetry.Api` 1.18.0 → 1.19.1 (`Bielu.PersistentQueues.OpenTelemetry`).
+
+- [#83](https://github.com/bielu/Bielu.PersistentQueues/pull/83) [`fe394d8`](https://github.com/bielu/Bielu.PersistentQueues/commit/fe394d8c2fadb9977112c36a298053583239a367) Thanks [@bielu](https://github.com/bielu)! - `Message.WithBytes(...)` is now `[Obsolete]`, and the `bytes` parameter of the `Message` constructor is documented as ignored. `Message` stopped storing raw serialized bytes in an earlier upstream change, so both have been no-ops since then. They stay for 1.x binary compatibility and will be removed in the next major version.
+
 ## [1.0.0] - 2026-09-12
 
 ### Major Changes
