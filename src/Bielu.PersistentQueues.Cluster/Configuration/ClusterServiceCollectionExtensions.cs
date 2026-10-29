@@ -69,12 +69,13 @@ public static class ClusterServiceCollectionExtensions
         {
             var store = sp.GetRequiredService<IMessageStore>();
             var queue = sp.GetRequiredService<IQueue>();
+            var assignment = sp.GetRequiredService<IPartitionAssignment>();
             var logger = sp.GetRequiredService<ILogger<TcpReplicationProtocol>>();
             // Replication endpoint is queue port + gossip offset + 1
             var replicationEndpoint = new IPEndPoint(
                 queue.Endpoint.Address,
                 queue.Endpoint.Port + config.GossipPortOffset + 1);
-            return new TcpReplicationProtocol(store, replicationEndpoint, logger, config.MaxPayloadBytes);
+            return new TcpReplicationProtocol(store, replicationEndpoint, config, assignment, logger);
         });
 
         // Decorate IPartitionedQueue with ClusteredPartitionedQueueDecorator

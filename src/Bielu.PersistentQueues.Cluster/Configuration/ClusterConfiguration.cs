@@ -8,8 +8,9 @@ namespace Bielu.PersistentQueues.Cluster;
 /// Configuration options for cluster membership and replication.
 /// </summary>
 /// <remarks>
-/// The gossip and replication listeners do not authenticate peers. Both ports must only be
-/// reachable from other cluster nodes (a trusted network segment or firewall rules).
+/// Unless <see cref="SharedSecret"/> is set, the gossip and replication listeners do not
+/// authenticate peers. Either way, both ports should only be reachable from other cluster nodes
+/// (a trusted network segment or firewall rules).
 /// </remarks>
 public sealed class ClusterConfiguration
 {
@@ -108,9 +109,33 @@ public sealed class ClusterConfiguration
     public TimeSpan ReplicaTrimGracePeriod { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
+    /// The minimum length of <see cref="SharedSecret"/>.
+    /// </summary>
+    public const int MinSharedSecretLength = 16;
+
+    /// <summary>
+    /// Gets or sets the secret every node of the cluster shares to authenticate gossip and
+    /// replication traffic. When not set, peers are not authenticated.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Every gossip message and replication request and response is signed with HMAC-SHA256 over
+    /// this secret and a timestamp; frames that are unsigned, forged or more than five minutes
+    /// off this node's clock are dropped. All nodes must use the same secret, and their clocks
+    /// must be roughly synchronized.
+    /// </para>
+    /// <para>
+    /// Use a random value of at least <see cref="MinSharedSecretLength"/> characters (for example
+    /// 32 random bytes, base64-encoded). Traffic is authenticated but not encrypted.
+    /// </para>
+    /// </remarks>
+    public string? SharedSecret { get; set; }
+
+    /// <summary>
     /// Validates the configuration.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when a setting is outside its supported range.</exception>
+    /// <exception cref="ArgumentException">Thrown when the shared secret is too short or the advertised address cannot be used.</exception>
     public void Validate()
     {
         ValidateReplicationFactor(ReplicationFactor);
@@ -126,6 +151,9 @@ public sealed class ClusterConfiguration
             throw new ArgumentOutOfRangeException(nameof(ReplicaTrimInterval), ReplicaTrimInterval, "Replica trim interval must not be negative.");
         if (ReplicaTrimGracePeriod < TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(ReplicaTrimGracePeriod), ReplicaTrimGracePeriod, "Replica trim grace period must not be negative.");
+        if (SharedSecret != null && SharedSecret.Length < MinSharedSecretLength)
+            throw new ArgumentException(
+                $"The shared secret must be at least {MinSharedSecretLength} characters long.", nameof(SharedSecret));
         if (AdvertisedAddress != null)
             ValidateAdvertisedAddress(AdvertisedAddress);
     }

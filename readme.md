@@ -802,6 +802,7 @@ services.AddPersistentQueues(builder =>
                cluster.ReplicationMode = ReplicationMode.Synchronous;
                cluster.AdvertisedAddress = IPAddress.Parse("10.0.0.2"); // this node's address as peers see it
                cluster.SeedNodes.Add(new IPEndPoint(IPAddress.Parse("10.0.0.1"), 5001));
+               cluster.SharedSecret = configuration["Cluster:SharedSecret"]; // same on every node
            });
 });
 ```
@@ -821,12 +822,14 @@ Ports: gossip listens on the queue port + `GossipPortOffset` (default `1`), and 
 
 Addresses: the listeners bind to the queue endpoint address, and peers are told to connect to `AdvertisedAddress` (the queue endpoint address when it is not set). `AutomaticEndpoint()` listens on loopback, which only works for nodes on the same machine, so set `AdvertisedAddress` (and a queue endpoint that is reachable from other hosts) for a real cluster. Cluster traffic is IPv4 only; an IPv6 or wildcard (`0.0.0.0`) advertised address is rejected at startup.
 
-> **Security:** the gossip and replication listeners do not authenticate peers. Only expose these ports to other cluster nodes (private network or firewall rules). Payloads are capped by `MaxPayloadBytes`, connections time out, and the replication listener only accepts reads and writes for partition sub-queues.
+> **Security:** set `SharedSecret` (at least 16 characters; for example 32 random bytes, base64-encoded) to the same value on every node. Every gossip message and replication request and response is then signed with HMAC-SHA256 over the secret and a timestamp. Frames that are unsigned, signed with another secret, or more than five minutes off the receiver's clock are dropped, so node clocks must be roughly in sync. Without a secret, peers are not authenticated. Traffic is authenticated but not encrypted, and the one-byte replication acknowledgments are not signed, so still expose these ports only to other cluster nodes (private network or firewall rules). Payloads are capped by `MaxPayloadBytes`, connections time out, and the replication listener only accepts requests for partition sub-queues.
+>
+> A replica accepts a trim only from the node its own assignment lists as the partition's primary. A stale primary therefore cannot delete replica copies; its trim is refused and retried once the views agree.
 
 **Current limitations**
 
 - Replication copies enqueued messages only, and consumed messages are removed from the replica only on the next trim. After a failover or ownership change the new primary can redeliver messages consumed since the last trim, plus those consumed within the grace period (at-least-once delivery). Consumers should be idempotent.
-- There is no consensus protocol. Nodes with different membership views (for example while gossip converges) can briefly disagree on ownership. Assignment epochs are tracked per node and are not used to fence stale primaries.
+- There is no consensus protocol. Nodes with different membership views (for example while gossip converges) can briefly disagree on ownership. Assignment epochs are tracked per node and are not used to fence stale primaries; only trims are fenced, by the replica's own view of ownership. A stale primary can still replicate writes, which at worst adds duplicate copies.
 - An ownership change copies the whole partition from its source node. The copy is transferred in pages bounded by `MaxPayloadBytes` and retried with backoff. If it still fails, an error is logged and the partition is served without the missing messages.
 - A message delayed with `ReceiveLater` is out of the store while it waits, so it can be trimmed from the replica, and it is not replicated again when it returns. Copies left on a node that is no longer the primary or the replica of a partition are not trimmed.
 - `EnablePartitioning`, `DisablePartitioning` and `Repartition` only affect the local node and must be run on every node while the queue is quiesced.
