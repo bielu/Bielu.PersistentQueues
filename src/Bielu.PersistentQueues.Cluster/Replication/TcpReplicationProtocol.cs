@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -36,6 +35,8 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
     private static readonly TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(30);
     private const int MaxSyncPageMessages = 1000;
     private const int SyncMessageOverheadBytes = 512;
+    private const int MaxIdPageSize = 10_000;
+    private const int IdOverheadBytes = 128;
 
     private readonly ILogger _logger;
     private readonly int _maxPayloadBytes;
@@ -75,16 +76,6 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
     {
         try
         {
-            using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            socket.NoDelay = true;
-
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(10));
-
-            await socket.ConnectAsync(replicaEndpoint, timeoutCts.Token).ConfigureAwait(false);
-            await using var stream = new NetworkStream(socket, ownsSocket: false);
-
-            // Serialize and send the replication request
             var request = new ReplicationRequest
             {
                 Type = ReplicationMessageType.Replicate,
@@ -93,20 +84,7 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
                 Messages = messages.Select(ToReplicatedMessage).ToList()
             };
 
-            var json = JsonSerializer.Serialize(request);
-            var requestBytes = Encoding.UTF8.GetBytes(json);
-
-            // Write length prefix + data
-            var lengthPrefix = BitConverter.GetBytes(requestBytes.Length);
-            await stream.WriteAsync(lengthPrefix, timeoutCts.Token).ConfigureAwait(false);
-            await stream.WriteAsync(requestBytes, timeoutCts.Token).ConfigureAwait(false);
-            await stream.FlushAsync(timeoutCts.Token).ConfigureAwait(false);
-
-            // Read acknowledgment
-            var ackBuffer = new byte[1];
-            var bytesRead = await stream.ReadAsync(ackBuffer, timeoutCts.Token).ConfigureAwait(false);
-
-            if (bytesRead == 1 && ackBuffer[0] == 1)
+            if (await RequestAckAsync(replicaEndpoint, request, cancellationToken).ConfigureAwait(false))
             {
                 _logger.LogDebug("Replication acknowledged by {Endpoint} for {QueueName} ({Count} messages)",
                     replicaEndpoint, queueName, messages.Count);
@@ -132,15 +110,6 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
     {
         try
         {
-            using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            socket.NoDelay = true;
-
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(30));
-
-            await socket.ConnectAsync(sourceEndpoint, timeoutCts.Token).ConfigureAwait(false);
-            await using var stream = new NetworkStream(socket, ownsSocket: false);
-
             var request = new ReplicationRequest
             {
                 Type = ReplicationMessageType.SyncPartition,
@@ -149,15 +118,7 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
                 AfterMessageIdentifier = afterMessageId?.MessageIdentifier
             };
 
-            var json = JsonSerializer.Serialize(request);
-            var requestBytes = Encoding.UTF8.GetBytes(json);
-            var lengthPrefix = BitConverter.GetBytes(requestBytes.Length);
-            await stream.WriteAsync(lengthPrefix, timeoutCts.Token).ConfigureAwait(false);
-            await stream.WriteAsync(requestBytes, timeoutCts.Token).ConfigureAwait(false);
-            await stream.FlushAsync(timeoutCts.Token).ConfigureAwait(false);
-
-            var responseBuffer = await ReadFrameAsync(stream, timeoutCts.Token).ConfigureAwait(false);
-            var response = JsonSerializer.Deserialize<SyncResponse>(responseBuffer);
+            var response = await RequestFrameAsync<SyncResponse>(sourceEndpoint, request, cancellationToken).ConfigureAwait(false);
 
             if (response is not { Succeeded: true })
                 throw new ClusterReplicationException(queueName, $"Source node {sourceEndpoint} could not read partition {queueName}.");
@@ -181,6 +142,112 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
             throw new ClusterReplicationException(queueName,
                 $"Sync of partition {queueName} from {sourceEndpoint} failed: {ex.Message}", ex);
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<MessageId>> ListReplicaMessageIdsAsync(
+        IPEndPoint replicaEndpoint,
+        string queueName,
+        DateTime sentBefore,
+        MessageId? afterMessageId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var request = new ReplicationRequest
+            {
+                Type = ReplicationMessageType.ListMessageIds,
+                QueueName = queueName,
+                SentBefore = sentBefore,
+                AfterSourceInstanceId = afterMessageId?.SourceInstanceId,
+                AfterMessageIdentifier = afterMessageId?.MessageIdentifier
+            };
+
+            var response = await RequestFrameAsync<MessageIdsResponse>(replicaEndpoint, request, cancellationToken).ConfigureAwait(false);
+
+            if (response is not { Succeeded: true })
+                throw new ClusterReplicationException(queueName, $"Replica {replicaEndpoint} could not list partition {queueName}.");
+
+            return response.MessageIds?.Select(FromWireMessageId).ToList().AsReadOnly() ?? (IReadOnlyList<MessageId>)Array.Empty<MessageId>();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (ClusterReplicationException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new ClusterReplicationException(queueName,
+                $"Listing partition {queueName} on {replicaEndpoint} failed: {ex.Message}", ex);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> TrimReplicaAsync(
+        IPEndPoint replicaEndpoint,
+        string queueName,
+        IReadOnlyList<MessageId> messageIds,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var request = new ReplicationRequest
+            {
+                Type = ReplicationMessageType.Trim,
+                QueueName = queueName,
+                MessageIds = messageIds.Select(ToWireMessageId).ToList()
+            };
+
+            return await RequestAckAsync(replicaEndpoint, request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Trimming replica {Endpoint} failed for {QueueName}", replicaEndpoint, queueName);
+            return false;
+        }
+    }
+
+    private static async Task<bool> RequestAckAsync(IPEndPoint endpoint, ReplicationRequest request, CancellationToken cancellationToken)
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(10));
+
+        await using var stream = await SendRequestAsync(socket, endpoint, request, timeoutCts.Token).ConfigureAwait(false);
+
+        var ackBuffer = new byte[1];
+        var bytesRead = await stream.ReadAsync(ackBuffer, timeoutCts.Token).ConfigureAwait(false);
+        return bytesRead == 1 && ackBuffer[0] == 1;
+    }
+
+    private async Task<TResponse?> RequestFrameAsync<TResponse>(IPEndPoint endpoint, ReplicationRequest request,
+        CancellationToken cancellationToken)
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(ConnectionTimeout);
+
+        await using var stream = await SendRequestAsync(socket, endpoint, request, timeoutCts.Token).ConfigureAwait(false);
+
+        var responseBuffer = await ReadFrameAsync(stream, timeoutCts.Token).ConfigureAwait(false);
+        return JsonSerializer.Deserialize<TResponse>(responseBuffer);
+    }
+
+    private static async Task<NetworkStream> SendRequestAsync(Socket socket, IPEndPoint endpoint, ReplicationRequest request,
+        CancellationToken cancellationToken)
+    {
+        socket.NoDelay = true;
+        await socket.ConnectAsync(endpoint, cancellationToken).ConfigureAwait(false);
+        var stream = new NetworkStream(socket, ownsSocket: false);
+
+        var requestBytes = JsonSerializer.SerializeToUtf8Bytes(request);
+        await stream.WriteAsync(BitConverter.GetBytes(requestBytes.Length), cancellationToken).ConfigureAwait(false);
+        await stream.WriteAsync(requestBytes, cancellationToken).ConfigureAwait(false);
+        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+        return stream;
     }
 
     /// <inheritdoc />
@@ -236,6 +303,14 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
 
                 case ReplicationMessageType.SyncPartition:
                     await HandleSyncPartitionAsync(request, stream, token).ConfigureAwait(false);
+                    break;
+
+                case ReplicationMessageType.ListMessageIds:
+                    await HandleListMessageIdsAsync(request, stream, token).ConfigureAwait(false);
+                    break;
+
+                case ReplicationMessageType.Trim:
+                    await HandleTrimAsync(request, stream, token).ConfigureAwait(false);
                     break;
             }
         }
@@ -298,13 +373,7 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
         try
         {
             var queueName = request.QueueName ?? string.Empty;
-            var afterMessageId = request.AfterMessageIdentifier.HasValue
-                ? new MessageId
-                {
-                    SourceInstanceId = request.AfterSourceInstanceId ?? Guid.Empty,
-                    MessageIdentifier = request.AfterMessageIdentifier.Value
-                }
-                : null;
+            var afterMessageId = ReadCursor(request);
 
             // Only partition sub-queues are replicated, so only those can be read back.
             var replicatedMessages = IsPartitionQueue(queueName)
@@ -319,10 +388,83 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
             response = new SyncResponse { Succeeded = false };
         }
 
-        var responseBytes = JsonSerializer.SerializeToUtf8Bytes(response);
-        var lengthPrefix = BitConverter.GetBytes(responseBytes.Length);
+        await WriteFrameAsync(stream, response, cancellationToken).ConfigureAwait(false);
+    }
 
-        await stream.WriteAsync(lengthPrefix, cancellationToken).ConfigureAwait(false);
+    private async Task HandleListMessageIdsAsync(ReplicationRequest request, NetworkStream stream, CancellationToken cancellationToken)
+    {
+        MessageIdsResponse response;
+        try
+        {
+            var queueName = request.QueueName ?? string.Empty;
+            var sentBefore = request.SentBefore ?? DateTime.MinValue;
+
+            // Each ID takes roughly IdOverheadBytes of JSON; keep the page well inside the frame limit.
+            var pageSize = Math.Clamp(_maxPayloadBytes / 2 / IdOverheadBytes, 1, MaxIdPageSize);
+            var ids = IsPartitionQueue(queueName)
+                ? _store.GetMessagesAfter(queueName, ReadCursor(request))
+                    .OrderBy(m => m.Id.MessageIdentifier, MessageIdentifierComparer.Instance)
+                    .Where(m => m.SentAt < sentBefore)
+                    .Take(pageSize)
+                    .Select(m => ToWireMessageId(m.Id))
+                    .ToList()
+                : [];
+
+            response = new MessageIdsResponse { Succeeded = true, MessageIds = ids };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error listing message IDs for {QueueName}", request.QueueName);
+            response = new MessageIdsResponse { Succeeded = false };
+        }
+
+        await WriteFrameAsync(stream, response, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task HandleTrimAsync(ReplicationRequest request, NetworkStream stream, CancellationToken cancellationToken)
+    {
+        byte ack = 0;
+        try
+        {
+            // Trimming is limited to partition sub-queues, like every other replication request.
+            if (request.QueueName is { } queueName && IsPartitionQueue(queueName) && request.MessageIds != null)
+            {
+                var held = request.MessageIds
+                    .Select(id => _store.GetMessage(queueName, FromWireMessageId(id)))
+                    .OfType<Message>()
+                    .ToList();
+                if (held.Count > 0)
+                    _store.DeleteIncoming(held);
+
+                _logger.LogDebug("Trimmed {Count} replica messages from {QueueName}", held.Count, queueName);
+                ack = 1;
+            }
+            else
+            {
+                _logger.LogWarning("Rejected trim request for non-partition queue {QueueName}", request.QueueName);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error trimming replica messages for {QueueName}", request.QueueName);
+        }
+
+        await stream.WriteAsync(new[] { ack }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static MessageId? ReadCursor(ReplicationRequest request) =>
+        request.AfterMessageIdentifier.HasValue
+            ? new MessageId
+            {
+                SourceInstanceId = request.AfterSourceInstanceId ?? Guid.Empty,
+                MessageIdentifier = request.AfterMessageIdentifier.Value
+            }
+            : null;
+
+    private static async Task WriteFrameAsync<T>(NetworkStream stream, T response, CancellationToken cancellationToken)
+    {
+        var responseBytes = JsonSerializer.SerializeToUtf8Bytes(response);
+        await stream.WriteAsync(BitConverter.GetBytes(responseBytes.Length), cancellationToken).ConfigureAwait(false);
         await stream.WriteAsync(responseBytes, cancellationToken).ConfigureAwait(false);
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -388,6 +530,18 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
         Headers = m.GetHeadersDictionary()
     };
 
+    private static WireMessageId ToWireMessageId(MessageId id) => new()
+    {
+        SourceInstanceId = id.SourceInstanceId,
+        MessageIdentifier = id.MessageIdentifier
+    };
+
+    private static MessageId FromWireMessageId(WireMessageId id) => new()
+    {
+        SourceInstanceId = id.SourceInstanceId,
+        MessageIdentifier = id.MessageIdentifier
+    };
+
     private static Message FromReplicatedMessage(ReplicatedMessage rm) => new(
         new MessageId
         {
@@ -429,7 +583,9 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
     private enum ReplicationMessageType
     {
         Replicate = 1,
-        SyncPartition = 2
+        SyncPartition = 2,
+        ListMessageIds = 3,
+        Trim = 4
     }
 
     private sealed class ReplicationRequest
@@ -440,6 +596,20 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
         public List<ReplicatedMessage>? Messages { get; set; }
         public Guid? AfterSourceInstanceId { get; set; }
         public Guid? AfterMessageIdentifier { get; set; }
+        public DateTime? SentBefore { get; set; }
+        public List<WireMessageId>? MessageIds { get; set; }
+    }
+
+    private sealed class WireMessageId
+    {
+        public Guid SourceInstanceId { get; set; }
+        public Guid MessageIdentifier { get; set; }
+    }
+
+    private sealed class MessageIdsResponse
+    {
+        public bool Succeeded { get; set; }
+        public List<WireMessageId>? MessageIds { get; set; }
     }
 
     private sealed class ReplicatedMessage

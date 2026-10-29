@@ -57,6 +57,46 @@ public interface IReplicationProtocol : IAsyncDisposable, IDisposable
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Requests one page of the message IDs a replica holds for a partition, used by the primary
+    /// to find replica copies of messages it has already consumed.
+    /// </summary>
+    /// <param name="replicaEndpoint">The endpoint of the replica node.</param>
+    /// <param name="queueName">The partition queue name.</param>
+    /// <param name="sentBefore">Only messages sent before this UTC time are listed.</param>
+    /// <param name="afterMessageId">
+    /// The cursor: only messages whose ID sorts after this ID are returned. Pass <c>null</c> for
+    /// the first page and the last ID of the previous page for the next one.
+    /// </param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>
+    /// The next page of message IDs, ordered by ID. An empty page means there are no more
+    /// matching messages after <paramref name="afterMessageId"/>.
+    /// </returns>
+    /// <exception cref="ClusterReplicationException">Thrown when the page could not be read from the replica.</exception>
+    Task<IReadOnlyList<MessageId>> ListReplicaMessageIdsAsync(
+        System.Net.IPEndPoint replicaEndpoint,
+        string queueName,
+        DateTime sentBefore,
+        MessageId? afterMessageId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes replica copies of messages the primary no longer holds.
+    /// </summary>
+    /// <param name="replicaEndpoint">The endpoint of the replica node.</param>
+    /// <param name="queueName">The partition queue name.</param>
+    /// <param name="messageIds">The IDs of the messages to remove. IDs the replica does not hold are ignored.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>
+    /// A task that resolves to true if the replica acknowledged the removal, or false if it failed.
+    /// </returns>
+    Task<bool> TrimReplicaAsync(
+        System.Net.IPEndPoint replicaEndpoint,
+        string queueName,
+        IReadOnlyList<MessageId> messageIds,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Starts listening for incoming replication requests from other nodes.
     /// </summary>
     /// <param name="cancellationToken">A token to cancel the listener.</param>
