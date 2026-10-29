@@ -400,6 +400,8 @@ Storage providers are distributed as separate NuGet packages, each implementing 
 - **LMDB** (`Bielu.PersistentQueues.Storage.LMDB`) — High-performance embedded key-value store powered by [LightningDB](https://github.com/CoreyKaylor/Lightning.NET).
 - **ZoneTree** (`Bielu.PersistentQueues.Storage.ZoneTree`) — Pure C# LSM-tree storage with no native dependencies.
 
+> **Upgrading the ZoneTree provider to 2.x:** it builds on ZoneTree 2.0, which converts the store's write-ahead log (WAL) files to a new checksum format the first time the store is opened. Existing data is migrated automatically, but the migration is one-way: a 1.x provider opening the store afterwards reports no error yet silently drops records that were still only in the WAL. Back up the data directory before upgrading if you might need to roll back.
+
 **Extensibility:**
 - Additional storage backends can be added by creating a package that references `Bielu.PersistentQueues` and implements `IMessageStore` and `IStoreTransaction`.
 
