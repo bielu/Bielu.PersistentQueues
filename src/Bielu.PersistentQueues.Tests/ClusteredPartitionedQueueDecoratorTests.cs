@@ -450,6 +450,168 @@ public class ClusteredPartitionedQueueDecoratorTests(ITestOutputHelper output) :
         }, maxPayloadBytes: 1024);
     }
 
+    [Fact]
+    public async Task replica_trim_removes_copies_of_messages_no_longer_on_primary()
+    {
+        await ClusterScenarioAsync(ctx =>
+        {
+            var partition = ctx.PartitionsWhere(a => a.PrimaryNodeId == ctx.Local.NodeId).First();
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(QueueName, partition);
+            var replica = ctx.NodeById(ctx.Assignment.GetAssignment(QueueName, partition)!.ReplicaNodeId);
+            var retained = NewMessage(partitionQueueName);
+            ctx.Queue.Store.StoreIncoming(retained);
+            var consumed = NewMessage(partitionQueueName);
+            ctx.Replication.ReplicaIdsHandler = (queueName, after) =>
+                queueName == partitionQueueName && after == null ? [retained.Id, consumed.Id] : [];
+
+            ctx.Clustered.StartCluster();
+
+            SpinWait.SpinUntil(() => ctx.Replication.TrimRequestsSnapshot().Length > 0, TimeSpan.FromSeconds(4)).ShouldBeTrue();
+            ctx.Clustered.Dispose();
+
+            var trim = ctx.Replication.TrimRequestsSnapshot().First();
+            trim.QueueName.ShouldBe(partitionQueueName);
+            trim.Endpoint.Port.ShouldBe(replica.QueueEndpoint.Port + ctx.Config.GossipPortOffset + 1);
+            trim.MessageIds.ShouldBe([consumed.Id]);
+
+            // Only partitions owned as primary are trimmed, using the configured grace period
+            var owned = ctx.PartitionsWhere(a => a.PrimaryNodeId == ctx.Local.NodeId)
+                .Select(p => PartitionConstants.FormatPartitionQueueName(QueueName, p));
+            var listed = ctx.Replication.ListRequestsSnapshot();
+            listed.Select(r => r.QueueName).Distinct().ShouldBe(owned, ignoreOrder: true);
+            listed.ShouldAllBe(r => r.SentBefore <= DateTime.UtcNow);
+        }, configure: c =>
+        {
+            c.ReplicaTrimInterval = TimeSpan.FromMilliseconds(50);
+            c.ReplicaTrimGracePeriod = TimeSpan.Zero;
+        });
+    }
+
+    [Fact]
+    public async Task replica_trim_skips_partitions_until_catch_up_sync_completes()
+    {
+        await ClusterScenarioAsync(ctx =>
+        {
+            // The remote node owns every partition, then this node joins and takes over half of them.
+            const string queueName = "payments";
+            ctx.Local.State = NodeState.Draining;
+            ctx.Clustered.CreatePartitionedQueue(queueName, PartitionCount);
+            ctx.Assignment.GetAssignments(queueName).ShouldAllBe(a => a.PrimaryNodeId == ctx.Remotes[0].NodeId);
+
+            var gate = new TaskCompletionSource();
+            ctx.Replication.SyncGate = gate.Task;
+            ctx.Local.State = NodeState.Active;
+            ctx.Coordinator.Raise(ClusterMembershipChangeType.NodeJoined, ctx.Local);
+            var taken = ctx.Assignment.GetAssignments(queueName)
+                .Where(a => a.PrimaryNodeId == ctx.Local.NodeId)
+                .Select(a => a.PartitionKey)
+                .ToList();
+            taken.ShouldNotBeEmpty();
+
+            ctx.Clustered.StartCluster();
+            Thread.Sleep(300);
+            ctx.Replication.ListRequestsSnapshot().Select(r => r.QueueName).ShouldNotContain(q => taken.Contains(q));
+
+            gate.SetResult();
+            SpinWait.SpinUntil(() => taken.All(q => ctx.Replication.ListRequestsSnapshot().Any(r => r.QueueName == q)),
+                TimeSpan.FromSeconds(4)).ShouldBeTrue();
+            ctx.Clustered.Dispose();
+        }, configure: c => c.ReplicaTrimInterval = TimeSpan.FromMilliseconds(50));
+    }
+
+    [Fact]
+    public async Task replica_trim_is_disabled_with_zero_interval()
+    {
+        await ClusterScenarioAsync(ctx =>
+        {
+            ctx.Clustered.StartCluster();
+            Thread.Sleep(200);
+            ctx.Clustered.Dispose();
+
+            ctx.Replication.ListRequestsSnapshot().ShouldBeEmpty();
+        }, configure: c => c.ReplicaTrimInterval = TimeSpan.Zero);
+    }
+
+    [Fact]
+    public async Task replication_protocol_lists_and_trims_replica_messages()
+    {
+        await ReplicationScenarioAsync(async (store, primary, replicaEndpoint, token) =>
+        {
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(QueueName, 0);
+            var messages = Enumerable.Range(0, 3).Select(_ => NewMessage(partitionQueueName)).ToList();
+            store.StoreIncoming(messages);
+
+            var listed = await primary.ListReplicaMessageIdsAsync(replicaEndpoint, partitionQueueName,
+                DateTime.UtcNow.AddMinutes(1), afterMessageId: null, token);
+            listed.ShouldBe(messages.Select(m => m.Id), ignoreOrder: true);
+
+            // Messages inside the grace period are not listed
+            (await primary.ListReplicaMessageIdsAsync(replicaEndpoint, partitionQueueName,
+                DateTime.UtcNow.AddMinutes(-1), afterMessageId: null, token)).ShouldBeEmpty();
+
+            var unknown = MessageId.GenerateRandom();
+            (await primary.TrimReplicaAsync(replicaEndpoint, partitionQueueName, [messages[0].Id, unknown], token)).ShouldBeTrue();
+
+            store.PersistedIncoming(partitionQueueName).Select(m => m.Id)
+                .ShouldBe([messages[1].Id, messages[2].Id], ignoreOrder: true);
+        });
+    }
+
+    [Fact]
+    public async Task replication_protocol_pages_replica_message_ids()
+    {
+        await ReplicationScenarioAsync(async (store, primary, replicaEndpoint, token) =>
+        {
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(QueueName, 0);
+            var messages = Enumerable.Range(0, 40).Select(_ => NewMessage(partitionQueueName)).ToList();
+            store.StoreIncoming(messages);
+
+            var listed = new List<MessageId>();
+            var pageCount = 0;
+            MessageId? cursor = null;
+            while (true)
+            {
+                var page = await primary.ListReplicaMessageIdsAsync(replicaEndpoint, partitionQueueName, DateTime.MaxValue, cursor, token);
+                if (page.Count == 0) break;
+                pageCount++;
+                listed.AddRange(page);
+                cursor = page[^1];
+            }
+
+            pageCount.ShouldBeGreaterThan(1);
+            listed.ShouldBe(messages.Select(m => m.Id), ignoreOrder: true);
+        }, maxPayloadBytes: 2048);
+    }
+
+    [Fact]
+    public async Task replication_protocol_rejects_list_and_trim_outside_partition_queues()
+    {
+        await ReplicationScenarioAsync(async (store, primary, replicaEndpoint, token) =>
+        {
+            var message = NewMessage(QueueName);
+            store.StoreIncoming(message);
+
+            (await primary.ListReplicaMessageIdsAsync(replicaEndpoint, QueueName, DateTime.MaxValue, null, token)).ShouldBeEmpty();
+            (await primary.TrimReplicaAsync(replicaEndpoint, QueueName, [message.Id], token)).ShouldBeFalse();
+
+            store.PersistedIncoming(QueueName).ShouldHaveSingleItem().Id.ShouldBe(message.Id);
+        });
+    }
+
+    [Fact]
+    public async Task replication_protocol_list_throws_and_trim_fails_when_replica_is_unreachable()
+    {
+        await ReplicationScenarioAsync(async (_, primary, _, token) =>
+        {
+            var unreachable = new IPEndPoint(IPAddress.Loopback, GetFreePort());
+            var partitionQueueName = PartitionConstants.FormatPartitionQueueName(QueueName, 0);
+
+            await Should.ThrowAsync<ClusterReplicationException>(() =>
+                primary.ListReplicaMessageIdsAsync(unreachable, partitionQueueName, DateTime.MaxValue, null, token));
+            (await primary.TrimReplicaAsync(unreachable, partitionQueueName, [MessageId.GenerateRandom()], token)).ShouldBeFalse();
+        });
+    }
+
     private async Task ReplicationScenarioAsync(
         Func<LmdbMessageStore, TcpReplicationProtocol, IPEndPoint, CancellationToken, Task> scenario,
         int maxPayloadBytes = ClusterConfiguration.DefaultMaxPayloadBytes)
@@ -577,6 +739,10 @@ public class ClusteredPartitionedQueueDecoratorTests(ITestOutputHelper output) :
         public List<(IPEndPoint Endpoint, string QueueName, IReadOnlyList<Message> Messages, long Epoch)> Calls { get; } = [];
         public List<(IPEndPoint Endpoint, string QueueName, MessageId? AfterMessageId)> SyncRequests { get; } = [];
         public Func<string, MessageId?, IReadOnlyList<Message>>? SyncHandler { get; set; }
+        public Task? SyncGate { get; set; }
+        public Func<string, MessageId?, IReadOnlyList<MessageId>>? ReplicaIdsHandler { get; set; }
+        private readonly List<(IPEndPoint Endpoint, string QueueName, DateTime SentBefore, MessageId? AfterMessageId)> _listRequests = [];
+        private readonly List<(IPEndPoint Endpoint, string QueueName, IReadOnlyList<MessageId> MessageIds)> _trimRequests = [];
         public bool Acknowledge { get; set; } = true;
         public int ListenCalls { get; private set; }
         public Exception? ListenFailure { get; set; }
@@ -593,6 +759,8 @@ public class ClusteredPartitionedQueueDecoratorTests(ITestOutputHelper output) :
         {
             lock (SyncRequests)
                 SyncRequests.Add((sourceEndpoint, queueName, afterMessageId));
+            if (SyncGate != null)
+                return SyncGate.ContinueWith(_ => SyncHandler?.Invoke(queueName, afterMessageId) ?? [], TaskScheduler.Default);
             try
             {
                 return Task.FromResult(SyncHandler?.Invoke(queueName, afterMessageId) ?? []);
@@ -601,6 +769,34 @@ public class ClusteredPartitionedQueueDecoratorTests(ITestOutputHelper output) :
             {
                 return Task.FromException<IReadOnlyList<Message>>(ex);
             }
+        }
+
+        public Task<IReadOnlyList<MessageId>> ListReplicaMessageIdsAsync(IPEndPoint replicaEndpoint, string queueName,
+            DateTime sentBefore, MessageId? afterMessageId, CancellationToken cancellationToken = default)
+        {
+            lock (_listRequests)
+                _listRequests.Add((replicaEndpoint, queueName, sentBefore, afterMessageId));
+            return Task.FromResult(ReplicaIdsHandler?.Invoke(queueName, afterMessageId) ?? []);
+        }
+
+        public Task<bool> TrimReplicaAsync(IPEndPoint replicaEndpoint, string queueName, IReadOnlyList<MessageId> messageIds,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_trimRequests)
+                _trimRequests.Add((replicaEndpoint, queueName, messageIds));
+            return Task.FromResult(true);
+        }
+
+        public (IPEndPoint Endpoint, string QueueName, DateTime SentBefore, MessageId? AfterMessageId)[] ListRequestsSnapshot()
+        {
+            lock (_listRequests)
+                return [.. _listRequests];
+        }
+
+        public (IPEndPoint Endpoint, string QueueName, IReadOnlyList<MessageId> MessageIds)[] TrimRequestsSnapshot()
+        {
+            lock (_trimRequests)
+                return [.. _trimRequests];
         }
 
         public Task StartListeningAsync(CancellationToken cancellationToken = default)

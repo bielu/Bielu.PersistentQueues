@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -56,6 +57,9 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
     private readonly IContentSerializer _contentSerializer;
     private readonly CancellationTokenSource _cts = new();
     private readonly object _reconcileLock = new();
+    // Partitions this node took over as primary but has not finished syncing; their replica
+    // copies must not be trimmed, since the primary may still be missing messages.
+    private readonly ConcurrentDictionary<string, byte> _unsyncedPrimaryPartitions = new();
     private int _clusterStarted;
     private bool _disposed;
 
@@ -145,6 +149,9 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
         var joining = _coordinator.JoinAsync(_cts.Token);
         ThrowIfFaulted(joining);
         ObserveFaults(joining, "Cluster join");
+
+        if (_config.ReplicationFactor > 1 && _config.ReplicaTrimInterval > TimeSpan.Zero)
+            ObserveFaults(RunReplicaTrimLoopAsync(_cts.Token), "Replica trimming");
 
         _logger.LogInformation("Cluster started. Node {NodeId} listening on {Endpoint}",
             _coordinator.LocalNode.NodeId, _coordinator.LocalNode.QueueEndpoint);
@@ -581,7 +588,10 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
                 {
                     var source = FindActiveNode(before.Primary) ?? FindActiveNode(before.Replica, exclude: localNodeId);
                     if (source != null)
+                    {
+                        _unsyncedPrimaryPartitions[key] = 0;
                         _ = CatchUpSyncAsync(key, source);
+                    }
                 }
                 else if (current.Replica == localNodeId && before.Replica != localNodeId)
                 {
@@ -642,6 +652,9 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
 
             _logger.LogInformation("Synced {Count} messages for {Partition} from {SourceNode}",
                 synced, partitionQueueName, sourceNode.NodeId);
+
+            // On failure the partition stays unsynced, which keeps its replica copies from being trimmed.
+            _unsyncedPrimaryPartitions.TryRemove(partitionQueueName, out _);
         }
         catch (OperationCanceledException) when (_cts.IsCancellationRequested)
         {
@@ -649,7 +662,8 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Catch-up sync failed for {Partition}; the partition may be missing messages", partitionQueueName);
+            _logger.LogError(ex, "Catch-up sync failed for {Partition}; the partition may be missing messages " +
+                "and its replica is no longer trimmed", partitionQueueName);
         }
     }
 
@@ -671,6 +685,96 @@ public sealed class ClusteredPartitionedQueueDecorator : IPartitionedQueue, IAsy
                 await Task.Delay(delay, _cts.Token).ConfigureAwait(false);
             }
         }
+    }
+
+    // ---- Replica trimming ----
+
+    private async Task RunReplicaTrimLoopAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(_config.ReplicaTrimInterval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+                await TrimReplicasAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Shutting down
+        }
+    }
+
+    /// <summary>
+    /// Removes replica copies of messages that are no longer stored on this node, for every
+    /// partition this node owns as primary. A message leaves the primary when it is consumed
+    /// (or moved), so without this the replica would keep every message ever written.
+    /// </summary>
+    private async Task TrimReplicasAsync(CancellationToken cancellationToken)
+    {
+        var sentBefore = DateTime.UtcNow - _config.ReplicaTrimGracePeriod;
+        var localNodeId = _coordinator.LocalNode.NodeId;
+
+        foreach (var assignment in _innerPartitionedQueue.Queues.SelectMany(_assignment.GetAssignments).ToList())
+        {
+            if (assignment.PrimaryNodeId != localNodeId)
+                continue;
+
+            var replica = FindActiveNode(assignment.ReplicaNodeId, exclude: localNodeId);
+            if (replica == null)
+                continue;
+
+            try
+            {
+                await TrimReplicaAsync(assignment.PartitionKey, GetReplicationEndpoint(replica), sentBefore, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (ClusterReplicationException ex)
+            {
+                _logger.LogWarning(ex, "Trimming replica of {Partition} failed; retrying on the next cycle", assignment.PartitionKey);
+            }
+        }
+    }
+
+    private async Task TrimReplicaAsync(string partitionQueueName, IPEndPoint replicaEndpoint, DateTime sentBefore,
+        CancellationToken cancellationToken)
+    {
+        var trimmed = 0;
+        MessageId? cursor = null;
+
+        // Ownership can move while paging; only a fully synced primary knows which messages were consumed.
+        while (CanTrimReplicaOf(partitionQueueName))
+        {
+            var page = await _replication.ListReplicaMessageIdsAsync(replicaEndpoint, partitionQueueName, sentBefore, cursor,
+                cancellationToken).ConfigureAwait(false);
+            if (page.Count == 0)
+                break;
+
+            var consumed = page.Where(id => Store.GetMessage(partitionQueueName, id) == null).ToList();
+            if (consumed.Count > 0 && CanTrimReplicaOf(partitionQueueName))
+            {
+                if (!await _replication.TrimReplicaAsync(replicaEndpoint, partitionQueueName, consumed, cancellationToken)
+                        .ConfigureAwait(false))
+                {
+                    throw new ClusterReplicationException(partitionQueueName,
+                        $"Replica {replicaEndpoint} did not acknowledge trimming {partitionQueueName}.");
+                }
+
+                trimmed += consumed.Count;
+            }
+
+            cursor = page[^1];
+        }
+
+        if (trimmed > 0)
+            _logger.LogDebug("Trimmed {Count} consumed messages from the replica of {Partition}", trimmed, partitionQueueName);
+    }
+
+    private bool CanTrimReplicaOf(string partitionQueueName)
+    {
+        if (_unsyncedPrimaryPartitions.ContainsKey(partitionQueueName) ||
+            !PartitionConstants.TryParsePartitionQueueName(partitionQueueName, out var queueName, out var partition))
+            return false;
+
+        return _assignment.GetAssignment(queueName, partition)?.PrimaryNodeId == _coordinator.LocalNode.NodeId;
     }
 
     // ---- Disposal ----

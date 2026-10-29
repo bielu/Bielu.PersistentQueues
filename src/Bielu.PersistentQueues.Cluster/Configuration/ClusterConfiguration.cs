@@ -92,6 +92,22 @@ public sealed class ClusterConfiguration
     public IPAddress? AdvertisedAddress { get; set; }
 
     /// <summary>
+    /// Gets or sets how often a primary removes replica copies of messages it has already consumed.
+    /// Set to <see cref="TimeSpan.Zero"/> to disable trimming.
+    /// </summary>
+    public TimeSpan ReplicaTrimInterval { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Gets or sets the minimum age (by <see cref="Message.SentAt"/>) of a replica copy before it can be trimmed.
+    /// </summary>
+    /// <remarks>
+    /// A write forwarded by a non-primary node can reach the replica before the primary. The grace
+    /// period keeps such copies until the primary has stored them, so set it above the longest
+    /// expected forwarding delay.
+    /// </remarks>
+    public TimeSpan ReplicaTrimGracePeriod { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
     /// Validates the configuration.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when a setting is outside its supported range.</exception>
@@ -106,6 +122,10 @@ public sealed class ClusterConfiguration
             throw new ArgumentOutOfRangeException(nameof(DeathThreshold), DeathThreshold, "Death threshold must be positive.");
         if (MaxPayloadBytes <= 0)
             throw new ArgumentOutOfRangeException(nameof(MaxPayloadBytes), MaxPayloadBytes, "Maximum payload size must be positive.");
+        if (ReplicaTrimInterval < TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(ReplicaTrimInterval), ReplicaTrimInterval, "Replica trim interval must not be negative.");
+        if (ReplicaTrimGracePeriod < TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(ReplicaTrimGracePeriod), ReplicaTrimGracePeriod, "Replica trim grace period must not be negative.");
         if (AdvertisedAddress != null)
             ValidateAdvertisedAddress(AdvertisedAddress);
     }

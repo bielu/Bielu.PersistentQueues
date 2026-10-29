@@ -815,6 +815,7 @@ Resolve `IPartitionedQueue` to get the cluster-aware queue:
 - **Reads**: `ReceiveFromPartition(s)`, `GetActivePartitions` and `GetAvailablePartitions` only cover partitions this node owns as primary.
 - **Ownership**: partitions are assigned round-robin over the active nodes ordered by node id, so every node with the same membership view computes the same owners. When a node joins, leaves or dies, ownership is recomputed. A node that becomes primary copies the partition from the previous primary (or from the previous replica if the primary is gone), and a new replica copies it from the primary.
 - **Recovery**: nodes keep probing peers they consider dead and fall back to the seed nodes when they have no reachable peers, so a cluster heals after a network partition.
+- **Replica trimming**: every `ReplicaTrimInterval` (default 1 minute, `TimeSpan.Zero` disables it) a primary asks its replica for the messages it holds that are older than `ReplicaTrimGracePeriod` (default 5 minutes), and removes those it no longer stores itself because they were consumed or moved. The grace period covers writes that were forwarded to the primary but reached the replica first. A primary skips this while it is still copying a partition it took over, and stops trimming that partition if the copy fails.
 
 Ports: gossip listens on the queue port + `GossipPortOffset` (default `1`), and replication listens on the queue port + `GossipPortOffset` + 1. Both must be reachable between nodes.
 
@@ -824,10 +825,10 @@ Addresses: the listeners bind to the queue endpoint address, and peers are told 
 
 **Current limitations**
 
-- Replication copies enqueued messages only. Messages consumed on the primary are not removed from the replica, so after a failover or ownership change the new primary can redeliver messages that were already processed (at-least-once delivery). Consumers should be idempotent.
+- Replication copies enqueued messages only, and consumed messages are removed from the replica only on the next trim. After a failover or ownership change the new primary can redeliver messages consumed since the last trim, plus those consumed within the grace period (at-least-once delivery). Consumers should be idempotent.
 - There is no consensus protocol. Nodes with different membership views (for example while gossip converges) can briefly disagree on ownership. Assignment epochs are tracked per node and are not used to fence stale primaries.
 - An ownership change copies the whole partition from its source node. The copy is transferred in pages bounded by `MaxPayloadBytes` and retried with backoff. If it still fails, an error is logged and the partition is served without the missing messages.
-- Replica copies are never trimmed. A replica partition keeps every message ever replicated to it, so its storage grows without limit (for LMDB, until the map size is reached, after which writes and replica acknowledgments on that node fail). After a failover, the new primary redelivers the whole replicated history of the partition, not only unconsumed messages. Size storage accordingly and keep consumers idempotent.
+- A message delayed with `ReceiveLater` is out of the store while it waits, so it can be trimmed from the replica, and it is not replicated again when it returns. Copies left on a node that is no longer the primary or the replica of a partition are not trimmed.
 - `EnablePartitioning`, `DisablePartitioning` and `Repartition` only affect the local node and must be run on every node while the queue is quiesced.
 
 ---

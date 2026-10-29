@@ -170,3 +170,11 @@ static Bielu.PersistentQueues.Cluster.ClusterServiceCollectionExtensions.AddClus
 Bielu.PersistentQueues.Cluster.ClusterConfiguration.AdvertisedAddress.get -> System.Net.IPAddress?
 Bielu.PersistentQueues.Cluster.ClusterConfiguration.AdvertisedAddress.set -> void
 Bielu.PersistentQueues.Cluster.ClusterReplicationException.ClusterReplicationException(string! partitionKey, string! message, System.Exception? innerException) -> void
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.ReplicaTrimGracePeriod.get -> System.TimeSpan
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.ReplicaTrimGracePeriod.set -> void
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.ReplicaTrimInterval.get -> System.TimeSpan
+Bielu.PersistentQueues.Cluster.ClusterConfiguration.ReplicaTrimInterval.set -> void
+Bielu.PersistentQueues.Cluster.IReplicationProtocol.ListReplicaMessageIdsAsync(System.Net.IPEndPoint! replicaEndpoint, string! queueName, System.DateTime sentBefore, Bielu.PersistentQueues.MessageId? afterMessageId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.MessageId!>!>!
+Bielu.PersistentQueues.Cluster.IReplicationProtocol.TrimReplicaAsync(System.Net.IPEndPoint! replicaEndpoint, string! queueName, System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.MessageId!>! messageIds, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Bielu.PersistentQueues.Cluster.TcpReplicationProtocol.ListReplicaMessageIdsAsync(System.Net.IPEndPoint! replicaEndpoint, string! queueName, System.DateTime sentBefore, Bielu.PersistentQueues.MessageId? afterMessageId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.MessageId!>!>!
+Bielu.PersistentQueues.Cluster.TcpReplicationProtocol.TrimReplicaAsync(System.Net.IPEndPoint! replicaEndpoint, string! queueName, System.Collections.Generic.IReadOnlyList<Bielu.PersistentQueues.MessageId!>! messageIds, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!

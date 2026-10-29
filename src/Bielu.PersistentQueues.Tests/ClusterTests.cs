@@ -387,6 +387,18 @@ public class ClusterConfigurationTests
         config.NodeId.ShouldNotBe(Guid.Empty);
         config.SeedNodes.ShouldNotBeNull();
         config.SeedNodes.Count.ShouldBe(0);
+        config.ReplicaTrimInterval.ShouldBe(TimeSpan.FromMinutes(1));
+        config.ReplicaTrimGracePeriod.ShouldBe(TimeSpan.FromMinutes(5));
+    }
+
+    [Fact]
+    public void validate_rejects_negative_replica_trim_settings()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(new ClusterConfiguration { ReplicaTrimInterval = TimeSpan.FromSeconds(-1) }.Validate)
+            .ParamName.ShouldBe(nameof(ClusterConfiguration.ReplicaTrimInterval));
+        Should.Throw<ArgumentOutOfRangeException>(new ClusterConfiguration { ReplicaTrimGracePeriod = TimeSpan.FromSeconds(-1) }.Validate)
+            .ParamName.ShouldBe(nameof(ClusterConfiguration.ReplicaTrimGracePeriod));
+        Should.NotThrow(new ClusterConfiguration { ReplicaTrimInterval = TimeSpan.Zero, ReplicaTrimGracePeriod = TimeSpan.Zero }.Validate);
     }
 
     [Fact]
