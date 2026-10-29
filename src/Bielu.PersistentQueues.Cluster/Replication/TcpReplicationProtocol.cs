@@ -40,12 +40,16 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
 
     private readonly ILogger _logger;
     private readonly int _maxPayloadBytes;
+    private readonly ClusterAuthenticator _authenticator;
+    private readonly IPartitionAssignment? _assignment;
+    private readonly Guid _localNodeId;
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
     private bool _disposed;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="TcpReplicationProtocol"/> class.
+    /// Initializes a new instance of the <see cref="TcpReplicationProtocol"/> class that does not
+    /// authenticate peers.
     /// </summary>
     /// <param name="store">The local message store for persisting replicated messages.</param>
     /// <param name="replicationEndpoint">The local endpoint to listen on for replication.</param>
@@ -57,6 +61,34 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
     /// </remarks>
     public TcpReplicationProtocol(IMessageStore store, IPEndPoint replicationEndpoint, ILogger<TcpReplicationProtocol> logger,
         int maxPayloadBytes = ClusterConfiguration.DefaultMaxPayloadBytes)
+        : this(store, replicationEndpoint, logger, maxPayloadBytes, ClusterAuthenticator.None, assignment: null, localNodeId: Guid.Empty)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TcpReplicationProtocol"/> class that signs its
+    /// traffic with <see cref="ClusterConfiguration.SharedSecret"/> (when set) and fences trims.
+    /// </summary>
+    /// <param name="store">The local message store for persisting replicated messages.</param>
+    /// <param name="replicationEndpoint">The local endpoint to listen on for replication.</param>
+    /// <param name="config">The cluster configuration, which supplies the node ID, payload limit and shared secret.</param>
+    /// <param name="assignment">
+    /// This node's view of partition ownership. A trim is only accepted from the node it lists as
+    /// the partition's primary, and only when this node is the replica.
+    /// </param>
+    /// <param name="logger">The logger instance.</param>
+    public TcpReplicationProtocol(IMessageStore store, IPEndPoint replicationEndpoint, ClusterConfiguration config,
+        IPartitionAssignment assignment, ILogger<TcpReplicationProtocol> logger)
+        : this(store, replicationEndpoint, logger,
+            (config ?? throw new ArgumentNullException(nameof(config))).MaxPayloadBytes,
+            new ClusterAuthenticator(config.SharedSecret),
+            assignment ?? throw new ArgumentNullException(nameof(assignment)),
+            config.NodeId)
+    {
+    }
+
+    private TcpReplicationProtocol(IMessageStore store, IPEndPoint replicationEndpoint, ILogger<TcpReplicationProtocol> logger,
+        int maxPayloadBytes, ClusterAuthenticator authenticator, IPartitionAssignment? assignment, Guid localNodeId)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _replicationEndpoint = replicationEndpoint ?? throw new ArgumentNullException(nameof(replicationEndpoint));
@@ -64,6 +96,9 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
         if (maxPayloadBytes <= 0)
             throw new ArgumentOutOfRangeException(nameof(maxPayloadBytes), maxPayloadBytes, "Maximum payload size must be positive.");
         _maxPayloadBytes = maxPayloadBytes;
+        _authenticator = authenticator;
+        _assignment = assignment;
+        _localNodeId = localNodeId;
     }
 
     /// <inheritdoc />
@@ -210,7 +245,7 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
         }
     }
 
-    private static async Task<bool> RequestAckAsync(IPEndPoint endpoint, ReplicationRequest request, CancellationToken cancellationToken)
+    private async Task<bool> RequestAckAsync(IPEndPoint endpoint, ReplicationRequest request, CancellationToken cancellationToken)
     {
         using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -233,17 +268,18 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
         await using var stream = await SendRequestAsync(socket, endpoint, request, timeoutCts.Token).ConfigureAwait(false);
 
         var responseBuffer = await ReadFrameAsync(stream, timeoutCts.Token).ConfigureAwait(false);
-        return JsonSerializer.Deserialize<TResponse>(responseBuffer);
+        return JsonSerializer.Deserialize<TResponse>(_authenticator.Open(ClusterChannel.ReplicationResponse, responseBuffer).Span);
     }
 
-    private static async Task<NetworkStream> SendRequestAsync(Socket socket, IPEndPoint endpoint, ReplicationRequest request,
+    private async Task<NetworkStream> SendRequestAsync(Socket socket, IPEndPoint endpoint, ReplicationRequest request,
         CancellationToken cancellationToken)
     {
         socket.NoDelay = true;
         await socket.ConnectAsync(endpoint, cancellationToken).ConfigureAwait(false);
         var stream = new NetworkStream(socket, ownsSocket: false);
 
-        var requestBytes = JsonSerializer.SerializeToUtf8Bytes(request);
+        request.SenderNodeId = _localNodeId;
+        var requestBytes = _authenticator.Seal(ClusterChannel.ReplicationRequest, JsonSerializer.SerializeToUtf8Bytes(request));
         await stream.WriteAsync(BitConverter.GetBytes(requestBytes.Length), cancellationToken).ConfigureAwait(false);
         await stream.WriteAsync(requestBytes, cancellationToken).ConfigureAwait(false);
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
@@ -291,7 +327,8 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
             await using var stream = new NetworkStream(socket, ownsSocket: true);
 
             var requestBuffer = await ReadFrameAsync(stream, token).ConfigureAwait(false);
-            var request = JsonSerializer.Deserialize<ReplicationRequest>(requestBuffer);
+            var request = JsonSerializer.Deserialize<ReplicationRequest>(
+                _authenticator.Open(ClusterChannel.ReplicationRequest, requestBuffer).Span);
 
             if (request == null) return;
 
@@ -427,7 +464,18 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
         try
         {
             // Trimming is limited to partition sub-queues, like every other replication request.
-            if (request.QueueName is { } queueName && IsPartitionQueue(queueName) && request.MessageIds != null)
+            if (request.QueueName is not { } queueName || !IsPartitionQueue(queueName) || request.MessageIds == null)
+            {
+                _logger.LogWarning("Rejected trim request for non-partition queue {QueueName}", request.QueueName);
+            }
+            else if (!IsTrimFromCurrentPrimary(queueName, request.SenderNodeId))
+            {
+                // Trimming deletes data, so only the primary in this node's own view may do it: a
+                // stale primary, or a node whose view has not converged yet, is refused and retries later.
+                _logger.LogWarning("Rejected trim of {QueueName} from node {SenderNodeId}, which is not its primary for this replica",
+                    queueName, request.SenderNodeId);
+            }
+            else
             {
                 var held = request.MessageIds
                     .Select(id => _store.GetMessage(queueName, FromWireMessageId(id)))
@@ -439,10 +487,6 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
                 _logger.LogDebug("Trimmed {Count} replica messages from {QueueName}", held.Count, queueName);
                 ack = 1;
             }
-            else
-            {
-                _logger.LogWarning("Rejected trim request for non-partition queue {QueueName}", request.QueueName);
-            }
         }
         catch (Exception ex)
         {
@@ -450,6 +494,19 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
         }
 
         await stream.WriteAsync(new[] { ack }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private bool IsTrimFromCurrentPrimary(string partitionQueueName, Guid senderNodeId)
+    {
+        // Without an ownership view (the unauthenticated constructor) trims are not fenced.
+        if (_assignment == null)
+            return true;
+
+        if (!PartitionConstants.TryParsePartitionQueueName(partitionQueueName, out var queueName, out var partition))
+            return false;
+
+        var current = _assignment.GetAssignment(queueName, partition);
+        return current != null && current.PrimaryNodeId == senderNodeId && current.ReplicaNodeId == _localNodeId;
     }
 
     private static MessageId? ReadCursor(ReplicationRequest request) =>
@@ -461,9 +518,9 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
             }
             : null;
 
-    private static async Task WriteFrameAsync<T>(NetworkStream stream, T response, CancellationToken cancellationToken)
+    private async Task WriteFrameAsync<T>(NetworkStream stream, T response, CancellationToken cancellationToken)
     {
-        var responseBytes = JsonSerializer.SerializeToUtf8Bytes(response);
+        var responseBytes = _authenticator.Seal(ClusterChannel.ReplicationResponse, JsonSerializer.SerializeToUtf8Bytes(response));
         await stream.WriteAsync(BitConverter.GetBytes(responseBytes.Length), cancellationToken).ConfigureAwait(false);
         await stream.WriteAsync(responseBytes, cancellationToken).ConfigureAwait(false);
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
@@ -505,8 +562,10 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
         await stream.ReadExactlyAsync(lengthBuffer, cancellationToken).ConfigureAwait(false);
         var length = BitConverter.ToInt32(lengthBuffer);
 
-        if (length <= 0 || length > _maxPayloadBytes)
-            throw new InvalidDataException($"Replication frame length {length} is outside the allowed range 1..{_maxPayloadBytes}.");
+        // A signed frame carries the timestamp and MAC on top of the payload.
+        var maxFrameBytes = _maxPayloadBytes + (_authenticator.Enabled ? ClusterAuthenticator.TrailerSize : 0);
+        if (length <= 0 || length > maxFrameBytes)
+            throw new InvalidDataException($"Replication frame length {length} is outside the allowed range 1..{maxFrameBytes}.");
 
         var buffer = new byte[length];
         await stream.ReadExactlyAsync(buffer, cancellationToken).ConfigureAwait(false);
@@ -598,6 +657,7 @@ public sealed class TcpReplicationProtocol : IReplicationProtocol
         public Guid? AfterMessageIdentifier { get; set; }
         public DateTime? SentBefore { get; set; }
         public List<WireMessageId>? MessageIds { get; set; }
+        public Guid SenderNodeId { get; set; }
     }
 
     private sealed class WireMessageId

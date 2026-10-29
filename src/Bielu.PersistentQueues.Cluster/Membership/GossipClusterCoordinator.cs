@@ -39,6 +39,7 @@ public sealed class GossipClusterCoordinator : IClusterCoordinator
     private readonly ILogger _logger;
     private readonly ConcurrentDictionary<Guid, NodeInfo> _members = new();
     private readonly IPEndPoint _gossipBindEndpoint;
+    private readonly ClusterAuthenticator _authenticator;
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
     private Task? _heartbeatTask;
@@ -67,6 +68,7 @@ public sealed class GossipClusterCoordinator : IClusterCoordinator
         var gossipPort = queueEndpoint.Port + config.GossipPortOffset;
         var advertisedAddress = config.ResolveAdvertisedAddress(queueEndpoint.Address);
         _gossipBindEndpoint = new IPEndPoint(queueEndpoint.Address, gossipPort);
+        _authenticator = new ClusterAuthenticator(config.SharedSecret);
 
         LocalNode = new NodeInfo
         {
@@ -191,7 +193,8 @@ public sealed class GossipClusterCoordinator : IClusterCoordinator
                 buffer.Write(chunk, 0, read);
             }
 
-            var gossipData = JsonSerializer.Deserialize<GossipMessage>(buffer.GetBuffer().AsSpan(0, (int)buffer.Length));
+            var payload = _authenticator.Open(ClusterChannel.Gossip, buffer.GetBuffer().AsMemory(0, (int)buffer.Length));
+            var gossipData = JsonSerializer.Deserialize<GossipMessage>(payload.Span);
 
             if (gossipData?.Members != null)
             {
@@ -242,7 +245,7 @@ public sealed class GossipClusterCoordinator : IClusterCoordinator
         };
 
         var json = JsonSerializer.Serialize(gossipMessage);
-        var bytes = Encoding.UTF8.GetBytes(json);
+        var bytes = _authenticator.Seal(ClusterChannel.Gossip, Encoding.UTF8.GetBytes(json));
         await stream.WriteAsync(bytes, timeoutCts.Token).ConfigureAwait(false);
     }
 
